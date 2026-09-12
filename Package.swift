@@ -10,6 +10,12 @@ let package = Package(
             name: "CableKit",
             path: "Sources/CableKit"
         ),
+        // CLI：开发期验证数据边界 + 用户可用的命令行工具
+        .executableTarget(
+            name: "CableScopeCLI",
+            dependencies: ["CableKit"],
+            path: "Sources/CableScopeCLI"
+        ),
         .testTarget(
             name: "CableKitTests",
             dependencies: ["CableKit"],
