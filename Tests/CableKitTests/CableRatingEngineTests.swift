@@ -53,6 +53,53 @@ final class CableRatingEngineTests: XCTestCase {
         XCTAssertTrue(rating.summary.contains("未观测到高速 USB 协商"))
     }
 
+    /// 多端口聚合：各 LocationID 独立评级，overall 取跨端口峰值
+    func testMultiLocationAggregation() {
+        var engine = CableRatingEngine()
+        let usbA = USBDeviceSnapshot(registryID: 1, locationID: 0x14100000, productName: "A",
+                                     vendorName: nil, vendorID: nil, productID: nil, serialNumber: nil,
+                                     bcdUSB: nil, speed: USBSpeed(bitsPerSecond: 480_000_000))
+        let usbB = USBDeviceSnapshot(registryID: 2, locationID: 0x14200000, productName: "B",
+                                     vendorName: nil, vendorID: nil, productID: nil, serialNumber: nil,
+                                     bcdUSB: nil, speed: USBSpeed(bitsPerSecond: 40_000_000_000))
+
+        engine.record(CableSnapshot(usbDevices: [usbA], power: nil, displays: [], thunderboltDevices: []))
+        engine.record(CableSnapshot(usbDevices: [usbB], power: nil, displays: [], thunderboltDevices: []))
+
+        XCTAssertEqual(engine.rating(forLocationID: 0x14100000)?.maxUSBBitsPerSecond, 480_000_000)
+        XCTAssertEqual(engine.rating(forLocationID: 0x14200000)?.maxUSBBitsPerSecond, 40_000_000_000)
+        XCTAssertNil(engine.rating(forLocationID: 0x99900000), "未知端口无评级")
+        XCTAssertEqual(engine.overallRating().maxUSBBitsPerSecond, 40_000_000_000, "overall 取跨端口峰值")
+        XCTAssertEqual(engine.overallRating().sampleCount, 2)
+    }
+
+    /// 显示器信息参与评级：链路速率与刷新率取历史峰值
+    func testDisplayInfoAggregatedIntoRating() {
+        var engine = CableRatingEngine()
+        let display60 = DisplaySnapshot(displayID: 1, name: nil, pixelWidth: 3840, pixelHeight: 2160,
+                                        refreshRateHz: 60, linkRateLabel: "HBR3", isMain: true)
+        let display120 = DisplaySnapshot(displayID: 1, name: nil, pixelWidth: 3840, pixelHeight: 2160,
+                                         refreshRateHz: 120, linkRateLabel: "HBR3", isMain: true)
+        engine.record(CableSnapshot(usbDevices: [], power: nil, displays: [display60], thunderboltDevices: []))
+        engine.record(CableSnapshot(usbDevices: [], power: nil, displays: [display120], thunderboltDevices: []))
+
+        let rating = engine.overallRating()
+        XCTAssertEqual(rating.maxRefreshRateHz ?? 0, 120, accuracy: 0.01)
+        XCTAssertEqual(rating.maxDisplayLinkRate, "HBR3")
+        XCTAssertTrue(rating.summary.contains("HBR3"))
+        XCTAssertTrue(rating.summary.contains("120Hz"))
+    }
+
+    /// 空引擎：无任何观测时不得产生误导性的 0 值
+    func testEmptyEngineProducesNilRating() {
+        let engine = CableRatingEngine()
+        let rating = engine.overallRating()
+        XCTAssertNil(rating.maxUSBBitsPerSecond)
+        XCTAssertNil(rating.maxChargingWatts)
+        XCTAssertEqual(rating.sampleCount, 0)
+        XCTAssertTrue(rating.summary.contains("未观测到高速 USB 协商"))
+    }
+
     func testPersistenceRoundTrip() throws {
         var engine = CableRatingEngine()
         let device = USBDeviceSnapshot(registryID: 1, locationID: 0x14200000, productName: "Disk",

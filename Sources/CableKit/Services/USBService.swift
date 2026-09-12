@@ -58,6 +58,13 @@ public final class USBService: USBServiceProtocol {
         var registryID: UInt64 = 0
         IORegistryEntryGetRegistryEntryID(entry, &registryID)
 
+        return USBDeviceParsing.parse(properties: properties, registryID: registryID)
+    }
+}
+
+/// IORegistry 属性字典 → USBDeviceSnapshot 的纯解析逻辑（internal 便于单测，无 IOKit 依赖）。
+enum USBDeviceParsing {
+    static func parse(properties: [String: Any], registryID: UInt64) -> USBDeviceSnapshot {
         let speedInt = int64Value(forKey: "Speed", in: properties)
         let locationID = uint32Value(forKey: "LocationID", in: properties) ?? 0
 
@@ -77,12 +84,12 @@ public final class USBService: USBServiceProtocol {
 
     // MARK: - CF/Any 取值辅助
 
-    private static func stringValue(forKey key: String, in dict: [String: Any]) -> String? {
+    static func stringValue(forKey key: String, in dict: [String: Any]) -> String? {
         guard let raw = dict[key] else { return nil }
         return raw as? String
     }
 
-    private static func int64Value(forKey key: String, in dict: [String: Any]) -> Int64? {
+    static func int64Value(forKey key: String, in dict: [String: Any]) -> Int64? {
         guard let raw = dict[key] else { return nil }
         switch raw {
         case let n as Int: return Int64(n)
@@ -94,18 +101,18 @@ public final class USBService: USBServiceProtocol {
         }
     }
 
-    private static func uint32Value(forKey key: String, in dict: [String: Any]) -> UInt32? {
+    static func uint32Value(forKey key: String, in dict: [String: Any]) -> UInt32? {
         guard let value = int64Value(forKey: key, in: dict), value >= 0, value <= UInt32.max else { return nil }
         return UInt32(value)
     }
 
-    private static func uint16Value(forKey key: String, in dict: [String: Any]) -> UInt16? {
+    static func uint16Value(forKey key: String, in dict: [String: Any]) -> UInt16? {
         guard let value = int64Value(forKey: key, in: dict), value >= 0, value <= UInt16.max else { return nil }
         return UInt16(value)
     }
 
     /// bcdUSB：兼容字符串（"0210"）与数字（512 = 0x0210）两种编码方式。
-    private static func bcdUSBString(in dict: [String: Any]) -> String? {
+    static func bcdUSBString(in dict: [String: Any]) -> String? {
         if let s = stringValue(forKey: "bcdUSB", in: dict) { return s }
         guard let n = int64Value(forKey: "bcdUSB", in: dict) else { return nil }
         return String(format: "%04x", n & 0xFFFF)

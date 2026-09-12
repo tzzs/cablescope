@@ -75,61 +75,13 @@ public final class DisplayService: DisplayServiceProtocol {
         return profilerName
     }
 
-    // MARK: - system_profiler 补充信息（名称回退 + link rate）
-
-    private struct ProfilerDisplayInfo {
-        var name: String?
-        var linkRate: String?
-    }
-
-    /// 解析 `system_profiler SPDisplaysDataType -json`，按 displayID 注册显示器补充信息。
     private static func systemProfilerDisplayInfo() -> [CGDirectDisplayID: ProfilerDisplayInfo] {
         guard let output = runProcess("/usr/sbin/system_profiler", arguments: ["SPDisplaysDataType", "-json"]),
               let data = output.data(using: .utf8),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let gpus = root["SPDisplaysDataType"] as? [[String: Any]] else {
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return [:]
         }
-
-        var result: [CGDirectDisplayID: ProfilerDisplayInfo] = [:]
-        for gpu in gpus {
-            guard let ndrvs = gpu["spdisplays_ndrvs"] as? [[String: Any]] else { continue }
-            for ndrv in ndrvs {
-                let info = ProfilerDisplayInfo(
-                    name: ndrv["_name"] as? String,
-                    linkRate: linkRateLabel(from: ndrv)
-                )
-                guard let idString = ndrv["_spdisplays_displayID"] as? String else { continue }
-                register(idString: idString, info: info, into: &result)
-            }
-        }
-        return result
-    }
-
-    /// 在单个显示器（ndrv）条目里查找键名含 "link" 的稳定字符串字段。
-    /// 内置显示器没有该字段 → nil；不猜具体键名，也不对未知值做映射加工。
-    private static func linkRateLabel(from ndrv: [String: Any]) -> String? {
-        for (key, value) in ndrv {
-            let lowered = key.lowercased()
-            guard lowered.contains("link"), !lowered.contains("displayid") else { continue }
-            if let s = value as? String, !s.isEmpty {
-                // 去掉 "spdisplays_" 前缀（如 "spdisplays_hbr3" → "hbr3"），保留系统原值语义。
-                return s.hasPrefix("spdisplays_") ? String(s.dropFirst("spdisplays_".count)) : s
-            }
-        }
-        return nil
-    }
-
-    /// displayID 字符串同时按 hex 与 decimal 解释注册（system_profiler 的进制未在文档中稳定约定）。
-    private static func register(idString: String, info: ProfilerDisplayInfo,
-                                 into dict: inout [CGDirectDisplayID: ProfilerDisplayInfo]) {
-        let trimmed = idString.trimmingCharacters(in: .whitespaces)
-        if let hex = UInt32(trimmed, radix: 16) {
-            dict[hex] = info
-        }
-        if let dec = UInt32(trimmed, radix: 10) {
-            dict[dec] = info
-        }
+        return DisplayProfilerParsing.parse(root: root)
     }
 
     // MARK: - Process 辅助
@@ -150,5 +102,58 @@ public final class DisplayService: DisplayServiceProtocol {
         process.waitUntilExit()
         guard process.terminationStatus == 0 else { return nil }
         return String(data: data, encoding: .utf8)
+    }
+}
+
+/// system_profiler SPDisplaysDataType JSON 解析的补充信息（internal 便于单测）。
+struct ProfilerDisplayInfo: Equatable {
+    var name: String?
+    var linkRate: String?
+}
+
+/// SPDisplaysDataType JSON 根字典 → displayID 补充信息映射的纯解析逻辑。
+enum DisplayProfilerParsing {
+    static func parse(root: [String: Any]) -> [CGDirectDisplayID: ProfilerDisplayInfo] {
+        guard let gpus = root["SPDisplaysDataType"] as? [[String: Any]] else { return [:] }
+
+        var result: [CGDirectDisplayID: ProfilerDisplayInfo] = [:]
+        for gpu in gpus {
+            guard let ndrvs = gpu["spdisplays_ndrvs"] as? [[String: Any]] else { continue }
+            for ndrv in ndrvs {
+                let info = ProfilerDisplayInfo(
+                    name: ndrv["_name"] as? String,
+                    linkRate: linkRateLabel(from: ndrv)
+                )
+                guard let idString = ndrv["_spdisplays_displayID"] as? String else { continue }
+                register(idString: idString, info: info, into: &result)
+            }
+        }
+        return result
+    }
+
+    /// 在单个显示器（ndrv）条目里查找键名含 "link" 的稳定字符串字段。
+    /// 内置显示器没有该字段 → nil；不猜具体键名，也不对未知值做映射加工。
+    static func linkRateLabel(from ndrv: [String: Any]) -> String? {
+        for (key, value) in ndrv {
+            let lowered = key.lowercased()
+            guard lowered.contains("link"), !lowered.contains("displayid") else { continue }
+            if let s = value as? String, !s.isEmpty {
+                // 去掉 "spdisplays_" 前缀（如 "spdisplays_hbr3" → "hbr3"），保留系统原值语义。
+                return s.hasPrefix("spdisplays_") ? String(s.dropFirst("spdisplays_".count)) : s
+            }
+        }
+        return nil
+    }
+
+    /// displayID 字符串同时按 hex 与 decimal 解释注册（system_profiler 的进制未在文档中稳定约定）。
+    static func register(idString: String, info: ProfilerDisplayInfo,
+                         into dict: inout [CGDirectDisplayID: ProfilerDisplayInfo]) {
+        let trimmed = idString.trimmingCharacters(in: .whitespaces)
+        if let hex = UInt32(trimmed, radix: 16) {
+            dict[hex] = info
+        }
+        if let dec = UInt32(trimmed, radix: 10) {
+            dict[dec] = info
+        }
     }
 }

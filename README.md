@@ -53,7 +53,9 @@ Sources/
 │   └── Rating/        #   CableRatingEngine：历史峰值 → 线缆评级（纯 Swift，可单测）
 ├── CableScopeCLI/     # 命令行工具
 └── CableScopeApp/     # SwiftUI 菜单栏 App（MenuBarExtra + 主窗口 + Swift Charts 功率曲线）
-Tests/CableKitTests/   # 14 个单元/冒烟测试
+Tests/
+├── CableKitTests/       # 39 个测试：数据契约、评级引擎、四个解析器（真机样例回归）+ 真实环境冒烟
+└── CableScopeCLITests/  # 34 个测试：参数解析、格式化、watch 快照差异计算
 Docs/                  # 产品定位与命名 / 技术架构 / 数据获取指南
 scripts/bundle_app.sh  # .app 打包脚本
 ```
@@ -67,7 +69,7 @@ scripts/bundle_app.sh  # .app 打包脚本
 
 ## 开发状态
 
-- [x] CableKit 适配层（USB/电源/显示器/雷电 + 快照流 + 评级引擎）— 14/14 测试通过
+- [x] CableKit 适配层（USB/电源/显示器/雷电 + 快照流 + 评级引擎）— 73/73 测试通过（含 CLI 测试 target）
 - [x] CLI 四个子命令（真机验证：PD 合同识别、e-marker 推断、评级持久化）
 - [x] macOS 菜单栏 App（功率大字、USB/显示器面板、实时功率曲线、线缆能力卡）
 - [ ] 插拔系统通知（UNUserNotificationCenter）

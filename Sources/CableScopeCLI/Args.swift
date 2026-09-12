@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - 子命令解析（手动解析，无第三方依赖）
 
-enum ParsedCommand {
+enum ParsedCommand: Equatable {
     case snapshot(pretty: Bool)
     case pretty
     case watch(interval: Double)

@@ -57,6 +57,26 @@ public struct USBDeviceSnapshot: Codable, Hashable, Sendable, Identifiable {
     /// 协商速率
     public let speed: USBSpeed?
 
+    public init(registryID: UInt64,
+                locationID: UInt32,
+                productName: String?,
+                vendorName: String?,
+                vendorID: UInt16?,
+                productID: UInt16?,
+                serialNumber: String?,
+                bcdUSB: String?,
+                speed: USBSpeed?) {
+        self.registryID = registryID
+        self.locationID = locationID
+        self.productName = productName
+        self.vendorName = vendorName
+        self.vendorID = vendorID
+        self.productID = productID
+        self.serialNumber = serialNumber
+        self.bcdUSB = bcdUSB
+        self.speed = speed
+    }
+
     public var id: UInt64 { registryID }
 }
 
@@ -131,6 +151,22 @@ public struct DisplaySnapshot: Codable, Hashable, Sendable, Identifiable {
     public let linkRateLabel: String?
     public let isMain: Bool
 
+    public init(displayID: UInt32,
+                name: String?,
+                pixelWidth: Int,
+                pixelHeight: Int,
+                refreshRateHz: Double?,
+                linkRateLabel: String?,
+                isMain: Bool) {
+        self.displayID = displayID
+        self.name = name
+        self.pixelWidth = pixelWidth
+        self.pixelHeight = pixelHeight
+        self.refreshRateHz = refreshRateHz
+        self.linkRateLabel = linkRateLabel
+        self.isMain = isMain
+    }
+
     public var id: UInt32 { displayID }
     public var resolutionLabel: String { "\(pixelWidth)×\(pixelHeight)" }
 }
@@ -142,6 +178,13 @@ public struct ThunderboltDeviceSnapshot: Codable, Hashable, Sendable, Identifiab
     /// 链路速度标签，如 "Up to 40Gb/s"
     public let linkSpeedLabel: String?
     public let deviceType: String?
+
+    public init(name: String, vendorName: String?, linkSpeedLabel: String?, deviceType: String?) {
+        self.name = name
+        self.vendorName = vendorName
+        self.linkSpeedLabel = linkSpeedLabel
+        self.deviceType = deviceType
+    }
 
     public var id: String { name + (vendorName ?? "") }
 }

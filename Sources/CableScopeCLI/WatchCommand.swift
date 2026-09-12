@@ -95,7 +95,8 @@ private final class SignalTaskBox: @unchecked Sendable {
 
 // MARK: - 快照差异
 
-private enum SnapshotDiff {
+/// 快照差异计算（internal 便于单测；纯函数，无 IO 依赖）
+enum SnapshotDiff {
     /// 两次快照之间的变化点；无变化返回空数组
     static func changes(from old: CableSnapshot, to new: CableSnapshot) -> [String] {
         var out: [String] = []

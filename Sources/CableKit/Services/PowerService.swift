@@ -26,7 +26,7 @@ public final class PowerService: PowerServiceProtocol {
     private static func readPowerSnapshot() -> PowerSnapshot? {
         guard let battery = readSmartBattery() else {
             // 主路径失败（如未来设备改名）时退回 IOPS 电量信息，尽力给出最小快照。
-            return readFallbackFromIOPS()
+            return PowerParsing.fallbackFromIOPS()
         }
         return battery
     }
@@ -44,6 +44,13 @@ public final class PowerService: PowerServiceProtocol {
         guard kr == KERN_SUCCESS, let ref = propertiesRef else { return nil }
         let props = ref.takeUnretainedValue() as? [String: Any] ?? [:]
 
+        return PowerParsing.parse(props: props)
+    }
+}
+
+/// IORegistry 属性字典 → PowerSnapshot 的纯解析逻辑（internal 便于单测，无 IOKit 依赖）。
+enum PowerParsing {
+    static func parse(props: [String: Any]) -> PowerSnapshot {
         let externalConnected = boolValue(forKey: "ExternalConnected", in: props) ?? false
         let isCharging = boolValue(forKey: "IsCharging", in: props) ?? false
 
@@ -85,7 +92,7 @@ public final class PowerService: PowerServiceProtocol {
     }
 
     /// 电量：优先 AppleSmartBattery 的 CurrentCapacity/MaxCapacity；异常时退回 IOPS。
-    private static func batteryPercent(from props: [String: Any]) -> Double? {
+    static func batteryPercent(from props: [String: Any]) -> Double? {
         if let current = intValue(forKey: "CurrentCapacity", in: props),
            let maxCapacity = intValue(forKey: "MaxCapacity", in: props), maxCapacity > 0 {
             let percent = Double(current) / Double(maxCapacity) * 100
@@ -96,7 +103,8 @@ public final class PowerService: PowerServiceProtocol {
 
     // MARK: - IOPS 备用来源
 
-    private static func readFallbackFromIOPS() -> PowerSnapshot? {
+    /// AppleSmartBattery 不可用时的最小快照（仅电量）。
+    static func fallbackFromIOPS() -> PowerSnapshot? {
         guard let percent = iopsBatteryPercent() else { return nil }
         return PowerSnapshot(isCharging: false,
                              batteryPercent: percent,
