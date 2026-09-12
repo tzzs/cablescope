@@ -16,6 +16,15 @@ let package = Package(
             dependencies: ["CableKit"],
             path: "Sources/CableScopeCLI"
         ),
+        // macOS 菜单栏 App（SwiftUI）
+        .executableTarget(
+            name: "CableScopeApp",
+            dependencies: ["CableKit"],
+            path: "Sources/CableScopeApp",
+            resources: [
+                .process("Resources")
+            ]
+        ),
         .testTarget(
             name: "CableKitTests",
             dependencies: ["CableKit"],
