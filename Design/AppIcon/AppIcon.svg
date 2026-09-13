@@ -43,8 +43,12 @@
   <!-- FOREGROUND LAYER — flat vector mark: rating-gauge arc + USB-C port at its pivot.
        Glass (specular / translucency / shadow) is added by Icon Composer, not baked in. -->
   <g id="foreground">
-    <!-- Rating-gauge arc: 220° open sweep, pivot at the port's center (512, 619.5) -->
-    <path d="M 230.1 516.9 A 300 300 0 0 1 793.9 516.9"
+    <!-- Rating-gauge arc: 140° sweep (radius 300, pivot at the port's center 512,619.5),
+         hand-written as two cubic Béziers instead of an SVG arc ("A") command — Icon
+         Composer's SVG importer does not resolve elliptical arcs and silently flattens
+         them into a straight chord between the endpoints. -->
+    <path d="M 230.1 516.9 C 273.23 398.39, 385.88 319.5, 512 319.5
+             C 638.12 319.5, 750.77 398.39, 793.9 516.9"
           fill="none" stroke="url(#arc-gradient)"
           stroke-width="48" stroke-linecap="round"/>
     <!-- USB-C port, sitting at the arc's pivot -->

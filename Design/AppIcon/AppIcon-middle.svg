@@ -1,0 +1,14 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <title>CableScope — middle layer</title>
+  <desc>Optional. Drag into Icon Composer as a middle layer group for extra parallax depth; the icon reads fine without it.</desc>
+  <defs>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#52CBFF" stop-opacity="0.42"/>
+      <stop offset="0.6" stop-color="#52CBFF" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#52CBFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g id="middle">
+    <circle cx="512" cy="619.5" r="340" fill="url(#halo)"/>
+  </g>
+</svg>
