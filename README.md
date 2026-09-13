@@ -1,6 +1,6 @@
 # CableScope
 
-![Swift 5.10+](https://img.shields.io/badge/Swift-5.10%2B-orange) ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-lightgrey) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow) [![CI](https://github.com/OWNER/cablescope/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/cablescope/actions/workflows/ci.yml)
+![Swift 5.10+](https://img.shields.io/badge/Swift-5.10%2B-orange) ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-lightgrey) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow) [![CI](https://github.com/tzzs/cablescope/actions/workflows/ci.yml/badge.svg)](https://github.com/tzzs/cablescope/actions/workflows/ci.yml)
 
 macOS menu bar tool that inspects connected cables (USB-C / Thunderbolt) for **charging speed, data transfer speed, video capabilities**, and a **cable rating**.
 
@@ -73,7 +73,7 @@ Sources/
 Tests/
 ├── CableKitTests/       # 70 tests: data contracts, per-port rating engine + migration, grouping, four parsers (real-device samples) + live smoke tests
 └── CableScopeCLITests/  # 34 tests: argument parsing, formatting, watch snapshot diffing
-Docs/                  # Product positioning & naming / technical architecture / data-source guide
+Docs/                  # Data-source guide (IOKit) & optimization roadmap
 scripts/bundle_app.sh  # .app bundling script
 ```
 

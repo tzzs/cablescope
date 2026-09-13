@@ -109,7 +109,7 @@ struct MenuBarPanelView: View {
                 openWindow(id: "registry")
                 NSApplication.shared.activate(ignoringOtherApps: true)
             }
-            MenuRowButton(title: "检查更新", systemImage: "arrow.triangle.down.circle",
+            MenuRowButton(title: "检查更新", systemImage: "arrow.down.circle",
                           isInProgress: isCheckingForUpdate) {
                 Task { await checkForUpdates() }
             }

@@ -37,6 +37,9 @@ struct CableCardsSectionView: View {
                     @unknown default: break
                     }
                 }
+                // 卡片自带 accent 选中描边，足以指示位置；抑制系统焦点环，
+                // 避免启动时初始焦点在选中描边外再叠一圈蓝色光晕。
+                .focusEffectDisabled()
             }
         }
     }
@@ -148,6 +151,7 @@ struct CableCardView: View {
             .contentShape(RoundedRectangle(cornerRadius: 12))
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+            .focusEffectDisabled() // 选中描边即焦点指示，抑制 Full Keyboard Access 下的按钮焦点环
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
@@ -182,11 +186,11 @@ struct CableCardView: View {
         ForEach(trustNotes, id: \.self) { note in
             switch note {
             case .zeroVendorID:
-                InfoChip(text: "e-marker 未上报厂商", systemImage: "questionmark.seal", color: .gray)
+                InfoChip(text: "e-marker 未上报厂商", systemImage: "questionmark.circle", color: .gray)
             case .reservedCurrentRating:
-                InfoChip(text: note.summary, systemImage: "questionmark.seal", color: .orange)
+                InfoChip(text: note.summary, systemImage: "questionmark.circle", color: .orange)
             case .unknownVendorID, .missingIdentity:
-                InfoChip(text: note.summary, systemImage: "questionmark.seal", color: .gray)
+                InfoChip(text: note.summary, systemImage: "questionmark.circle", color: .gray)
             }
         }
     }

@@ -1,6 +1,6 @@
 # CableScope · 线缆透视
 
-![Swift 5.10+](https://img.shields.io/badge/Swift-5.10%2B-orange) ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-lightgrey) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow) [![CI](https://github.com/OWNER/cablescope/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/cablescope/actions/workflows/ci.yml)
+![Swift 5.10+](https://img.shields.io/badge/Swift-5.10%2B-orange) ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-lightgrey) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow) [![CI](https://github.com/tzzs/cablescope/actions/workflows/ci.yml/badge.svg)](https://github.com/tzzs/cablescope/actions/workflows/ci.yml)
 
 macOS 菜单栏工具：检测连接数据线（USB-C / 雷电）的**充电速度、传输速度、视频能力**与**线缆评级**。
 
@@ -71,7 +71,7 @@ Sources/
 Tests/
 ├── CableKitTests/       # 126 个测试：数据契约、按端口分桶评级引擎 + 旧格式迁移、端口分组、六组解析器（真机样例回归）+ 诊断/评级存储/真机冒烟
 └── CableScopeCLITests/  # 34 个测试：参数解析、格式化、watch 快照差异计算
-Docs/                  # 产品定位与命名 / 技术架构 / 数据获取指南
+Docs/                  # 数据获取指南 / 优化路线图
 scripts/bundle_app.sh  # .app 打包脚本
 ```
 

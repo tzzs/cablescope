@@ -2,10 +2,9 @@ import AppKit
 import Foundation
 
 /// 应用内更新检查：查询 GitHub Releases 最新版本并与当前构建版本比较。
-/// 仓库地址为占位符 —— 开源后把 OWNER 替换为实际 GitHub 用户/组织名。
 enum UpdateChecker {
-    /// GitHub 仓库占位地址（开源后替换 OWNER）。
-    static let repositoryURL = "https://github.com/OWNER/cablescope"
+    /// GitHub 仓库地址。
+    static let repositoryURL = "https://github.com/tzzs/cablescope"
 
     // MARK: - 查询最新 Release
 

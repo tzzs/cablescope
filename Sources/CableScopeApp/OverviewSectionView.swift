@@ -195,11 +195,10 @@ struct OverviewSectionView: View {
                 }
             }
             if let description = power.adapterDescription, !description.isEmpty {
-                Text(description)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .padding(.leading, 2)
+                kvRow(icon: "powerplug.fill", title: "充电器") {
+                    Text(Self.prettyAdapterDescription(description))
+                        .font(.callout)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -253,6 +252,17 @@ struct OverviewSectionView: View {
         }
     }
 
+    /// IOKit 原文适配器描述（充电器固件上报，如 "pd charger"）→ 展示文案：
+    /// 词首大写 + 常见缩写全大写。仅 App 展示层美化；快照数据保持原文（CLI/JSON 不变）。
+    static func prettyAdapterDescription(_ raw: String) -> String {
+        let acronyms: Set<String> = ["pd", "usb", "usbc", "usb-c", "gan"]
+        return raw.split(separator: " ").map { word in
+            let lower = word.lowercased()
+            if acronyms.contains(lower) { return lower.uppercased() }
+            return word.prefix(1).uppercased() + word.dropFirst()
+        }.joined(separator: " ")
+    }
+
     private static func resolutionText(_ display: DisplaySnapshot) -> String {
         var text = display.resolutionLabel
         if let refreshRateHz = display.refreshRateHz {
@@ -267,7 +277,7 @@ struct OverviewSectionView: View {
     private var ratingFooter: some View {
         if let rating = viewModel.rating, rating.sampleCount > 0 {
             Divider()
-            HStack(alignment: .top, spacing: 8) {
+            HStack(spacing: 8) {
                 Image(systemName: "star.fill")
                     .font(.caption)
                     .foregroundStyle(.orange)
