@@ -128,13 +128,15 @@ extension CableScopeCLI {
                 lines.append("\(indent)• \(device.displayName)  " + parts.joined(separator: " · "))
             }
             for device in session.thunderboltDevices {
+                // 拓扑深度缩进（M6）：与 USB 设备链同一 indent 模式
+                let indent = String(repeating: "  ", count: (device.depth ?? 0) + 1)
                 var parts: [String] = []
                 if let vendor = device.vendorName { parts.append(vendor) }
                 if let link = device.linkSpeedLabel { parts.append(link) }
                 // 雷雳代际（M3）：存在时显示，如 "· 雷雳 4 / USB4"
                 if let generation = device.generation { parts.append(generation) }
                 let suffix = parts.isEmpty ? "" : "  " + parts.joined(separator: " · ")
-                lines.append("    • \(device.name)\(suffix)")
+                lines.append("\(indent)• \(device.name)\(suffix)")
             }
             if session.deviceCount == 0 {
                 lines.append("    （无设备）")

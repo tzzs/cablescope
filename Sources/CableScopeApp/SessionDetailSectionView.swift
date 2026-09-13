@@ -218,6 +218,8 @@ struct SessionDetailSectionView: View {
                         InfoChip(text: generation, color: .purple)
                     }
                 }
+                // 拓扑深度缩进（M6）：与 USB 设备链的 hubDepth 缩进同一视觉模式。
+                .padding(.leading, CGFloat(device.depth ?? 0) * 18)
                 .accessibilityElement(children: .combine)
             }
         }
