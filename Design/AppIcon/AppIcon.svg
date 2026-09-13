@@ -1,6 +1,6 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
   <title>CableScope App Icon</title>
-  <desc>Coiled cable ring pierced by an oscilloscope pulse. macOS 26 Liquid Glass layered source: background / middle / foreground groups. The rounded-rect mask is applied by the system and is intentionally not baked in.</desc>
+  <desc>A USB-C port sitting at the pivot of an open rating-gauge arc. macOS 26 Liquid Glass layered source: background / middle / foreground groups. The rounded-rect mask is applied by the system and is intentionally not baked in.</desc>
 
   <defs>
     <linearGradient id="bg-gradient" x1="0" y1="0" x2="0" y2="1">
@@ -21,7 +21,7 @@
       <stop offset="0.6" stop-color="#52CBFF" stop-opacity="0.12"/>
       <stop offset="1" stop-color="#52CBFF" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="cable-gradient" x1="0.2" y1="0" x2="0.8" y2="1">
+    <linearGradient id="arc-gradient" x1="0.2" y1="0" x2="0.8" y2="1">
       <stop offset="0" stop-color="#8BEFFF"/>
       <stop offset="0.45" stop-color="#4FC2FF"/>
       <stop offset="1" stop-color="#2F7BF0"/>
@@ -35,21 +35,20 @@
     <rect width="1024" height="1024" fill="url(#bg-vignette)"/>
   </g>
 
-  <!-- MIDDLE LAYER — soft electric halo, gives the mark parallax depth in Icon Composer -->
+  <!-- MIDDLE LAYER — soft electric halo centered on the arc's pivot, gives the mark parallax depth in Icon Composer -->
   <g id="middle">
-    <circle cx="512" cy="512" r="350" fill="url(#halo)"/>
+    <circle cx="512" cy="619.5" r="340" fill="url(#halo)"/>
   </g>
 
-  <!-- FOREGROUND LAYER — flat vector mark: coiled cable + scope pulse.
+  <!-- FOREGROUND LAYER — flat vector mark: rating-gauge arc + USB-C port at its pivot.
        Glass (specular / translucency / shadow) is added by Icon Composer, not baked in. -->
   <g id="foreground">
-    <!-- Coiled cable: 290° ring, open on the right where the pulse exits -->
-    <path d="M 679.1 629.0 A 204 204 0 1 1 679.1 395.0"
-          fill="none" stroke="url(#cable-gradient)"
-          stroke-width="80" stroke-linecap="round"/>
-    <!-- Oscilloscope pulse traveling through the coil -->
-    <path d="M 298 512 H 434 C 474 512 474 388 512 388 C 550 388 550 512 590 512 H 760"
-          fill="none" stroke="#FFFFFF"
-          stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Rating-gauge arc: 220° open sweep, pivot at the port's center (512, 619.5) -->
+    <path d="M 230.1 516.9 A 300 300 0 0 1 793.9 516.9"
+          fill="none" stroke="url(#arc-gradient)"
+          stroke-width="48" stroke-linecap="round"/>
+    <!-- USB-C port, sitting at the arc's pivot -->
+    <rect x="352" y="534.5" width="320" height="170" rx="85"
+          fill="none" stroke="#FFFFFF" stroke-width="40"/>
   </g>
 </svg>
