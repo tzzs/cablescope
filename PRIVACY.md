@@ -19,12 +19,14 @@ This can include device names, vendor/product IDs (VID/PID), negotiated speeds, 
 
 ## What never happens
 
-- No telemetry, no analytics, no crash reporting.
-- No network requests of any kind. Everything works fully offline.
+- No telemetry, no analytics, no crash reporting, no tracking.
+- Nothing from your machine is ever uploaded. Any data CableScope creates stays on your Mac.
 
-## The one planned outbound request
+## The only outbound request
 
-A future update-check feature will be the only outbound request CableScope ever makes: fetching **release metadata from GitHub Releases** to tell you when a new version is available. It will never upload any information from your machine.
+The **Check for Updates** action in the menu bar panel sends one `GET` request to `api.github.com` to fetch the latest release tag of this repository, so it can tell you when a new version is available. It is triggered only when you click that item — there is no automatic or background checking, no identifiers or machine information are sent, and nothing from the response is stored. Everything else works fully offline.
+
+A machine-readable `PrivacyInfo.xcprivacy` (required for App Store submissions) is bundled with the app: no tracking, no collected data types, and a `DiskSpace` required-reason declaration for the optional CLI throughput benchmark (free-space check before writing its test file).
 
 ## Deleting your data
 

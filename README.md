@@ -93,7 +93,8 @@ scripts/bundle_app.sh  # .app bundling script
 - [x] Multi-cable layout (per-port cable sessions, USB root-port grouping + Thunderbolt receptacle numbers, legacy ratings.json migration)
 - [x] Plug/unplug system notifications (UNUserNotificationCenter)
 - [ ] Real-world USB throughput measurement (5-second read/write benchmark)
-- [ ] IOKit notifications to replace polling, official distribution (notarization), app icon
+- [x] IOKit notifications to replace polling (AppleSmartBattery interest + USB matching notifications with polling fallback)
+- [ ] Official distribution (notarization), app icon (Xcode path)
 
 ### Known Limitations
 
@@ -101,7 +102,7 @@ scripts/bundle_app.sh  # .app bundling script
 - Displays and charging power **cannot be attributed to a specific cable** (macOS only exposes the active adapter and has no display→port mapping): they stay in the system overview. With exactly one cable connected, charging status is promoted onto that cable's card.
 - Physical port labels are technical ("USB 端口 0x014" / "雷雳端口 2"); friendly left/right positions would require registry port-topology work (v2).
 - The built-in display has no DP link rate field; `linkRateLabel` only becomes meaningful when an external DP/Thunderbolt display is connected.
-- `watch`/the snapshot stream currently use content-change detection with fallback polling (IOKit notification bridging is on the roadmap).
+- `watch`/the snapshot stream use event-driven wake-ups (AppleSmartBattery interest + USB matching notifications) with fallback polling for content-change detection.
 - The `.app` bundling script is intended for local use; App Store/notarized distribution should later move to an Xcode project.
 
 ## Contributing

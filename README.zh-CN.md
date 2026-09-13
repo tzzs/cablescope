@@ -91,7 +91,8 @@ scripts/bundle_app.sh  # .app 打包脚本
 - [x] 多线缆布局（按物理端口聚合线缆会话：USB 根端口分组 + 雷雳 receptacle 编号，旧 ratings.json 自动迁移）
 - [x] 插拔系统通知（UNUserNotificationCenter）
 - [ ] USB 实测吞吐（5 秒读写测速）
-- [ ] IOKit 通知替代轮询、正式分发（公证）、App 图标
+- [x] IOKit 通知替代轮询（AppleSmartBattery 兴趣通知 + USB 匹配通知 + 轮询兜底的混合模式）
+- [ ] 正式分发（公证）、App 图标（Xcode 路径）
 
 ### 已知限制
 
@@ -99,7 +100,7 @@ scripts/bundle_app.sh  # .app 打包脚本
 - 显示器与充电功率**无法归属到具体某根线**（macOS 只暴露当前活跃适配器，显示器也没有端口映射数据）：固定挂在整机概览；仅接一根线时充电状态自动提升到该线卡片。
 - 端口名暂为技术格式（"USB 端口 0x014" / "雷雳端口 2"），左/右物理方位需要更深层的 registry 端口拓扑工作（v2）。
 - 内置显示器无 DP link rate 字段，`linkRateLabel` 需接外接 DP/雷电显示器才会生效。
-- `watch`/快照流当前为内容变化检测 + 兜底轮询（IOKit 通知桥接在 roadmap）。
+- `watch`/快照流为事件驱动唤醒（AppleSmartBattery 兴趣通知 + USB 匹配通知）+ 兜底轮询的内容变化检测。
 - `.app` 打包脚本适用于本地使用；App Store/公证分发建议后续迁移 Xcode 工程。
 
 ## 参与贡献
