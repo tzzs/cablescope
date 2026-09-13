@@ -221,22 +221,26 @@ public struct ThunderboltDeviceSnapshot: Codable, Hashable, Sendable, Identifiab
     public let receptaclePort: Int?
     /// 雷雳代际（M3）："雷雳 5" / "雷雳 4 / USB4" / "雷雳 3"；速度标签缺失或无法识别时为 nil
     public let generation: String?
+    /// 树内层级（M6）：receptacle 根设备为 0，下挂设备（级联链/坞站下游）逐层 +1；
+    /// 旧 JSON / 旧解析数据为 nil（展示时按 0 处理）
+    public let depth: Int?
 
     public init(name: String, vendorName: String?, linkSpeedLabel: String?, deviceType: String?,
-                receptaclePort: Int? = nil, generation: String? = nil) {
+                receptaclePort: Int? = nil, generation: String? = nil, depth: Int? = nil) {
         self.name = name
         self.vendorName = vendorName
         self.linkSpeedLabel = linkSpeedLabel
         self.deviceType = deviceType
         self.receptaclePort = receptaclePort
         self.generation = generation
+        self.depth = depth
     }
 
     public var id: String { name + (vendorName ?? "") }
 
-    // 兼容旧 JSON（无 receptaclePort/generation 键）：缺失时视为 nil。
+    // 兼容旧 JSON（无 receptaclePort/generation/depth 键）：缺失时视为 nil。
     private enum CodingKeys: String, CodingKey {
-        case name, vendorName, linkSpeedLabel, deviceType, receptaclePort, generation
+        case name, vendorName, linkSpeedLabel, deviceType, receptaclePort, generation, depth
     }
 
     public init(from decoder: Decoder) throws {
@@ -247,6 +251,7 @@ public struct ThunderboltDeviceSnapshot: Codable, Hashable, Sendable, Identifiab
         self.deviceType = try container.decodeIfPresent(String.self, forKey: .deviceType)
         self.receptaclePort = try container.decodeIfPresent(Int.self, forKey: .receptaclePort)
         self.generation = try container.decodeIfPresent(String.self, forKey: .generation)
+        self.depth = try container.decodeIfPresent(Int.self, forKey: .depth)
     }
 }
 

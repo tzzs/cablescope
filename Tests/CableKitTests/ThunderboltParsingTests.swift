@@ -61,6 +61,8 @@ final class ThunderboltParsingTests: XCTestCase {
         XCTAssertEqual(devices[0].receptaclePort, 1, "端口号应随设备保留")
         XCTAssertEqual(devices[1].linkSpeedLabel, nil, "下挂节点缺 current_speed_key 时回退 link_status_key/nil")
         XCTAssertEqual(devices[1].receptaclePort, 1, "级联子树继承外层 receptacle 编号")
+        XCTAssertEqual(devices[0].depth, 0, "receptacle 根设备为 0 层")
+        XCTAssertEqual(devices[1].depth, 1, "嵌套 receptacle 里的下挂设备为 1 层")
     }
 
     /// 多 receptacle 场景：不同物理口的设备携带各自端口号（会话聚合的依据）
@@ -76,6 +78,7 @@ final class ThunderboltParsingTests: XCTestCase {
         let devices = ThunderboltParsing.parse(root: root)
         XCTAssertEqual(devices.map(\.name), ["Dock A", "Dock B"])
         XCTAssertEqual(devices.map(\.receptaclePort), [1, 2])
+        XCTAssertEqual(devices.map(\.depth), [0, 0], "两个 receptacle 根设备同为 0 层")
     }
 
     func testUnknownStatusStillCollectedConservatively() {
@@ -104,6 +107,7 @@ final class ThunderboltParsingTests: XCTestCase {
         let devices = ThunderboltParsing.parse(root: root)
         XCTAssertEqual(devices.map(\.name), ["Dock", "Monitor"])
         XCTAssertTrue(devices.allSatisfy { $0.receptaclePort == 1 })
+        XCTAssertEqual(devices.map(\.depth), [0, 1], "数组子设备层级 +1")
     }
 
     /// 非数字 receptacle 编号（receptacle_x_tag）不应崩溃，端口号降级为 nil
@@ -130,6 +134,17 @@ final class ThunderboltParsingTests: XCTestCase {
         XCTAssertEqual(ThunderboltGeneration.label(forLinkSpeedLabel: "Up to 22 Gb/s"), "雷雳 3")
         XCTAssertNil(ThunderboltGeneration.label(forLinkSpeedLabel: "Up to 10 Gb/s"), "未知速度不猜测代际")
         XCTAssertNil(ThunderboltGeneration.label(forLinkSpeedLabel: nil), "标签缺失时为 nil")
+    }
+
+    /// M6 修复回归：雷雳 5 非对称模式 "120" 含 "20"，不得被雷雳 3 规则吞掉；
+    /// 十六进制状态码兜底形态（link_status_key）也不应被误读成速度。
+    func testGenerationMappingTB5AsymmetricAndHexStatus() {
+        XCTAssertEqual(ThunderboltGeneration.label(forLinkSpeedLabel: "Up to 120 Gb/s"), "雷雳 5",
+                       "120G 非对称应识别为雷雳 5")
+        XCTAssertEqual(ThunderboltGeneration.label(forLinkSpeedLabel: "Up to 120Gb/s"), "雷雳 5",
+                       "无空格标签形态同样命中")
+        XCTAssertNil(ThunderboltGeneration.label(forLinkSpeedLabel: "0x140"),
+                     "十六进制状态码不是速度，不猜测代际")
     }
 
     /// 解析集成：generation 由 current_speed_key 反推并写入设备快照
@@ -169,16 +184,18 @@ final class ThunderboltParsingTests: XCTestCase {
         XCTAssertEqual(device.name, "CalDigit Dock")
         XCTAssertEqual(device.receptaclePort, 1)
         XCTAssertNil(device.generation, "旧 JSON 缺 generation 键应解码为 nil")
+        XCTAssertNil(device.depth, "旧 JSON 缺 depth 键应解码为 nil")
     }
 
-    /// round-trip：编码完整写出 generation，解码后还原一致
+    /// round-trip：编码完整写出 generation/depth，解码后还原一致
     func testGenerationRoundTrip() throws {
         let device = ThunderboltDeviceSnapshot(name: "SSD", vendorName: nil, linkSpeedLabel: "Up to 80 Gb/s",
-                                               deviceType: nil, receptaclePort: 2, generation: "雷雳 5")
+                                               deviceType: nil, receptaclePort: 2, generation: "雷雳 5", depth: 1)
         let data = try JSONEncoder().encode(device)
         XCTAssertEqual(try JSONDecoder().decode(ThunderboltDeviceSnapshot.self, from: data), device)
-        // 编码产物应显式包含 generation 键（新字段完整写出，供新版本读取）
+        // 编码产物应显式包含新字段键（完整写出，供新版本读取）
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         XCTAssertEqual(object?["generation"] as? String, "雷雳 5")
+        XCTAssertEqual(object?["depth"] as? Int, 1)
     }
 }

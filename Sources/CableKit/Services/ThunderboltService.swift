@@ -60,23 +60,30 @@ public final class ThunderboltService: ThunderboltServiceProtocol {
 ///
 /// 依据（真机实测，macOS 26 / M4 空载）：system_profiler 的 `current_speed_key`
 /// 形如 "Up to 40 Gb/s"（也兼容无空格的 "Up to 40Gb/s" 形态）。速度上限是最稳定的代际信号：
+/// - 120Gb/s → 雷雳 5（非对称模式）
 /// - 80Gb/s → 雷雳 5
 /// - 40Gb/s → 雷雳 4 / USB4（同速可跨代际，措辞并列为诚实表述）
 /// - 20/22Gb/s → 雷雳 3
 /// - 其他/缺失 → nil（不猜测）
 ///
-/// 已知边界：雷雳 5 非对称模式理论标签 "Up to 120 Gb/s" 含 "20"，会被误判为雷雳 3；
-/// 真机实测仅见过 40Gb/s 形态，待有雷雳 5 外设时复核。
+/// M6 修复：实现为提取标签中的最大数值再匹配——旧 contains 子串匹配会把
+/// 雷雳 5 非对称标签 "Up to 120 Gb/s" 的 "20" 误判为雷雳 3；顺带让 "0x140"
+/// 这类十六进制状态码（link_status_key 兜底形态）不再被误读成速度。
+/// 真机实测仅见过 40Gb/s 形态，120G 非对称标签待有雷雳 5 外设时复核。
 /// 增强路径结论（真机实测）：system_profiler JSON 无 firmware/retimer 类代际字段
 /// （`link_status_key` 是 "0x100" 形态的十六进制状态码）；ioreg `IOThunderboltPort`
 /// 虽有 `"Thunderbolt Version" = 32` 字段，但其取值语义无法在无外设时验证，故不纳入映射。
 enum ThunderboltGeneration {
     static func label(forLinkSpeedLabel label: String?) -> String? {
-        guard let label else { return nil }
-        if label.contains("80") { return "雷雳 5" }
-        if label.contains("40") { return "雷雳 4 / USB4" }
-        if label.contains("20") || label.contains("22") { return "雷雳 3" }
-        return nil
+        let gbps = label?.split(whereSeparator: { !$0.isNumber })
+            .compactMap { Int($0) }
+            .max()
+        switch gbps {
+        case 120, 80: return "雷雳 5"
+        case 40: return "雷雳 4 / USB4"
+        case 20, 22: return "雷雳 3"
+        default: return nil
+        }
     }
 }
 
@@ -98,15 +105,17 @@ enum ThunderboltParsing {
                 }
                 // 端口号随设备保留（PortGrouping 以它聚合成雷雳会话）；编号非数字时为 nil。
                 let number = key.dropFirst("receptacle_".count).dropLast("_tag".count)
-                collectDevices(in: receptacle, receptaclePort: Int(number), into: &devices)
+                collectDevices(in: receptacle, receptaclePort: Int(number), depth: 0, into: &devices)
             }
         }
         return devices.sorted { $0.name < $1.name }
     }
 
     /// 递归展平：字典节点带 `device_name_key` 即视为一台设备（链路中间的 switch/坞站也算）。
-    /// 整条 receptacle 子树（含级联链/坞站下游）共享同一个端口号。
-    static func collectDevices(in node: [String: Any], receptaclePort: Int?, into devices: inout [ThunderboltDeviceSnapshot]) {
+    /// 整条 receptacle 子树（含级联链/坞站下游）共享同一个端口号；
+    /// `depth` 为 JSON 嵌套层级（每层 dict/array +1），receptacle 根设备为 0（M6 拓扑深度）。
+    static func collectDevices(in node: [String: Any], receptaclePort: Int?, depth: Int,
+                               into devices: inout [ThunderboltDeviceSnapshot]) {
         if let name = node["device_name_key"] as? String, !name.isEmpty {
             // 代际由速度标签反推（映射规则见 ThunderboltGeneration 注释）
             let linkSpeed = (node["current_speed_key"] as? String) ?? (node["link_status_key"] as? String)
@@ -116,15 +125,16 @@ enum ThunderboltParsing {
                 linkSpeedLabel: linkSpeed,
                 deviceType: node["device_type_key"] as? String,
                 receptaclePort: receptaclePort,
-                generation: ThunderboltGeneration.label(forLinkSpeedLabel: linkSpeed)
+                generation: ThunderboltGeneration.label(forLinkSpeedLabel: linkSpeed),
+                depth: depth
             ))
         }
         for value in node.values {
             if let child = value as? [String: Any] {
-                collectDevices(in: child, receptaclePort: receptaclePort, into: &devices)
+                collectDevices(in: child, receptaclePort: receptaclePort, depth: depth + 1, into: &devices)
             } else if let children = value as? [[String: Any]] {
                 for child in children {
-                    collectDevices(in: child, receptaclePort: receptaclePort, into: &devices)
+                    collectDevices(in: child, receptaclePort: receptaclePort, depth: depth + 1, into: &devices)
                 }
             }
         }
