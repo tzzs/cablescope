@@ -22,6 +22,16 @@ public protocol ThunderboltServiceProtocol: Sendable {
     func listThunderboltDevices() async throws -> [ThunderboltDeviceSnapshot]
 }
 
+public protocol PortControllerServiceProtocol: Sendable {
+    /// USB-C / MagSafe 端口控制器状态（AppleHPM/AppleTC + SOP/SOP' + PD 档位）
+    func listPorts() async throws -> [USBCPortSnapshot]
+}
+
+public protocol RegistryServiceProtocol: Sendable {
+    /// 按任意 IOKit 类名枚举 IORegistry 条目，携带全量原始属性
+    func listEntries(matchingClass className: String) async throws -> [RegistryEntrySnapshot]
+}
+
 /// 快照监视器：组合各 Service，提供单次快照与插拔事件流
 public protocol CableMonitorProtocol: Sendable {
     /// 立即采集一次完整快照

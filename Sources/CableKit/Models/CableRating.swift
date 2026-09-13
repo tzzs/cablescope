@@ -64,14 +64,14 @@ public struct CableRating: Codable, Hashable, Sendable {
     }
 }
 
-/// 评级引擎协议：按 LocationID 聚合历史快照峰值
+/// 评级引擎协议：按线缆会话（物理端口）聚合历史快照峰值
 public protocol CableRatingEngineProtocol: Sendable {
-    /// 记录一次快照（内部按 LocationID 聚合）
+    /// 记录一次快照（内部按线缆会话分桶聚合）
     mutating func record(_ snapshot: CableSnapshot)
-    /// 当前整体评级（全端口聚合）
+    /// 当前整体评级（全端口 + 整机桶聚合）
     func overallRating() -> CableRating
-    /// 指定 LocationID（物理端口）的评级
-    func rating(forLocationID locationID: UInt32) -> CableRating?
+    /// 指定线缆会话的评级（会话 id 见 `CableSession.id`，如 "usb-0x014" / "tb-2"）
+    func rating(forSessionID sessionID: String) -> CableRating?
     /// 持久化到磁盘（JSON）
     func save(to url: URL) throws
     /// 从磁盘恢复历史

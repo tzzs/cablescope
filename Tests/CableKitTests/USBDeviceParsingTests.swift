@@ -54,10 +54,52 @@ final class USBDeviceParsingTests: XCTestCase {
 
     func testMissingOptionalFields() {
         let device = USBDeviceParsing.parse(properties: ["Speed": 480_000_000], registryID: 1)
-        XCTAssertEqual(device.locationID, 0, "LocationID 缺失时归入 0 号桶")
+        XCTAssertEqual(device.locationID, 0, "LocationID 缺失且无路径段时归入 0 号桶")
         XCTAssertNil(device.productName)
         XCTAssertNil(device.vendorID)
         XCTAssertNil(device.serialNumber)
         XCTAssertEqual(device.speed?.bitsPerSecond, 480_000_000)
+    }
+
+    // MARK: LocationID 路径回退（内置 hub 无 LocationID 属性的真机场景）
+
+    func testLocationIDFallsBackToPathSegment() {
+        let props: [String: Any] = ["USB Product Name": "USB2.1 Hub"]
+        let device = USBDeviceParsing.parse(properties: props, registryID: 1,
+                                            pathSegment: "USB2.1 Hub@00100000")
+        XCTAssertEqual(device.locationID, 0x00100000, "无 LocationID 属性时回退路径末段 @hex")
+    }
+
+    func testPropertyLocationIDWinsOverPathSegment() {
+        let props: [String: Any] = ["LocationID": 0x14100000]
+        let device = USBDeviceParsing.parse(properties: props, registryID: 1,
+                                            pathSegment: "HID Device@00160000")
+        XCTAssertEqual(device.locationID, 0x14100000, "属性优先于路径回退")
+    }
+
+    func testLocationIDPathSegmentParsing() {
+        XCTAssertEqual(USBDeviceParsing.locationID(fromPathSegment: "USB2.1 Hub@00100000"), 0x00100000)
+        XCTAssertEqual(USBDeviceParsing.locationID(fromPathSegment: "HID Device@00160000"), 0x00160000)
+        XCTAssertNil(USBDeviceParsing.locationID(fromPathSegment: "USB2.1 Hub"), "无 @ 段返回 nil")
+        XCTAssertNil(USBDeviceParsing.locationID(fromPathSegment: "Device@zzz"), "非法十六进制返回 nil")
+        XCTAssertNil(USBDeviceParsing.locationID(fromPathSegment: "Device@"), "空 hex 返回 nil")
+    }
+
+    // MARK: 物理端口配对字段
+
+    func testPhysicalPortIDRoundTrip() throws {
+        let device = USBDeviceParsing.parse(properties: ["LocationID": 0x160000], registryID: 7,
+                                            physicalPortID: "Port-USB-C@1")
+        XCTAssertEqual(device.physicalPortID, "Port-USB-C@1")
+
+        // 旧 JSON（无 physicalPortID 键）解码兼容
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(device)
+        let object = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        var legacyObject = object
+        legacyObject.removeValue(forKey: "physicalPortID")
+        let legacyData = try JSONSerialization.data(withJSONObject: legacyObject)
+        let decoded = try JSONDecoder().decode(USBDeviceSnapshot.self, from: legacyData)
+        XCTAssertNil(decoded.physicalPortID, "旧 JSON 缺失 physicalPortID 时解码为 nil")
     }
 }

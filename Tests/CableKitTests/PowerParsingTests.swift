@@ -24,6 +24,7 @@ final class PowerParsingTests: XCTestCase {
         let power = PowerParsing.parse(props: props)
 
         XCTAssertTrue(power.isCharging)
+        XCTAssertTrue(power.externalConnected)
         XCTAssertEqual(power.adapterVoltageMV, 20000, "顶层无 AdapterVoltage 时应回退到 AdapterDetails")
         XCTAssertEqual(power.adapterAmperageMA, 2014, "瞬时电流取顶层 Amperage")
         XCTAssertEqual(power.watts ?? 0, 20.0 * 2.014, accuracy: 0.01, "瞬时功率 = 电压 × 实际抽流")
@@ -62,6 +63,7 @@ final class PowerParsingTests: XCTestCase {
         let power = PowerParsing.parse(props: props)
 
         XCTAssertFalse(power.isCharging)
+        XCTAssertFalse(power.externalConnected)
         XCTAssertNil(power.adapterVoltageMV)
         XCTAssertNil(power.adapterAmperageMA)
         XCTAssertNil(power.pdContract)
@@ -75,7 +77,35 @@ final class PowerParsingTests: XCTestCase {
             "ExternalConnected": false,
             "IsCharging": true,
         ]
-        XCTAssertFalse(PowerParsing.parse(props: props).isCharging)
+        let power = PowerParsing.parse(props: props)
+        XCTAssertFalse(power.isCharging)
+        XCTAssertFalse(power.externalConnected)
+    }
+
+    /// 真机回归（2026-09-13）：电池保温/优化充电暂停时，插着电但 IsCharging=No、
+    /// 顶层 Amperage 为负（电池侧微小放电）。UI 须据此显示"已接通电源"而非"未充电"。
+    func testConnectedButPausedCharging() {
+        let props: [String: Any] = [
+            "ExternalConnected": true,
+            "IsCharging": false,
+            "Amperage": -540,
+            "CurrentCapacity": 86,
+            "MaxCapacity": 100,
+            "AdapterDetails": [
+                "AdapterVoltage": 20000,
+                "Current": 5000,
+                "Watts": 100,
+                "Description": "pd charger",
+            ],
+        ]
+        let power = PowerParsing.parse(props: props)
+
+        XCTAssertFalse(power.isCharging, "暂停充电时不得到误报正在充电")
+        XCTAssertTrue(power.externalConnected, "插电状态必须如实上报，UI 靠它区分已接通/未接通")
+        XCTAssertEqual(power.adapterVoltageMV, 20000)
+        XCTAssertEqual(power.adapterAmperageMA, -540)
+        XCTAssertEqual(power.watts ?? 0, 20.0 * -0.54, accuracy: 0.01, "瞬时功率保留原始负值，由 UI 层决定是否展示")
+        XCTAssertEqual(power.pdContract?.watts ?? 0, 100, accuracy: 0.01, "保温时 PD 合同依然可读")
     }
 
     func testStringBooleanTolerance() {

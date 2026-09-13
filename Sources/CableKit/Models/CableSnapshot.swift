@@ -47,6 +47,8 @@ public struct USBDeviceSnapshot: Codable, Hashable, Sendable, Identifiable {
     public let registryID: UInt64
     /// 物理端口定位（LocationID），跨快照聚合历史时的 key
     public let locationID: UInt32
+    /// 物理端口名（"Port-USB-C@1"，来自祖先链 UsbIOPort 路径；老机型/树形差异时为 nil）
+    public let physicalPortID: String?
     public let productName: String?
     public let vendorName: String?
     public let vendorID: UInt16?
@@ -56,18 +58,23 @@ public struct USBDeviceSnapshot: Codable, Hashable, Sendable, Identifiable {
     public let bcdUSB: String?
     /// 协商速率
     public let speed: USBSpeed?
+    /// IORegistry 全量原始属性（IORegistryEntryCreateCFProperties 的完整字典）
+    public let rawProperties: [String: IORegistryValue]
 
     public init(registryID: UInt64,
                 locationID: UInt32,
+                physicalPortID: String? = nil,
                 productName: String?,
                 vendorName: String?,
                 vendorID: UInt16?,
                 productID: UInt16?,
                 serialNumber: String?,
                 bcdUSB: String?,
-                speed: USBSpeed?) {
+                speed: USBSpeed?,
+                rawProperties: [String: IORegistryValue] = [:]) {
         self.registryID = registryID
         self.locationID = locationID
+        self.physicalPortID = physicalPortID
         self.productName = productName
         self.vendorName = vendorName
         self.vendorID = vendorID
@@ -75,9 +82,31 @@ public struct USBDeviceSnapshot: Codable, Hashable, Sendable, Identifiable {
         self.serialNumber = serialNumber
         self.bcdUSB = bcdUSB
         self.speed = speed
+        self.rawProperties = rawProperties
     }
 
     public var id: UInt64 { registryID }
+
+    // 兼容旧 JSON（无 rawProperties/physicalPortID 键）：缺失时视为空字典/nil。
+    private enum CodingKeys: String, CodingKey {
+        case registryID, locationID, physicalPortID, productName, vendorName, vendorID, productID
+        case serialNumber, bcdUSB, speed, rawProperties
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.registryID = try container.decode(UInt64.self, forKey: .registryID)
+        self.locationID = try container.decode(UInt32.self, forKey: .locationID)
+        self.physicalPortID = try container.decodeIfPresent(String.self, forKey: .physicalPortID)
+        self.productName = try container.decodeIfPresent(String.self, forKey: .productName)
+        self.vendorName = try container.decodeIfPresent(String.self, forKey: .vendorName)
+        self.vendorID = try container.decodeIfPresent(UInt16.self, forKey: .vendorID)
+        self.productID = try container.decodeIfPresent(UInt16.self, forKey: .productID)
+        self.serialNumber = try container.decodeIfPresent(String.self, forKey: .serialNumber)
+        self.bcdUSB = try container.decodeIfPresent(String.self, forKey: .bcdUSB)
+        self.speed = try container.decodeIfPresent(USBSpeed.self, forKey: .speed)
+        self.rawProperties = try container.decodeIfPresent([String: IORegistryValue].self, forKey: .rawProperties) ?? [:]
+    }
 }
 
 /// USB-C PD 充电合同
@@ -101,7 +130,11 @@ public struct PDContract: Codable, Hashable, Sendable {
 
 /// 电源/充电快照（来自 AppleSmartBattery + IOPS）
 public struct PowerSnapshot: Codable, Hashable, Sendable {
+    /// 正在充电（IsCharging && ExternalConnected）。
+    /// 注意：电池保温/优化充电暂停时 IsCharging=false 但已接通电源，用 externalConnected 区分。
     public let isCharging: Bool
+    /// 适配器已接通（ExternalConnected），无论是否正在充电
+    public let externalConnected: Bool
     /// 电池电量百分比 0-100
     public let batteryPercent: Double?
     /// 当前适配器电压 mV
@@ -114,6 +147,8 @@ public struct PowerSnapshot: Codable, Hashable, Sendable {
     public let adapterDescription: String?
     /// 电池循环次数
     public let cycleCount: Int?
+    /// IORegistry 全量原始属性（AppleSmartBattery 的完整字典，含 AdapterDetails 嵌套）
+    public let rawProperties: [String: IORegistryValue]
 
     /// 当前充电功率 W
     public var watts: Double? {
@@ -127,14 +162,18 @@ public struct PowerSnapshot: Codable, Hashable, Sendable {
                 adapterAmperageMA: Int?,
                 pdContract: PDContract?,
                 adapterDescription: String?,
-                cycleCount: Int?) {
+                cycleCount: Int?,
+                externalConnected: Bool = false,
+                rawProperties: [String: IORegistryValue] = [:]) {
         self.isCharging = isCharging
+        self.externalConnected = externalConnected
         self.batteryPercent = batteryPercent
         self.adapterVoltageMV = adapterVoltageMV
         self.adapterAmperageMA = adapterAmperageMA
         self.pdContract = pdContract
         self.adapterDescription = adapterDescription
         self.cycleCount = cycleCount
+        self.rawProperties = rawProperties
     }
 }
 
@@ -178,15 +217,37 @@ public struct ThunderboltDeviceSnapshot: Codable, Hashable, Sendable, Identifiab
     /// 链路速度标签，如 "Up to 40Gb/s"
     public let linkSpeedLabel: String?
     public let deviceType: String?
+    /// 所在物理端口的 receptacle 编号（来自 receptacle_N_tag；旧 JSON / 解析失败时为 nil）
+    public let receptaclePort: Int?
+    /// 雷雳代际（M3）："雷雳 5" / "雷雳 4 / USB4" / "雷雳 3"；速度标签缺失或无法识别时为 nil
+    public let generation: String?
 
-    public init(name: String, vendorName: String?, linkSpeedLabel: String?, deviceType: String?) {
+    public init(name: String, vendorName: String?, linkSpeedLabel: String?, deviceType: String?,
+                receptaclePort: Int? = nil, generation: String? = nil) {
         self.name = name
         self.vendorName = vendorName
         self.linkSpeedLabel = linkSpeedLabel
         self.deviceType = deviceType
+        self.receptaclePort = receptaclePort
+        self.generation = generation
     }
 
     public var id: String { name + (vendorName ?? "") }
+
+    // 兼容旧 JSON（无 receptaclePort/generation 键）：缺失时视为 nil。
+    private enum CodingKeys: String, CodingKey {
+        case name, vendorName, linkSpeedLabel, deviceType, receptaclePort, generation
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.vendorName = try container.decodeIfPresent(String.self, forKey: .vendorName)
+        self.linkSpeedLabel = try container.decodeIfPresent(String.self, forKey: .linkSpeedLabel)
+        self.deviceType = try container.decodeIfPresent(String.self, forKey: .deviceType)
+        self.receptaclePort = try container.decodeIfPresent(Int.self, forKey: .receptaclePort)
+        self.generation = try container.decodeIfPresent(String.self, forKey: .generation)
+    }
 }
 
 /// 一次完整的线缆状态快照
@@ -197,19 +258,45 @@ public struct CableSnapshot: Codable, Hashable, Sendable, Identifiable {
     public let power: PowerSnapshot?
     public let displays: [DisplaySnapshot]
     public let thunderboltDevices: [ThunderboltDeviceSnapshot]
+    /// 按物理端口聚合的线缆会话（UI 一等公民；由 PortGrouping 在采集时组装）
+    public let sessions: [CableSession]
+    /// USB-C / MagSafe 物理端口控制器状态（AppleHPM/AppleTC；老机型枚举为空属正常）
+    public let ports: [USBCPortSnapshot]
 
     public init(id: UUID = UUID(),
                 timestamp: Date = Date(),
                 usbDevices: [USBDeviceSnapshot],
                 power: PowerSnapshot?,
                 displays: [DisplaySnapshot],
-                thunderboltDevices: [ThunderboltDeviceSnapshot]) {
+                thunderboltDevices: [ThunderboltDeviceSnapshot],
+                sessions: [CableSession] = [],
+                ports: [USBCPortSnapshot] = []) {
         self.id = id
         self.timestamp = timestamp
         self.usbDevices = usbDevices
         self.power = power
         self.displays = displays
         self.thunderboltDevices = thunderboltDevices
+        self.sessions = sessions
+        self.ports = ports
+    }
+
+    // 兼容旧 JSON（无 sessions/ports 键）：缺失时视为空数组，由消费方按需用 PortGrouping 现算。
+    // 只自定义解码，编码仍用合成实现（新字段完整写出）。
+    private enum CodingKeys: String, CodingKey {
+        case id, timestamp, usbDevices, power, displays, thunderboltDevices, sessions, ports
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.timestamp = try container.decode(Date.self, forKey: .timestamp)
+        self.usbDevices = try container.decode([USBDeviceSnapshot].self, forKey: .usbDevices)
+        self.power = try container.decodeIfPresent(PowerSnapshot.self, forKey: .power)
+        self.displays = try container.decode([DisplaySnapshot].self, forKey: .displays)
+        self.thunderboltDevices = try container.decode([ThunderboltDeviceSnapshot].self, forKey: .thunderboltDevices)
+        self.sessions = try container.decodeIfPresent([CableSession].self, forKey: .sessions) ?? []
+        self.ports = try container.decodeIfPresent([USBCPortSnapshot].self, forKey: .ports) ?? []
     }
 
     public func toJSON(pretty: Bool = false) throws -> Data {

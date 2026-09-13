@@ -58,19 +58,65 @@ public final class USBService: USBServiceProtocol {
         var registryID: UInt64 = 0
         IORegistryEntryGetRegistryEntryID(entry, &registryID)
 
-        return USBDeviceParsing.parse(properties: properties, registryID: registryID)
+        // 内置根 hub 类设备没有 LocationID 属性（真机验证），位置只编码在路径末段的
+        // "@unit" 里（IORegistryEntryGetName 不含它）——回退解析路径末段
+        // （"…/USB2.1 Hub@00100000" → 0x00100000），保证端口归组不落到未知桶。
+        var pathBuffer = [CChar](repeating: 0, count: 512)
+        let pathLastSegment: String?
+        if IORegistryEntryGetPath(entry, kIOServicePlane, &pathBuffer) == KERN_SUCCESS {
+            pathLastSegment = String(cString: pathBuffer).split(separator: "/").last.map(String.init)
+        } else {
+            pathLastSegment = nil
+        }
+
+        return USBDeviceParsing.parse(properties: properties,
+                                      registryID: registryID,
+                                      physicalPortID: physicalPortID(for: entry),
+                                      pathSegment: pathLastSegment)
+    }
+
+    /// 沿 IOService plane 祖先链查找 XHCI 控制器的 `UsbIOPort` 属性，
+    /// 其路径最后一段即物理端口名（如 …/Port-USB-C@1）。找不到（老机型/树形差异）时返回 nil。
+    private static func physicalPortID(for entry: io_registry_entry_t) -> String? {
+        var current: io_registry_entry_t = entry
+        var obtainedCurrent = false
+        defer { if obtainedCurrent { IOObjectRelease(current) } }
+        for _ in 0..<12 {
+            var parent: io_registry_entry_t = 0
+            guard IORegistryEntryGetParentEntry(current, kIOServicePlane, &parent) == KERN_SUCCESS else { break }
+            if obtainedCurrent { IOObjectRelease(current) }
+            current = parent
+            obtainedCurrent = true
+
+            var propertyRef: Unmanaged<CFTypeRef>?
+            if let ref = IORegistryEntryCreateCFProperty(current, "UsbIOPort" as CFString, kCFAllocatorDefault, 0) {
+                propertyRef = ref
+            }
+            defer { propertyRef?.release() }
+            if let value = propertyRef?.takeUnretainedValue() as? String,
+               let portID = PortParsing.portID(fromUsbIOPortPath: value) {
+                return portID
+            }
+        }
+        return nil
     }
 }
 
 /// IORegistry 属性字典 → USBDeviceSnapshot 的纯解析逻辑（internal 便于单测，无 IOKit 依赖）。
 enum USBDeviceParsing {
-    static func parse(properties: [String: Any], registryID: UInt64) -> USBDeviceSnapshot {
+    static func parse(properties: [String: Any],
+                      registryID: UInt64,
+                      physicalPortID: String? = nil,
+                      pathSegment: String? = nil) -> USBDeviceSnapshot {
         let speedInt = int64Value(forKey: "Speed", in: properties)
-        let locationID = uint32Value(forKey: "LocationID", in: properties) ?? 0
+        // LocationID 属性缺失时回退路径末段的 @hex 段（内置 hub 场景）。
+        let locationID = uint32Value(forKey: "LocationID", in: properties)
+            ?? pathSegment.flatMap(locationID(fromPathSegment:)) ?? 0
 
         return USBDeviceSnapshot(
             registryID: registryID,
             locationID: locationID,
+            physicalPortID: physicalPortID,
             productName: stringValue(forKey: "USB Product Name", in: properties),
             vendorName: stringValue(forKey: "USB Vendor Name", in: properties),
             vendorID: uint16Value(forKey: "idVendor", in: properties),
@@ -78,8 +124,17 @@ enum USBDeviceParsing {
             serialNumber: stringValue(forKey: "USB Serial Number", in: properties),
             // bcdUSB 在不同系统版本上可能是 "0210" 字符串，也可能是数字 512（BCD 0x0210）。
             bcdUSB: bcdUSBString(in: properties),
-            speed: speedInt.map { USBSpeed(bitsPerSecond: Int($0)) }
+            speed: speedInt.map { USBSpeed(bitsPerSecond: Int($0)) },
+            rawProperties: IORegistryValue.dictionary(from: properties)
         )
+    }
+
+    /// "USB2.1 Hub@00100000" → 0x00100000；无 @ 段或非法十六进制时返回 nil。
+    static func locationID(fromPathSegment segment: String) -> UInt32? {
+        guard let atIndex = segment.lastIndex(of: "@") else { return nil }
+        let hex = String(segment[segment.index(after: atIndex)...])
+        guard !hex.isEmpty, let value = UInt32(hex, radix: 16) else { return nil }
+        return value
     }
 
     // MARK: - CF/Any 取值辅助

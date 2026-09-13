@@ -12,6 +12,9 @@ import IOKit.ps
 ///   → `adapterVoltageMV` 回退到 AdapterDetails.AdapterVoltage（配合顶层 Amperage 得到瞬时功率）
 ///   → `pdContract` 取合同值（AdapterDetails.AdapterVoltage×Current，如 20V×5A=100W 能力）
 /// - 拔掉电源：ExternalConnected=No → 快照 isCharging=false 且电压/电流/合同均为 nil。
+/// - 已接通但暂停充电（电量保持/优化充电暂停，如 86% 时 IsCharging=No 而 ExternalConnected=Yes）：
+///   isCharging=false 但 externalConnected=true，此时顶层 Amperage 可为负（电池侧微小放电），
+///   消费方须用 externalConnected 而非 isCharging 判断"是否插电"。
 public final class PowerService: PowerServiceProtocol {
     public init() {}
 
@@ -87,7 +90,9 @@ enum PowerParsing {
             adapterAmperageMA: externalConnected ? amperageMA : nil,
             pdContract: pdContract,
             adapterDescription: adapterDescription,
-            cycleCount: intValue(forKey: "CycleCount", in: props)
+            cycleCount: intValue(forKey: "CycleCount", in: props),
+            externalConnected: externalConnected,
+            rawProperties: IORegistryValue.dictionary(from: props)
         )
     }
 
