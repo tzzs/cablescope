@@ -1,0 +1,19 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <title>CableScope — foreground layer</title>
+  <desc>Drag into Icon Composer as a foreground layer group. Flat, opaque strokes; no baked shadows or highlights.</desc>
+  <defs>
+    <linearGradient id="cable-gradient" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#8BEFFF"/>
+      <stop offset="0.45" stop-color="#4FC2FF"/>
+      <stop offset="1" stop-color="#2F7BF0"/>
+    </linearGradient>
+  </defs>
+  <g id="foreground">
+    <path d="M 679.1 629.0 A 204 204 0 1 1 679.1 395.0"
+          fill="none" stroke="url(#cable-gradient)"
+          stroke-width="80" stroke-linecap="round"/>
+    <path d="M 298 512 H 434 C 474 512 474 388 512 388 C 550 388 550 512 590 512 H 760"
+          fill="none" stroke="#FFFFFF"
+          stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
