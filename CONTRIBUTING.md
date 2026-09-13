@@ -41,6 +41,7 @@ The layering rule is simple: **all system access lives in CableKit**. The CLI an
 - **New parsing logic must ship with fixture tests built from real-device samples.** See the existing parser tests under `Tests/CableKitTests/` (e.g. `PortParsingTests`, `PowerParsingTests`) for the pattern: capture the real IORegistry properties, embed them as fixtures, assert the parsed result. If you could not capture a real sample, say so in the PR description.
 - **Keep both READMEs in sync**: user-facing changes to `README.md` must be mirrored in `README.zh-CN.md` (same information, Chinese wording), and vice versa. Update `Docs/` when behavior or data sources change.
 - Run `swift test` before pushing; all tests must pass.
+- **Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)**: `<type>(<scope>): <description>`. Types used in this repo: `feat`, `fix`, `docs`, `test`, `build`, `chore` (add `refactor`/`perf` when applicable); scope is the affected area (`kit`, `app`, `cli`, `widget`, `design`, `roadmap`, …), omitted only for cross-cutting changes. Descriptions are written in Chinese, matching existing history. A breaking change adds `!` after the type/scope and/or a `BREAKING CHANGE:` footer.
 
 ### Vendor database entries (`usb-vendors.json`)
 
@@ -87,5 +88,6 @@ Please include:
 - **本地跑**：`swift build` / `swift test`；试玩数据用 `swift run CableScopeCLI pretty`。冒烟测试不假设任何外设存在，空机器也能跑通。
 - **分层红线**：只有 `CableKit` 允许碰 IOKit / 系统接口；CLI 与 App 只消费值类型。
 - **PR 要求**：新增解析逻辑必须带真机 fixture 测试；`usb-vendors.json` 一条 JSON 记录一个真实 VID 并注明来源；`README.md` 与 `README.zh-CN.md` 必须同步修改。
+- **提交信息**：遵循 [Conventional Commits](https://www.conventionalcommits.org/) 规范，格式 `<type>(<scope>): <description>`；type 用 `feat`/`fix`/`docs`/`test`/`build`/`chore`（视情况可加 `refactor`/`perf`），scope 为改动模块（`kit`/`app`/`cli`/`widget`/`design`/`roadmap` 等），description 沿用现有习惯写中文；破坏性变更在 type/scope 后加 `!` 并/或补 `BREAKING CHANGE:` footer。
 - **措辞红线**：不给"假线"判决；凡非直读的能力结论一律用"至少支持 / 可能"表述。
 - **报 bug**：请附机型与芯片、macOS 版本，以及相关 IOKit 类的输出（`swift run CableScopeCLI properties <类名> --json`）。
