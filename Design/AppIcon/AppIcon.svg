@@ -1,6 +1,6 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
   <title>CableScope App Icon</title>
-  <desc>A USB-C port sitting at the pivot of an open rating-gauge arc. macOS 26 Liquid Glass layered source: background / middle / foreground groups. The rounded-rect mask is applied by the system and is intentionally not baked in.</desc>
+  <desc>A USB-C port sitting at the pivot of an open rating-gauge arc. macOS 26 Liquid Glass layered source: background / foreground groups (no middle/halo layer for now). The rounded-rect mask is applied by the system and is intentionally not baked in.</desc>
 
   <defs>
     <linearGradient id="bg-gradient" x1="0" y1="0" x2="0" y2="1">
@@ -16,11 +16,6 @@
       <stop offset="0.62" stop-color="#060B2B" stop-opacity="0"/>
       <stop offset="1" stop-color="#060B2B" stop-opacity="0.34"/>
     </radialGradient>
-    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#52CBFF" stop-opacity="0.42"/>
-      <stop offset="0.6" stop-color="#52CBFF" stop-opacity="0.12"/>
-      <stop offset="1" stop-color="#52CBFF" stop-opacity="0"/>
-    </radialGradient>
     <linearGradient id="arc-gradient" x1="0.2" y1="0" x2="0.8" y2="1">
       <stop offset="0" stop-color="#8BEFFF"/>
       <stop offset="0.45" stop-color="#4FC2FF"/>
@@ -35,10 +30,9 @@
     <rect width="1024" height="1024" fill="url(#bg-vignette)"/>
   </g>
 
-  <!-- MIDDLE LAYER — soft electric halo centered on the arc's pivot, gives the mark parallax depth in Icon Composer -->
-  <g id="middle">
-    <circle cx="512" cy="619.5" r="340" fill="url(#halo)"/>
-  </g>
+  <!-- MIDDLE LAYER — intentionally omitted for now (kept simple: background + foreground only).
+       The halo lives separately in AppIcon-middle.svg / CableScope.icon (hidden) if we
+       decide to bring the glow back later. -->
 
   <!-- FOREGROUND LAYER — flat vector mark: rating-gauge arc + USB-C port at its pivot.
        Glass (specular / translucency / shadow) is added by Icon Composer, not baked in. -->
