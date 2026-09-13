@@ -105,6 +105,7 @@ enum SnapshotDiff {
         diffUSB(old: old.usbDevices, new: new.usbDevices, into: &out)
         diffDisplays(old: old.displays, new: new.displays, into: &out)
         diffThunderbolt(old: old.thunderboltDevices, new: new.thunderboltDevices, into: &out)
+        diffPDO(old: old.ports, new: new.ports, into: &out)
 
         return out
     }
@@ -115,7 +116,27 @@ enum SnapshotDiff {
         parts.append("USB ×\(snapshot.usbDevices.count)")
         parts.append("显示器 ×\(snapshot.displays.count)")
         parts.append("雷电 ×\(snapshot.thunderboltDevices.count)")
+        if !snapshot.ports.isEmpty {
+            parts.append("端口 ×\(snapshot.ports.count)")
+        }
         return parts.joined(separator: " · ")
+    }
+
+    /// PD 协商档变化（端口控制器直读；老机型无数据时自然静默）。
+    private static func diffPDO(old: [USBCPortSnapshot], new: [USBCPortSnapshot], into out: inout [String]) {
+        let oldWinning = Dictionary(old.compactMap { ($0.portID, $0.powerSource?.winning) },
+                                    uniquingKeysWith: { first, _ in first })
+        for port in new {
+            guard let after = port.powerSource?.winning else { continue }
+            let before = oldWinning[port.portID] ?? nil
+            if before != after {
+                if let before {
+                    out.append("PD 档位 \(before.label) → \(after.label)")
+                } else {
+                    out.append("PD 协商开始：\(after.label)")
+                }
+            }
+        }
     }
 
     private static func diffPower(old: PowerSnapshot?, new: PowerSnapshot?, into out: inout [String]) {

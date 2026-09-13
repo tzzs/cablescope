@@ -70,6 +70,63 @@ final class ArgsTests: XCTestCase {
         assertUsageError(["rating", "--clear"], contains: "rating 不支持参数")
     }
 
+    // MARK: properties
+
+    func testPropertiesDefaultsToUSBHostDevice() throws {
+        XCTAssertEqual(try Args.parse(["properties"]),
+                       .properties(className: CableScopeCLI.defaultRegistryClassName, json: false))
+    }
+
+    func testPropertiesWithClassNameAndJSON() throws {
+        XCTAssertEqual(try Args.parse(["properties", "AppleSmartBattery"]),
+                       .properties(className: "AppleSmartBattery", json: false))
+        XCTAssertEqual(try Args.parse(["properties", "--json", "IODisplayConnect"]),
+                       .properties(className: "IODisplayConnect", json: true))
+        XCTAssertEqual(try Args.parse(["properties", "IOThunderboltPort", "--json"]),
+                       .properties(className: "IOThunderboltPort", json: true))
+    }
+
+    func testPropertiesRejectsExtraPositionalAndUnknownFlag() {
+        assertUsageError(["properties", "A", "B"], contains: "只接受一个类名")
+        assertUsageError(["properties", "--pretty"], contains: "properties 不支持参数")
+    }
+
+    // MARK: throughput
+
+    func testThroughputDefaults() throws {
+        XCTAssertEqual(try Args.parse(["throughput"]), .throughput(volume: nil, seconds: 5.0))
+    }
+
+    func testThroughputVolumeAndSecondsBothForms() throws {
+        XCTAssertEqual(try Args.parse(["throughput", "--volume", "/Volumes/USB盘"]),
+                       .throughput(volume: "/Volumes/USB盘", seconds: 5.0))
+        XCTAssertEqual(try Args.parse(["throughput", "--volume=SanDisk", "--seconds=0.3"]),
+                       .throughput(volume: "SanDisk", seconds: 0.3))
+        // 允许小数秒
+        XCTAssertEqual(try Args.parse(["throughput", "--seconds", "1.5"]),
+                       .throughput(volume: nil, seconds: 1.5))
+    }
+
+    func testThroughputLastFlagWins() throws {
+        XCTAssertEqual(try Args.parse(["throughput", "--seconds", "3", "--seconds=8"]),
+                       .throughput(volume: nil, seconds: 8.0))
+        XCTAssertEqual(try Args.parse(["throughput", "--volume", "A", "--volume", "B"]),
+                       .throughput(volume: "B", seconds: 5.0))
+    }
+
+    func testThroughputInvalidSeconds() {
+        assertUsageError(["throughput", "--seconds", "0"], contains: "无效")
+        assertUsageError(["throughput", "--seconds", "-1"], contains: "无效")
+        assertUsageError(["throughput", "--seconds", "abc"], contains: "无效")
+        assertUsageError(["throughput", "--seconds"], contains: "需要一个数值")
+    }
+
+    func testThroughputVolumeNeedsValueAndRejectsUnknownFlag() {
+        assertUsageError(["throughput", "--volume"], contains: "需要一个挂载点路径或卷名")
+        assertUsageError(["throughput", "--volume=--seconds"], contains: "需要一个挂载点路径或卷名")
+        assertUsageError(["throughput", "--bogus"], contains: "throughput 不支持参数")
+    }
+
     // MARK: help
 
     func testHelpAnywhere() throws {

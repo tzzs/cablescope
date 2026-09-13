@@ -7,7 +7,7 @@ import Foundation
 
 extension CableScopeCLI {
     static func runRating(reset: Bool) async throws {
-        let storeURL = ratingsStoreURL
+        let storeURL = RatingStore.canonicalURL
 
         if reset {
             let fm = FileManager.default
@@ -24,16 +24,8 @@ extension CableScopeCLI {
             return
         }
 
-        // 加载历史；文件缺失 → 全新统计；文件损坏 → 提示后重新开始
-        var engine: CableRatingEngine
-        do {
-            engine = try CableRatingEngine.load(from: storeURL)
-        } catch {
-            if FileManager.default.fileExists(atPath: storeURL.path) {
-                FileHandle.standardError.write(Data("⚠️ 评级历史文件读取失败（\(error)），已重新开始统计。\n".utf8))
-            }
-            engine = CableRatingEngine()
-        }
+        // RatingStore 内含旧 app-ratings.json 的幂等迁移（App/CLI 统一到 ratings.json）。
+        var engine = RatingStore.loadEngine()
 
         let snapshot = try await acquireSnapshot()
         engine.record(snapshot)
@@ -55,12 +47,5 @@ extension CableScopeCLI {
         }
         if !observed.hasSuffix("：") { print(observed) }
         print("💾 已保存到 \(storeURL.path)")
-    }
-
-    private static var ratingsStoreURL: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Application Support", isDirectory: true)
-        return base.appendingPathComponent("CableScope/ratings.json")
     }
 }

@@ -33,8 +33,9 @@ final class FormattingTests: XCTestCase {
     }
 
     func testIDDescription() {
+        // 0x05AC 在内置 VID 目录里命中 Apple，VID 段附带厂商名
         XCTAssertEqual(makeUSB(product: nil, vendor: nil, vid: 0x05AC, pid: 0x2086).idDescription,
-                       "VID 0x05AC · PID 0x2086")
+                       "VID 0x05AC (Apple, Inc.) · PID 0x2086")
         XCTAssertEqual(makeUSB(product: nil, vendor: nil).idDescription, "", "无 ID 时输出空串")
     }
 
@@ -59,6 +60,16 @@ final class FormattingTests: XCTestCase {
         let power = PowerSnapshot(isCharging: false, batteryPercent: 80,
                                   adapterVoltageMV: nil, adapterAmperageMA: nil,
                                   pdContract: nil, adapterDescription: nil, cycleCount: nil)
-        XCTAssertEqual(power.shortSummary, "未在充电")
+        XCTAssertEqual(power.shortSummary, "未接通电源")
+    }
+
+    /// 保温/优化充电暂停：插电但 IsCharging=false、瞬时电流为负，不得展示负功率
+    func testShortSummaryConnectedButPaused() {
+        let power = PowerSnapshot(isCharging: false, batteryPercent: 86,
+                                  adapterVoltageMV: 20_000, adapterAmperageMA: -540,
+                                  pdContract: PDContract(voltageMV: 20_000, currentMA: 5_000),
+                                  adapterDescription: "pd charger", cycleCount: 40,
+                                  externalConnected: true)
+        XCTAssertEqual(power.shortSummary, "已接通电源 · 未在充电")
     }
 }

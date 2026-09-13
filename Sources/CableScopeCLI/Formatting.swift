@@ -49,9 +49,23 @@ enum Fmt {
 extension USBDeviceSnapshot {
     var displayName: String { productName ?? vendorName ?? "未知设备" }
 
+    /// VID 解析出的厂商名：优先用系统上报的 vendorName，缺失时查内置 VID 目录（M3）。
+    var resolvedVendorName: String? {
+        if let vendorName { return vendorName }
+        guard let vendorID else { return nil }
+        return VendorDirectory.shared.name(forVendorID: UInt32(vendorID))
+    }
+
     var idDescription: String {
         var parts: [String] = []
-        if let vendorID { parts.append(String(format: "VID 0x%04X", vendorID)) }
+        if let vendorID {
+            var vidText = String(format: "VID 0x%04X", vendorID)
+            // 目录里解析出厂商名时附在 hex 后，如 "VID 0x05F6 (iTE)"。
+            if let name = resolvedVendorName {
+                vidText += " (\(name))"
+            }
+            parts.append(vidText)
+        }
         if let productID { parts.append(String(format: "PID 0x%04X", productID)) }
         return parts.joined(separator: " · ")
     }
@@ -68,12 +82,15 @@ extension DisplaySnapshot {
 }
 
 extension PowerSnapshot {
-    /// 一行摘要，如 "65.4 W · 充电中"
+    /// 一行摘要，如 "65.4 W · 充电中"；保温暂停时为 "已接通电源 · 未在充电"（瞬时功率为负，不展示）。
     var shortSummary: String {
-        var parts: [String] = []
-        if let watts { parts.append(Fmt.watts(watts)) }
-        parts.append(isCharging ? "充电中" : "未在充电")
-        return parts.joined(separator: " · ")
+        if isCharging, let watts {
+            return "\(Fmt.watts(watts)) · 充电中"
+        }
+        if externalConnected {
+            return "已接通电源 · 未在充电"
+        }
+        return "未接通电源"
     }
 }
 
