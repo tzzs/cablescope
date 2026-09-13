@@ -3,12 +3,19 @@ import PackageDescription
 
 let package = Package(
     name: "CableScope",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v14)],
+    products: [
+        // 供 Xcode 工程（xcodegen 生成）与未来外部引用使用
+        .library(name: "CableKit", targets: ["CableKit"]),
+    ],
     targets: [
         // 系统 IO 适配层（IOKit / CoreFoundation / CoreGraphics 封装）
         .target(
             name: "CableKit",
-            path: "Sources/CableKit"
+            path: "Sources/CableKit",
+            resources: [
+                .process("Resources")
+            ]
         ),
         // CLI：开发期验证数据边界 + 用户可用的命令行工具
         .executableTarget(
