@@ -3,22 +3,31 @@ import SwiftUI
 
 // MARK: - 通用小组件（全部使用语义色，深浅色模式均友好）
 
-/// 分区卡片容器。
+/// 分区卡片容器。`caption` 为标题旁的灰色说明文字（可选）。
 struct SectionCard<Content: View>: View {
     private let title: String
     private let systemImage: String
+    private let caption: String?
     private let content: Content
 
-    init(title: String, systemImage: String, @ViewBuilder content: () -> Content) {
+    init(title: String, systemImage: String, caption: String? = nil, @ViewBuilder content: () -> Content) {
         self.title = title
         self.systemImage = systemImage
+        self.caption = caption
         self.content = content()
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label(title, systemImage: systemImage)
-                .font(.headline)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Label(title, systemImage: systemImage)
+                    .font(.headline)
+                if let caption {
+                    Text(caption)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
             content
         }
         .padding(14)
@@ -27,24 +36,31 @@ struct SectionCard<Content: View>: View {
     }
 }
 
-/// 充电状态徽章：正在充电（绿）/ 未充电（灰）/ 等待数据。
+/// 充电状态徽章：正在充电（绿）/ 已接通电源（蓝）/ 未接通电源（灰）/ 等待数据。
+/// "已接通电源"覆盖电池保温、优化充电暂停等 IsCharging=false 但插着电的状态。
 struct ChargingBadge: View {
     let isCharging: Bool
+    let isConnected: Bool
     let hasData: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var color: Color {
         guard hasData else { return .secondary }
-        return isCharging ? .green : .gray
+        if isCharging { return .green }
+        return isConnected ? .blue : .gray
     }
 
     private var text: String {
         if !hasData { return "等待数据" }
-        return isCharging ? "正在充电" : "未充电"
+        if isCharging { return "正在充电" }
+        return isConnected ? "已接通电源" : "未接通电源"
     }
 
     private var icon: String {
         if !hasData { return "hourglass" }
-        return isCharging ? "bolt.fill" : "bolt.slash"
+        if isCharging { return "bolt.fill" }
+        return isConnected ? "powerplug.fill" : "bolt.slash"
     }
 
     var body: some View {
@@ -54,6 +70,10 @@ struct ChargingBadge: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(color.opacity(0.14), in: Capsule())
+            .accessibilityElement(children: .combine)
+            // 充电中闪电脉冲（macOS 14+）：用动效传达"正在取电"的活跃状态；
+            // 尊重系统的"减弱动态效果"（HIG 无障碍要求，symbolEffect 不会自动降级）。
+            .symbolEffect(.pulse, options: .repeating, isActive: isCharging && !reduceMotion)
     }
 }
 
@@ -79,6 +99,7 @@ struct InfoChip: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
         .background(color.opacity(isProminent ? 0.22 : 0.14), in: Capsule())
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -109,23 +130,6 @@ struct SpeedBadge: View {
     }
 }
 
-/// 标题 + 数值的小指标。
-struct MetricLabel: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.callout.weight(.medium))
-                .monospacedDigit()
-        }
-    }
-}
-
 /// 空状态提示。
 struct EmptyHint: View {
     let text: String
@@ -139,6 +143,7 @@ struct EmptyHint: View {
         .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -146,14 +151,18 @@ struct EmptyHint: View {
 struct MenuRowButton: View {
     let title: String
     let systemImage: String
+    /// 动作进行中（如"检查更新"轮询期间）图标脉冲提示；Reduce Motion 下静止。
+    var isInProgress: Bool = false
     let action: () -> Void
 
     @State private var isHovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
                 .font(.callout)
+                .symbolEffect(.pulse, options: .repeating, isActive: isInProgress && !reduceMotion)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 5)
                 .padding(.horizontal, 8)

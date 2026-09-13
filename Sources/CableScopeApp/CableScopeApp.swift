@@ -9,6 +9,9 @@ struct CableScopeApp: App {
         // 菜单栏常驻形态：不占 Dock、不带前台激活（从 SwiftPM 可执行文件运行时必要）。
         NSApplication.shared.setActivationPolicy(.accessory)
 
+        // 插拔通知：前台也弹横幅（无 bundle 的 SPM 运行会自动跳过）。
+        NotificationController.activate()
+
         let viewModel = MonitorViewModel()
         _viewModel = StateObject(wrappedValue: viewModel)
 
@@ -29,6 +32,12 @@ struct CableScopeApp: App {
         // .accessory 策略下 SwiftUI 不会自动呈现 WindowGroup 窗口（启动时只有状态项窗口）；
         // 由 MenuBarLabelView 出现时通过 openWindow 拉起主窗口。
         mainWindow
+
+        // IOKit 属性检查器：按类名浏览 IORegistry 全量属性（调试/高级用途）。
+        Window("IOKit 属性检查器", id: "registry") {
+            RegistryInspectorView()
+        }
+        .windowResizability(.contentMinSize)
     }
 
     private var mainWindow: some Scene {

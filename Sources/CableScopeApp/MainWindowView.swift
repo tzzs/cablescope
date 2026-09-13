@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// 主窗口：状态头部 + 充电 / 数据传输 / 视频 / 线缆能力 四张分区卡。
+/// 主窗口（方案 A）：状态头部 + 整机概览卡 + 线缆卡片行 + 选中线详情卡。
+/// 电池 / 输入功率 / 显示器属于整机区；每根线缆一张卡片，点选后下方展示该线详情。
 struct MainWindowView: View {
     @ObservedObject var viewModel: MonitorViewModel
 
@@ -8,10 +9,9 @@ struct MainWindowView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 HeaderView(viewModel: viewModel)
-                ChargingPanelView(viewModel: viewModel)
-                TransferPanelView(viewModel: viewModel)
-                VideoPanelView(viewModel: viewModel)
-                RatingCardView(viewModel: viewModel)
+                OverviewSectionView(viewModel: viewModel)
+                CableCardsSectionView(viewModel: viewModel)
+                SessionDetailSectionView(viewModel: viewModel)
             }
             .padding(16)
         }
@@ -23,6 +23,8 @@ struct MainWindowView: View {
 
 private struct HeaderView: View {
     @ObservedObject var viewModel: MonitorViewModel
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 12) {
@@ -41,16 +43,26 @@ private struct HeaderView: View {
                 }
             }
             Spacer()
-            ChargingBadge(isCharging: viewModel.isCharging, hasData: viewModel.snapshot != nil)
-            if viewModel.isRefreshing {
-                ProgressView()
-                    .controlSize(.small)
+            ChargingBadge(isCharging: viewModel.isCharging,
+                          isConnected: viewModel.isExternalConnected,
+                          hasData: viewModel.snapshot != nil)
+            Button {
+                openWindow(id: "registry")
+                NSApplication.shared.activate(ignoringOtherApps: true)
+            } label: {
+                Label("IOKit 属性", systemImage: "list.bullet.rectangle.portrait")
             }
+            .keyboardShortcut("i", modifiers: .command)
             Button {
                 viewModel.refresh()
             } label: {
                 Label("刷新", systemImage: "arrow.clockwise")
+                    // 采集中图标脉冲替代独立进度圈（.rotate 需 macOS 15，取 14 可用的 pulse）；
+                    // Reduce Motion 下静止。
+                    .symbolEffect(.pulse, options: .repeating,
+                                  isActive: viewModel.isRefreshing && !reduceMotion)
             }
+            .keyboardShortcut("r", modifiers: .command)
             .disabled(viewModel.isRefreshing)
         }
     }

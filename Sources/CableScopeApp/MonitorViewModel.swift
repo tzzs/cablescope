@@ -28,12 +28,15 @@ final class MonitorViewModel: ObservableObject {
     @Published private(set) var powerHistory: [PowerPoint] = []
     @Published private(set) var hasPowerData = false
     @Published private(set) var isRefreshing = false
+    /// 当前选中的线缆会话（CableSession.id）；nil = 回退默认（第一根）。
+    @Published private(set) var selectedSessionID: String?
 
     // MARK: 依赖
 
     private let monitor: CableMonitor
     private var ratingEngine: CableRatingEngine
     private let ratingsURL: URL
+    private let notifications = NotificationController()
 
     // MARK: 后台任务
 
@@ -42,12 +45,9 @@ final class MonitorViewModel: ObservableObject {
 
     init(monitor: CableMonitor = CableMonitor(), ratingsURL: URL? = nil) {
         self.monitor = monitor
-        self.ratingsURL = ratingsURL ?? Self.defaultRatingsURL()
-        if let restored = try? CableRatingEngine.load(from: self.ratingsURL) {
-            self.ratingEngine = restored
-        } else {
-            self.ratingEngine = CableRatingEngine()
-        }
+        self.ratingsURL = ratingsURL ?? RatingStore.canonicalURL
+        // RatingStore 内含旧 app-ratings.json 的幂等迁移（App/CLI 统一到 ratings.json）。
+        self.ratingEngine = RatingStore.loadEngine()
         self.rating = ratingEngine.overallRating()
     }
 
@@ -97,19 +97,14 @@ final class MonitorViewModel: ObservableObject {
 
     var isCharging: Bool { snapshot?.power?.isCharging ?? false }
 
-    /// 当前充电功率（仅充电中且读数 > 0 时有效）。
+    /// 适配器已接通（无论是否正在充电，见 PowerSnapshot.externalConnected）。
+    var isExternalConnected: Bool { snapshot?.power?.externalConnected ?? false }
+
+    /// 当前充电功率（仅充电中且读数 > 0 时有效；保温暂停时 Amperage 为负，自然落入 nil）。
     var displayWatts: Double? {
         guard let power = snapshot?.power, power.isCharging,
               let watts = power.watts, watts > 0 else { return nil }
         return watts
-    }
-
-    /// 菜单栏标题："⚡65W" / "⚡--"。
-    var menuLabel: String {
-        if let watts = displayWatts {
-            return String(format: "⚡%.0fW", watts)
-        }
-        return "⚡--"
     }
 
     /// 当前协商到的最高 USB 速率（"最新 USB 速率"）。
@@ -117,6 +112,81 @@ final class MonitorViewModel: ObservableObject {
         snapshot?.usbDevices
             .compactMap(\.speed)
             .max { $0.bitsPerSecond < $1.bitsPerSecond }
+    }
+
+    // MARK: - 线缆会话（多线缆 UI 的一等公民）
+
+    /// 按物理端口聚合的线缆会话（快照采集时由 PortGrouping 组装）。
+    var sessions: [CableSession] { snapshot?.sessions ?? [] }
+
+    /// 当前选中的会话；选择失效（拔线）或尚未选择时回退第一根。
+    var selectedSession: CableSession? {
+        sessions.first { $0.id == selectedSessionID } ?? sessions.first
+    }
+
+    /// 整机电源数据归属到指定会话（nil = 不可归属，充电信息只在整机概览展示）。
+    /// 归属规则见 PortGrouping.attributablePowerSessionID：单线无歧义；多线时恰好一个
+    /// 活跃端口在收电（powerSource.winning）才归属该端口，避免把充电数据记到别的线上。
+    func power(for session: CableSession) -> PowerSnapshot? {
+        guard let snapshot else { return nil }
+        let ownerID = PortGrouping.attributablePowerSessionID(sessions: snapshot.sessions,
+                                                              ports: snapshot.ports,
+                                                              power: snapshot.power)
+        return ownerID == session.id ? snapshot.power : nil
+    }
+
+    /// 切换选中的线缆会话（nil = 回退默认选择）。
+    func selectSession(_ id: String?) {
+        selectedSessionID = id
+    }
+
+    /// 方向键在卡片间移动选中（键盘可达性）；越界后循环。
+    func selectAdjacentSession(offset: Int) {
+        let ids = sessions.map(\.id)
+        guard !ids.isEmpty else { return }
+        let current = ids.firstIndex { $0 == selectedSessionID } ?? 0
+        selectedSessionID = ids[(current + offset + ids.count) % ids.count]
+    }
+
+    /// 指定线缆会话的历史评级（端口峰值不清零）。
+    func rating(forSessionID sessionID: String) -> CableRating? {
+        ratingEngine.rating(forSessionID: sessionID)
+    }
+
+    // MARK: - 端口控制器数据（AppleHPM 直读）
+
+    /// 会话对应的端口控制器快照（USB 会话按 physicalPortID 配对；雷雳会话 v1 暂无对应关系）。
+    func port(for session: CableSession) -> USBCPortSnapshot? {
+        guard let physicalPortID = session.physicalPortID else { return nil }
+        return snapshot?.ports.first { $0.portID == physicalPortID }
+    }
+
+    /// 当前协商档的功率（WinningPowerSourceOption；未协商/无端口数据时为 nil）。
+    var negotiatedPDOVoltageMV: Int? {
+        snapshot?.ports.compactMap { $0.powerSource?.winning?.voltageMV }.max()
+    }
+
+    var negotiatedPDOWatts: Double? {
+        snapshot?.ports.compactMap { $0.powerSource?.winning?.watts }.max()
+    }
+
+    /// 充电瓶颈诊断（派生自当前快照，纯展示）。
+    var chargingDiagnostics: ChargingDiagnostics? {
+        guard let power = snapshot?.power else { return nil }
+        return DiagnosticsEngine.diagnoseCharging(power: power,
+                                                  adapterMaxWatts: negotiatedPDOWatts)
+    }
+
+    /// 展示用的 PD 档位来源：优先取正在协商的端口，否则取档位最多的一份。
+    var activePDO: PDOPortPowerSnapshot? {
+        let sources = snapshot?.ports.compactMap(\.powerSource) ?? []
+        return sources.first { $0.winning != nil }
+            ?? sources.max { $0.options.count < $1.options.count }
+    }
+
+    /// 近 5 分钟是否出现过非零功率。未充电时采样全为 0，画出来是无意义的平线。
+    var hasNonZeroPower: Bool {
+        powerHistory.contains { $0.isFinite && $0.watts > 0.01 }
     }
 
     /// 功率曲线分段：NaN（无数据）断开后的连续段，段与段之间不连线。
@@ -142,7 +212,12 @@ final class MonitorViewModel: ObservableObject {
     private func ingest(_ snapshot: CableSnapshot) {
         self.snapshot = snapshot
 
-        // 评级：记录 + 持久化（引擎按 LocationID 聚合历史峰值，落盘到 app-ratings.json）。
+        // 选中会话被拔除时自动回退到第一根，避免详情区悬空。
+        if let current = selectedSessionID, !snapshot.sessions.contains(where: { $0.id == current }) {
+            selectedSessionID = snapshot.sessions.first?.id
+        }
+
+        // 评级：记录 + 持久化（引擎按线缆会话聚合历史峰值，落盘到统一 ratings.json）。
         ratingEngine.record(snapshot)
         rating = ratingEngine.overallRating()
         do {
@@ -150,6 +225,9 @@ final class MonitorViewModel: ObservableObject {
         } catch {
             // 持久化失败不影响 UI，下次快照会重试。
         }
+
+        // 插拔通知（内容有变化才到 ingest，session 集合变化即插拔事件）。
+        notifications.process(snapshot: snapshot, port: { self.port(for: $0) })
     }
 
     private func appendPowerSample() {
@@ -170,11 +248,5 @@ final class MonitorViewModel: ObservableObject {
         if watts.isFinite {
             hasPowerData = true
         }
-    }
-
-    private static func defaultRatingsURL() -> URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory
-        return base.appendingPathComponent("CableScope/app-ratings.json")
     }
 }
