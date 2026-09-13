@@ -22,13 +22,20 @@ struct CableScopeApp: App {
         MenuBarExtra {
             MenuBarPanelView(viewModel: viewModel)
         } label: {
-            MenuBarLabelView(viewModel: viewModel)
+            MenuBarLabelView(viewModel: viewModel, opensMainOnLaunch: true)
         }
         .menuBarExtraStyle(.window)
 
-        Window("CableScope", id: "main") {
+        // .accessory 策略下 SwiftUI 不会自动呈现 WindowGroup 窗口（启动时只有状态项窗口）；
+        // 由 MenuBarLabelView 出现时通过 openWindow 拉起主窗口。
+        mainWindow
+    }
+
+    private var mainWindow: some Scene {
+        WindowGroup("CableScope", id: "main") {
             MainWindowView(viewModel: viewModel)
                 .frame(minWidth: 460, idealWidth: 520, minHeight: 440)
         }
+        .windowResizability(.contentMinSize)
     }
 }

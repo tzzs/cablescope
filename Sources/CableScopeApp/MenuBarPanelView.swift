@@ -4,6 +4,11 @@ import SwiftUI
 /// 独立 View + @ObservedObject，保证 VM 变化时状态项文字实时刷新。
 struct MenuBarLabelView: View {
     @ObservedObject var viewModel: MonitorViewModel
+    /// 启动时自动呈现主窗口（accessory 策略下 SwiftUI 不自动展示 WindowGroup）
+    var opensMainOnLaunch: Bool = false
+
+    @Environment(\.openWindow) private var openWindow
+    @State private var hasOpenedMain = false
 
     var body: some View {
         HStack(spacing: 3) {
@@ -12,6 +17,14 @@ struct MenuBarLabelView: View {
             Text(viewModel.menuLabel)
                 .font(.system(size: 11, weight: .medium, design: .rounded))
                 .monospacedDigit()
+        }
+        .task {
+            guard opensMainOnLaunch, !hasOpenedMain else { return }
+            hasOpenedMain = true
+            // 等场景装配完成后再拉起主窗口
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            openWindow(id: "main")
+            NSApplication.shared.activate(ignoringOtherApps: true)
         }
     }
 }
