@@ -1,0 +1,100 @@
+name: CableScope
+options:
+  bundleIdPrefix: com.cablescope
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+configs:
+  Debug: debug
+  Release: release
+  AppStore: release
+packages:
+  CableKit:
+    path: "."
+targets:
+  CableScopeApp:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/CableScopeApp
+      # App 图标资产（直接指向 .xcassets，xcodegen 识别为可编译资产；放 Sources 外避免 SwiftPM 干扰）
+      - path: Packaging/assets/AppIcon.xcassets
+    dependencies:
+      - package: CableKit
+        product: CableKit
+      # 桌面小组件扩展；embed 进 App 的 PlugIns（xcodegen 处理拷贝与依赖）
+      - target: CableScopeWidget
+        embed: true
+    # Info.plist 放在 Sources 之外：放 Sources 里会被 SwiftPM 当作未声明资源报警告
+    info:
+      path: Packaging/info/CableScopeApp-Info.plist
+      properties:
+        CFBundleDisplayName: CableScope
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        LSUIElement: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cablescope.app
+        MARKETING_VERSION: 1.0.0
+        CURRENT_PROJECT_VERSION: 1
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # 注：SWIFT_VERSION 是语言模式，仅接受 4/4.2/5/6；工具链版本（swift-tools-version:5.10）
+        # 由所选 Xcode 决定，写 5.10 会导致 swiftc 报 invalid value。
+        SWIFT_VERSION: "5.0"
+      configs:
+        AppStore:
+          CODE_SIGN_ENTITLEMENTS: Packaging/entitlements/mas.entitlements
+  CableScopeWidget:
+    type: app-extension
+    platform: macOS
+    sources:
+      - Sources/CableScopeWidget
+    dependencies:
+      - package: CableKit
+        product: CableKit
+    info:
+      path: Packaging/info/CableScopeWidget-Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        CFBundleDisplayName: CableScope Widget
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cablescope.app.widget
+        MARKETING_VERSION: 1.0.0
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "5.0"
+      configs:
+        AppStore:
+          CODE_SIGN_ENTITLEMENTS: Packaging/entitlements/widget-mas.entitlements
+  CableScopeCLI:
+    type: tool
+    platform: macOS
+    sources:
+      - Sources/CableScopeCLI
+    dependencies:
+      - package: CableKit
+        product: CableKit
+    settings:
+      base:
+        PRODUCT_NAME: CableScopeCLI
+schemes:
+  CableScopeApp:
+    build:
+      targets:
+        CableScopeApp: all
+    run:
+      config: Debug
+    archive:
+      config: AppStore
+  CableScopeWidget:
+    build:
+      targets:
+        CableScopeWidget: all
+  CableScopeCLI:
+    build:
+      targets:
+        CableScopeCLI: all
+    run:
+      config: Debug

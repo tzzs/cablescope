@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, package, notarize & publish
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # tag v0.2.0 -> 版本号 0.2.0（写入 App Info.plist 与 DMG 文件名）
+      - name: Derive version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Releasing CableScope ${VERSION} (tag ${GITHUB_REF_NAME})"
+
+      - name: Swift release build
+        run: swift build -c release
+
+      # bundle_app.sh 产出 build/CableScope.app；
+      # APP_VERSION 注入 Info.plist；CODESIGN_IDENTITY 来自 secrets，
+      # 缺失时脚本跳过签名，产出未签名 bundle（不失败）。
+      - name: Bundle app (sign only when certificate secret present)
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+          DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
+        run: |
+          if [[ -n "${DEVELOPER_ID_APPLICATION:-}" ]]; then
+            export CODESIGN_IDENTITY="${DEVELOPER_ID_APPLICATION}"
+            echo "检测到 DEVELOPER_ID_APPLICATION，将对 App 进行 Developer ID 签名。"
+          else
+            echo "::notice::缺少 DEVELOPER_ID_APPLICATION secret，跳过签名，产出未签名 App。"
+          fi
+          ./scripts/bundle_app.sh release
+
+      # 始终打 DMG（无论是否签名），供无证书环境也能发布产物
+      - name: Create DMG
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          DMG="build/CableScope-${VERSION}.dmg"
+          rm -rf build/dmg-staging
+          mkdir -p build/dmg-staging
+          ditto "build/CableScope.app" "build/dmg-staging/CableScope.app"
+          hdiutil create -volname "CableScope ${VERSION}" \
+            -srcfolder build/dmg-staging -ov -format UDZO "$DMG"
+          echo "DMG_PATH=${DMG}" >> "$GITHUB_ENV"
+          echo "已生成 ${DMG}"
+
+      # 公证需要全部 4 个 secrets；任一缺失则跳过并提示，不让流水线失败
+      - name: Notarize DMG (skipped when secrets absent)
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [[ -z "${APPLE_ID:-}" || -z "${APPLE_TEAM_ID:-}" || -z "${APPLE_APP_SPECIFIC_PASSWORD:-}" || -z "${DEVELOPER_ID_APPLICATION:-}" ]]; then
+            echo "::notice::公证 secrets 缺失（APPLE_ID / APPLE_TEAM_ID / APPLE_APP_SPECIFIC_PASSWORD / DEVELOPER_ID_APPLICATION），跳过签名与公证，发布未公证 DMG。"
+            exit 0
+          fi
+          set -euo pipefail
+          DMG="build/CableScope-${VERSION}.dmg"
+
+          # App 已在 bundle 步骤完成 Developer ID + hardened runtime 签名；
+          # DMG 内的 App 签名不变，直接对 DMG 公证。
+          echo "提交公证（notarytool，等待完成）…"
+          xcrun notarytool submit "$DMG" \
+            --apple-id "${APPLE_ID}" \
+            --team-id "${APPLE_TEAM_ID}" \
+            --password "${APPLE_APP_SPECIFIC_PASSWORD}" \
+            --wait
+
+          echo "装订公证票据（stapler）…"
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
+          echo "公证完成。"
+
+      - name: Create GitHub release and upload artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          DMG="build/CableScope-${VERSION}.dmg"
+          test -f "$DMG"
+          test -f ".build/release/CableScopeCLI"
+          gh release create "$TAG" \
+            --title "CableScope ${TAG}" \
+            --generate-notes \
+            "$DMG" \
+            ".build/release/CableScopeCLI"
+          echo "已上传 ${DMG} 与 CableScopeCLI 二进制。"

@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build & Test (macOS 15)
+    # 需要最新 Xcode/Swift 工具链；macos-15 自带 Swift 6.x，可编译 swift-tools 5.10 包
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: swift --version
+
+      - name: Build (debug)
+        run: swift build
+
+      - name: Test
+        # 部分用例含真机冒烟（USB-C / 电池 / IORegistry），在空环境的 runner 上
+        # 会走"无设备/无数据"降级分支，属合法结果，不应失败。
+        run: swift test
