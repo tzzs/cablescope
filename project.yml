@@ -19,6 +19,8 @@ targets:
       - Sources/CableScopeApp
       # App 图标资产（直接指向 .xcassets，xcodegen 识别为可编译资产；放 Sources 外避免 SwiftPM 干扰）
       - path: Packaging/assets/AppIcon.xcassets
+      # MAS 隐私清单（App Store 提审要求；随构建拷贝到 bundle 根）
+      - path: Packaging/privacy/PrivacyInfo.xcprivacy
     dependencies:
       - package: CableKit
         product: CableKit

@@ -42,8 +42,14 @@ PLIST
 
 cp "$BIN_PATH/CableScopeApp" "$APP_DIR/Contents/MacOS/CableScopeApp"
 
+# ---- 隐私清单（MAS 提审要求；DMG 分发同样无害）----
+if [[ -f "Packaging/privacy/PrivacyInfo.xcprivacy" ]]; then
+    cp "Packaging/privacy/PrivacyInfo.xcprivacy" "$APP_DIR/Contents/Resources/"
+fi
+
 # ---- App 图标：从全出血 1024 master 生成经典 .icns（全 macOS 版本兼容，无需 actool）----
-ICON_MASTER="Packaging/assets/AppIcon.xcassets/AppIcon.appiconset/icon-1024.png"
+# master 即 appiconset 的 512@2x 槽位（1024×1024），与 Xcode 路径同源
+ICON_MASTER="Packaging/assets/AppIcon.xcassets/AppIcon.appiconset/icon_512x512@2x.png"
 if [[ -f "$ICON_MASTER" ]] && command -v iconutil >/dev/null 2>&1; then
     ICONSET="$(mktemp -d)/AppIcon.iconset"
     mkdir -p "$ICONSET"
