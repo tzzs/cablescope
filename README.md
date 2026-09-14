@@ -58,6 +58,7 @@ swift run CableScopeApp
 | `watch` | Watch for changes and print diff lines on content change (`--interval N` adjusts the fallback polling interval) |
 | `rating` | Record and show the cable capability card (persisted under `~/Library/Application Support/CableScope/`); `--reset` clears it |
 | `properties [Class]` | Enumerate IORegistry entries of an IOKit class and print **all** raw properties (ioreg-style text; `--json` for structured output) |
+| `throughput` | Optional read/write throughput benchmark on a mounted USB volume (writes a temporary test file; `--volume <path\|name>` picks the volume, `--seconds N` adjusts per-phase duration, default 5s) |
 
 ## Project Layout
 
@@ -71,8 +72,8 @@ Sources/
 ├── CableScopeCLI/     # Command-line tool
 └── CableScopeApp/     # SwiftUI menu bar app (MenuBarExtra + main window + Swift Charts power chart)
 Tests/
-├── CableKitTests/       # 70 tests: data contracts, per-port rating engine + migration, grouping, four parsers (real-device samples) + live smoke tests
-└── CableScopeCLITests/  # 34 tests: argument parsing, formatting, watch snapshot diffing
+├── CableKitTests/       # 130 tests: data contracts, per-port rating engine + migration, grouping, parsers (real-device samples), diagnostics, vendor directory, rating store + live smoke tests
+└── CableScopeCLITests/  # 43 tests: argument parsing (incl. throughput), formatting, watch snapshot diffing
 Docs/                  # Data-source guide (IOKit) & optimization roadmap
 scripts/bundle_app.sh  # .app bundling script
 ```
@@ -86,15 +87,16 @@ scripts/bundle_app.sh  # .app bundling script
 
 ## Status
 
-- [x] CableKit adapter layer (USB/power/displays/Thunderbolt + snapshot stream + rating engine) — 164/164 tests passing (including the CLI test target)
-- [x] All five CLI subcommands (validated on real hardware: PD contract detection, e-marker inference, rating persistence)
+- [x] CableKit adapter layer (USB/power/displays/Thunderbolt + snapshot stream + rating engine) — 173/173 tests passing (including the CLI test target)
+- [x] All six CLI subcommands (validated on real hardware: PD contract detection, e-marker inference, rating persistence)
 - [x] macOS menu bar app (system overview, one card per cable with per-cable detail, live power chart, per-port rating)
 - [x] IOKit property inspector (App window + CLI `properties` subcommand; snapshots carry full `rawProperties`)
 - [x] Multi-cable layout (per-port cable sessions, USB root-port grouping + Thunderbolt receptacle numbers, legacy ratings.json migration)
 - [x] Plug/unplug system notifications (UNUserNotificationCenter)
-- [ ] Real-world USB throughput measurement (5-second read/write benchmark)
+- [x] Real-world USB throughput measurement (CLI `throughput` subcommand + App "Throughput" section: read/write benchmark on a mounted volume)
 - [x] IOKit notifications to replace polling (AppleSmartBattery interest + USB matching notifications with polling fallback)
-- [ ] Official distribution (notarization), app icon (Xcode path)
+- [x] App icon (classic Assets.car appiconset + Icon Composer Liquid Glass layers, both Xcode and SwiftPM/DMG paths)
+- [ ] Official distribution (notarized DMG release; tag `v0.1.0` cut locally, GitHub Secrets and the actual signed release still pending)
 
 ### Known Limitations
 

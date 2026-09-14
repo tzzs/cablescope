@@ -56,6 +56,7 @@ swift run CableScopeApp
 | `watch` | 监听变化，内容变化时打印差异行（`--interval N` 调整兜底轮询） |
 | `rating` | 记录并显示线缆能力卡（持久化于 `~/Library/Application Support/CableScope/`），`--reset` 清空 |
 | `properties [类名]` | 按类名枚举 IORegistry 条目，输出**全量** IOKit 属性（ioreg 风格文本；`--json` 结构化输出） |
+| `throughput` | 可选的 U 盘实测吞吐基准（写入临时测试文件读写测速；`--volume <路径\|卷名>` 选卷，`--seconds N` 调整每阶段时长，默认 5 秒） |
 
 ## 工程结构
 
@@ -69,8 +70,8 @@ Sources/
 ├── CableScopeCLI/     # 命令行工具
 └── CableScopeApp/     # SwiftUI 菜单栏 App（MenuBarExtra + 主窗口 + Swift Charts 功率曲线）
 Tests/
-├── CableKitTests/       # 126 个测试：数据契约、按端口分桶评级引擎 + 旧格式迁移、端口分组、六组解析器（真机样例回归）+ 诊断/评级存储/真机冒烟
-└── CableScopeCLITests/  # 34 个测试：参数解析、格式化、watch 快照差异计算
+├── CableKitTests/       # 130 个测试：数据契约、按端口分桶评级引擎 + 旧格式迁移、端口分组、解析器（真机样例回归）、诊断、厂商库、评级存储 + 真机冒烟
+└── CableScopeCLITests/  # 43 个测试：参数解析（含 throughput）、格式化、watch 快照差异计算
 Docs/                  # 数据获取指南 / 优化路线图
 scripts/bundle_app.sh  # .app 打包脚本
 ```
@@ -84,15 +85,16 @@ scripts/bundle_app.sh  # .app 打包脚本
 
 ## 开发状态
 
-- [x] CableKit 适配层（USB/电源/显示器/雷电 + 快照流 + 评级引擎）— 164/164 测试通过（含 CLI 测试 target）
-- [x] CLI 五个子命令（真机验证：PD 合同识别、e-marker 推断、评级持久化）
+- [x] CableKit 适配层（USB/电源/显示器/雷电 + 快照流 + 评级引擎）— 173/173 测试通过（含 CLI 测试 target）
+- [x] CLI 六个子命令（真机验证：PD 合同识别、e-marker 推断、评级持久化）
 - [x] macOS 菜单栏 App（整机概览、每线一卡 + 线缆详情、实时功率曲线、端口评级）
 - [x] IOKit 属性检查器（App 专属窗口 + CLI `properties` 子命令；快照携带全量 `rawProperties`）
 - [x] 多线缆布局（按物理端口聚合线缆会话：USB 根端口分组 + 雷雳 receptacle 编号，旧 ratings.json 自动迁移）
 - [x] 插拔系统通知（UNUserNotificationCenter）
-- [ ] USB 实测吞吐（5 秒读写测速）
+- [x] USB 实测吞吐（CLI `throughput` 子命令 + App「吞吐实测」区：挂载卷读写测速）
 - [x] IOKit 通知替代轮询（AppleSmartBattery 兴趣通知 + USB 匹配通知 + 轮询兜底的混合模式）
-- [ ] 正式分发（公证）、App 图标（Xcode 路径）
+- [x] App 图标（经典 Assets.car appiconset + Icon Composer Liquid Glass 分层，Xcode 与 SwiftPM/DMG 两路均已接入）
+- [ ] 正式分发（公证签名发布；本地已打 tag `v0.1.0`，GitHub Secrets 与实际签名发布仍待执行）
 
 ### 已知限制
 

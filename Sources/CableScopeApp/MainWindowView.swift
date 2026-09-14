@@ -12,6 +12,7 @@ struct MainWindowView: View {
                 OverviewSectionView(viewModel: viewModel)
                 CableCardsSectionView(viewModel: viewModel)
                 SessionDetailSectionView(viewModel: viewModel)
+                ThroughputSectionView()
             }
             .padding(16)
         }
