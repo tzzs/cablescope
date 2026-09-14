@@ -19,6 +19,9 @@ targets:
       - Sources/CableScopeApp
       # App 图标资产（直接指向 .xcassets，xcodegen 识别为可编译资产；放 Sources 外避免 SwiftPM 干扰）
       - path: Packaging/assets/AppIcon.xcassets
+      # Icon Composer 分层图标（Liquid Glass）：actool 编译进 Assets.car，新系统渲染分层玻璃，
+      # 旧系统自动回退经典渲染；与上面 appiconset（.icns 同源）并存，见 Design/AppIcon/README
+      - path: Design/AppIcon/CableScope.icon
       # MAS 隐私清单（App Store 提审要求；随构建拷贝到 bundle 根）
       - path: Packaging/privacy/PrivacyInfo.xcprivacy
     dependencies:
