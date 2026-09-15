@@ -217,9 +217,10 @@ struct EmptyHint: View {
 /// 菜单面板里的整行按钮（带悬停高亮，接近原生菜单项）。
 /// 不带前置图标——原生 NSMenu 的纯文字项就是这个样式，同时也避免了不同 SF Symbol
 /// 字形宽度不一导致的文字起点错位（Label 不保留固定宽度的图标列）。
-/// 不额外加左右内边距——直接吃外层面板的 padding，文字起点才能和分隔线上方的
-/// 内容（"已连接线缆"、电量行等）对齐；悬停高亮因此贴着面板的内容宽度铺满，
-/// 也更接近原生菜单里高亮条几乎通栏的样子。
+/// 高亮背景仍然贴着面板的内容宽度铺满（`.frame(maxWidth: .infinity)` 在内部
+/// 水平 padding 之后应用，背景尺寸不受影响），和分隔线上方的内容（"已连接线缆"、
+/// 电量行等）保持同一条外边界；但文字/勾选标记相对这条外边界额外留了内边距，
+/// 避免像早期版本那样文字直接贴着高亮矩形的左右边缘，没有呼吸空间。
 struct MenuRowButton: View {
     let title: String
     /// 动作进行中（如"检查更新"轮询期间）在行尾显示小号进度指示。
@@ -230,6 +231,8 @@ struct MenuRowButton: View {
     let action: () -> Void
 
     @State private var isHovering = false
+
+    private static let horizontalInset: CGFloat = 8
 
     var body: some View {
         Button(action: action) {
@@ -245,6 +248,7 @@ struct MenuRowButton: View {
                         .font(.callout.weight(.semibold))
                 }
             }
+            .padding(.horizontal, Self.horizontalInset)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 4)
             .background(
