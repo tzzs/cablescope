@@ -61,7 +61,9 @@ public enum ThroughputTester {
     // MARK: - 候选卷
 
     /// 卷信息查询用的 resource key（resourceValues(forKeys:) 需要 Set，显式类型避免推断失败）
-    private static let volumeInfoKeys: Set<URLResourceKey> = [.volumeNameKey, .volumeIsRemovableKey, .volumeIsInternalKey]
+    private static let volumeInfoKeys: Set<URLResourceKey> = [
+        .volumeNameKey, .volumeIsRemovableKey, .volumeIsInternalKey, .volumeIsReadOnlyKey
+    ]
     private static let volumeNameKeys: Set<URLResourceKey> = [.volumeNameKey]
     private static let volumeCapacityKeys: Set<URLResourceKey> = [.volumeAvailableCapacityForImportantUsageKey]
 
@@ -70,6 +72,10 @@ public enum ThroughputTester {
     /// 注意：/System/Volumes/*（系统合成卷）与 CoreSimulator 的模拟器镜像卷
     /// 也会被 resource key 标成"外部/可移动"，必须一并排除——否则恰为唯一
     /// "候选"时会被自动选中，把测速文件写进系统数据卷。
+    /// 只读挂载卷（如安装用的 DMG 镜像）同样要排除：`volumeIsRemovableKey` 反映的是
+    /// "介质是否可弹出"而非"是否可写"，DMG 挂载出来的虚拟卷完全符合"可弹出"语义、
+    /// 会混进候选列表，但其可用容量恒为 0，测速一上来就撞空间预检报错——与其让用户
+    /// 选中一个注定测不了的卷，不如从候选阶段就排掉。
     public static func listCandidateVolumes() -> [(url: URL, name: String, isRemovable: Bool)] {
         let mounted = FileManager.default.mountedVolumeURLs(
             includingResourceValuesForKeys: Array(volumeInfoKeys),
@@ -83,9 +89,12 @@ public enum ThroughputTester {
             let values = try? url.resourceValues(forKeys: volumeInfoKeys)
             let isInternal = values?.volumeIsInternal ?? false
             let isRemovable = values?.volumeIsRemovable ?? false
+            let isReadOnly = values?.volumeIsReadOnly ?? false
             let name = values?.volumeName ?? url.lastPathComponent
-            // 再排除内置盘（如 /Volumes/Macintosh HD - Data），避免误测内置盘
+            // 排除内置盘（如 /Volumes/Macintosh HD - Data），避免误测内置盘；
+            // 再排除只读卷（如已挂载的安装 DMG），避免选中即报错的候选。
             guard isRemovable || !isInternal else { continue }
+            guard !isReadOnly else { continue }
             candidates.append((url: url, name: name, isRemovable: isRemovable))
         }
         return candidates
