@@ -11,8 +11,7 @@ struct MenuBarLabelView: View {
     @State private var hasOpenedMain = false
 
     var body: some View {
-        Image(systemName: "cable.connector")
-            .imageScale(.small)
+        BrandGlyph.image(size: CGSize(width: 15, height: 11.25))
             .task {
             guard opensMainOnLaunch, !hasOpenedMain else { return }
             hasOpenedMain = true
@@ -41,8 +40,11 @@ struct MenuBarPanelView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label("CableScope", systemImage: "cable.connector")
-                    .font(.headline)
+                HStack(spacing: 6) {
+                    BrandGlyph.image(size: CGSize(width: 20, height: 15))
+                    Text("CableScope")
+                        .font(.headline)
+                }
                 Spacer()
                 ChargingBadge(isCharging: viewModel.isCharging,
                               isConnected: viewModel.isExternalConnected,
@@ -103,36 +105,35 @@ struct MenuBarPanelView: View {
                 sessionRows
             }
 
-            Divider()
-
-            MenuRowButton(title: "打开 CableScope", systemImage: "macwindow") {
-                openMainWindow(id: "main")
-            }
-            MenuRowButton(title: "IOKit 属性检查器", systemImage: "list.bullet.rectangle.portrait") {
-                openMainWindow(id: "registry")
-            }
-            MenuRowButton(title: "检查更新", systemImage: "arrow.down.circle",
-                          isInProgress: isCheckingForUpdate) {
-                Task { await checkForUpdates() }
-            }
-            if let updateStatusMessage {
-                Text(updateStatusMessage)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-            }
-            Toggle(isOn: $showDockIcon) {
-                Label("在 Dock 显示图标", systemImage: "dock.rectangle")
-                    .font(.callout)
-            }
-            .toggleStyle(.switch)
-            .controlSize(.small)
-            .padding(.horizontal, 8)
-            .onChange(of: showDockIcon) { _, isOn in
-                NSApplication.shared.setActivationPolicy(isOn ? .regular : .accessory)
-            }
-            MenuRowButton(title: "退出", systemImage: "power") {
-                NSApplication.shared.terminate(nil)
+            // 菜单项本身贴着排（spacing 0）——每行的高度和呼吸感全靠 MenuRowButton 自己的
+            // .padding(.vertical) 撑出来，贴近原生 NSMenu 里相邻菜单项紧挨在一起、行高本身
+            // 就是间距的样子，而不是额外在行与行之间再加一段空隙。"在 Dock 显示图标"也统一
+            // 用 MenuRowButton（选中时行尾 checkmark），不用开关控件，和其余纯文字菜单项同款。
+            VStack(alignment: .leading, spacing: 0) {
+                Divider()
+                    .padding(.bottom, 6)
+                MenuRowButton(title: "打开 CableScope") {
+                    openMainWindow(id: "main")
+                }
+                MenuRowButton(title: "IOKit 属性检查器") {
+                    openMainWindow(id: "registry")
+                }
+                MenuRowButton(title: "检查更新", isInProgress: isCheckingForUpdate) {
+                    Task { await checkForUpdates() }
+                }
+                if let updateStatusMessage {
+                    Text(updateStatusMessage)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
+                }
+                MenuRowButton(title: "在 Dock 显示图标", isChecked: showDockIcon) {
+                    showDockIcon.toggle()
+                    NSApplication.shared.setActivationPolicy(showDockIcon ? .regular : .accessory)
+                }
+                MenuRowButton(title: "退出") {
+                    NSApplication.shared.terminate(nil)
+                }
             }
         }
         .padding(12)
