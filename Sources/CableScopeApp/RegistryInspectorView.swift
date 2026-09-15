@@ -89,7 +89,8 @@ struct RegistryInspectorView: View {
                     Text(entry.displayTitle)
                         .font(.callout.weight(.medium))
                         .lineLimit(1)
-                    Text("\(entry.className) · #\(entry.registryID)")
+                    Text(entry.disambiguatingSubtitle.map { "\(entry.className) · \($0)" }
+                         ?? "\(entry.className) · #\(entry.registryID)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
