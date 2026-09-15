@@ -24,12 +24,16 @@ struct MainWindowView: View {
         .task { viewModel.start() }
         .navigationSubtitle(subtitleText)
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                ChargingBadge(isCharging: viewModel.isCharging,
-                              isConnected: viewModel.isExternalConnected,
-                              hasData: viewModel.snapshot != nil)
-            }
+            // 三者放进同一个 .primaryAction 组、统一用纯图标尺寸：窗口较窄时
+            // .principal（居中）会和 .primaryAction（靠右）挤在一起，把彩色胶囊徽章和
+            // 图标按钮并排摆出"三个大小、行为都不一致的按钮"的错觉。改成同尺寸图标后，
+            // 充电状态图标不可点击、无悬停高亮，完整文案移到 .help 提示，
+            // 视觉上读作"一个状态指示 + 两个操作"，不再像同一组按钮。
             ToolbarItemGroup(placement: .primaryAction) {
+                ChargingStatusIcon(isCharging: viewModel.isCharging,
+                                    isConnected: viewModel.isExternalConnected,
+                                    hasData: viewModel.snapshot != nil)
+
                 Button {
                     openWindow(id: "registry")
                     NSApplication.shared.activate(ignoringOtherApps: true)

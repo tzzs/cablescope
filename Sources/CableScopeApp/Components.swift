@@ -36,8 +36,31 @@ struct SectionCard<Content: View>: View {
     }
 }
 
-/// 充电状态徽章：正在充电（绿）/ 已接通电源（蓝）/ 未接通电源（灰）/ 等待数据。
-/// "已接通电源"覆盖电池保温、优化充电暂停等 IsCharging=false 但插着电的状态。
+/// 充电状态的语义（颜色 / 文案 / 图标），供下面胶囊徽章和工具栏纯图标两种样式共享，
+/// 避免两处各写一份判断逻辑、后续改状态文案漏改一处。
+private struct ChargingStatus {
+    let color: Color
+    let text: String
+    let icon: String
+    let isCharging: Bool
+
+    init(isCharging: Bool, isConnected: Bool, hasData: Bool) {
+        self.isCharging = isCharging
+        switch (hasData, isCharging, isConnected) {
+        case (false, _, _):
+            color = .secondary; text = "等待数据"; icon = "hourglass"
+        case (true, true, _):
+            color = .green; text = "正在充电"; icon = "bolt.fill"
+        case (true, false, true):
+            // "已接通电源"覆盖电池保温、优化充电暂停等 IsCharging=false 但插着电的状态。
+            color = .blue; text = "已接通电源"; icon = "powerplug.fill"
+        case (true, false, false):
+            color = .gray; text = "未接通电源"; icon = "bolt.slash"
+        }
+    }
+}
+
+/// 充电状态徽章：胶囊样式，文字+图标一起展示，用于菜单栏面板等有余量展示文案的场景。
 struct ChargingBadge: View {
     let isCharging: Bool
     let isConnected: Bool
@@ -45,35 +68,38 @@ struct ChargingBadge: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var color: Color {
-        guard hasData else { return .secondary }
-        if isCharging { return .green }
-        return isConnected ? .blue : .gray
-    }
-
-    private var text: String {
-        if !hasData { return "等待数据" }
-        if isCharging { return "正在充电" }
-        return isConnected ? "已接通电源" : "未接通电源"
-    }
-
-    private var icon: String {
-        if !hasData { return "hourglass" }
-        if isCharging { return "bolt.fill" }
-        return isConnected ? "powerplug.fill" : "bolt.slash"
-    }
-
     var body: some View {
-        Label(text, systemImage: icon)
+        let status = ChargingStatus(isCharging: isCharging, isConnected: isConnected, hasData: hasData)
+        Label(status.text, systemImage: status.icon)
             .font(.caption.weight(.medium))
-            .foregroundStyle(color)
+            .foregroundStyle(status.color)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(color.opacity(0.14), in: Capsule())
+            .background(status.color.opacity(0.14), in: Capsule())
             .accessibilityElement(children: .combine)
             // 充电中闪电脉冲（macOS 14+）：用动效传达"正在取电"的活跃状态；
             // 尊重系统的"减弱动态效果"（HIG 无障碍要求，symbolEffect 不会自动降级）。
-            .symbolEffect(.pulse, options: .repeating, isActive: isCharging && !reduceMotion)
+            .symbolEffect(.pulse, options: .repeating, isActive: status.isCharging && !reduceMotion)
+    }
+}
+
+/// 充电状态的纯图标版本：用于主窗口工具栏，与"刷新""IOKit 属性"两个操作按钮同尺寸的
+/// 图标并排展示。不用 Button 包裹（不可点击、不带悬停高亮），完整文案挪到 .help 提示里——
+/// 这样它在工具栏里读作"一个状态指示图标"而不是"第三个大小、行为都不一样的按钮"。
+struct ChargingStatusIcon: View {
+    let isCharging: Bool
+    let isConnected: Bool
+    let hasData: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        let status = ChargingStatus(isCharging: isCharging, isConnected: isConnected, hasData: hasData)
+        Image(systemName: status.icon)
+            .foregroundStyle(status.color)
+            .symbolEffect(.pulse, options: .repeating, isActive: status.isCharging && !reduceMotion)
+            .help(status.text)
+            .accessibilityLabel(status.text)
     }
 }
 
