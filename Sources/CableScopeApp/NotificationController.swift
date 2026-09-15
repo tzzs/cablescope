@@ -11,16 +11,18 @@ import Foundation
 final class NotificationController {
     private var knownSessionIDs: Set<String>?
 
-    /// 是否可用：仅在打包含 bundle ID 时启用（SwiftPM 裸可执行没有，UNUserNotificationCenter 会崩溃）。
-    private var isAvailable: Bool { Bundle.main.bundleIdentifier != nil }
+    /// 是否可用：仅在打包含 bundle ID 时启用（SwiftPM 裸可执行没有，`UNUserNotificationCenter.current()`
+    /// 会因 `bundleProxyForCurrentProcess` 为 nil 直接抛未捕获异常崩掉整个进程）。
+    private nonisolated static var isAvailable: Bool { Bundle.main.bundleIdentifier != nil }
 
     nonisolated static func activate() {
+        guard isAvailable else { return } // SwiftPM 裸可执行（`swift run`/`make run-app`）静默跳过
         // 前台（菜单栏形态常驻前台上下文）也要弹横幅，而不是静默入中心。
         UNUserNotificationCenter.current().delegate = ForegroundPresenter.shared
     }
 
     func process(snapshot: CableSnapshot, port: @escaping (CableSession) -> USBCPortSnapshot?) {
-        guard isAvailable else { return }
+        guard Self.isAvailable else { return }
         let currentIDs = Set(snapshot.sessions.map(\.id))
 
         guard let known = knownSessionIDs else {

@@ -50,8 +50,8 @@ struct RegistryInspectorView: View {
                     }
                 }
                 .labelsHidden()
-                .onChange(of: className) { newValue in
-                    classDraft = newValue
+                .onChange(of: className) {
+                    classDraft = className
                 }
 
                 TextField("输入任意 IOKit 类名后回车，如 AppleHPM", text: $classDraft)

@@ -42,6 +42,21 @@ PLIST
 
 cp "$BIN_PATH/CableScopeApp" "$APP_DIR/Contents/MacOS/CableScopeApp"
 
+# ---- SwiftPM 资源 bundle（如 CableKit 的 CableScope_CableKit.bundle，内含 usb-vendors.json）----
+# resource_bundle_accessor.swift 用 Bundle.main.bundleURL（.app 包本身，不是 Contents/Resources）
+# 拼接 bundle 名去找它；找不到时回退开发机 .build 里的硬编码绝对路径，
+# 两条路径在其他人机器上都不存在，于是命中其内置 fatalError 崩溃。
+# 因此这里必须把 bundle 平铺复制到 .app 包根目录，而不是 Contents/Resources/。
+shopt -s nullglob
+RESOURCE_BUNDLES=("$BIN_PATH"/*.bundle)
+shopt -u nullglob
+if (( ${#RESOURCE_BUNDLES[@]} > 0 )); then
+    for bundle in "${RESOURCE_BUNDLES[@]}"; do
+        cp -R "$bundle" "$APP_DIR/"
+        echo "已嵌入资源 bundle：$(basename "$bundle")"
+    done
+fi
+
 # ---- 隐私清单（MAS 提审要求；DMG 分发同样无害）----
 if [[ -f "Packaging/privacy/PrivacyInfo.xcprivacy" ]]; then
     cp "Packaging/privacy/PrivacyInfo.xcprivacy" "$APP_DIR/Contents/Resources/"

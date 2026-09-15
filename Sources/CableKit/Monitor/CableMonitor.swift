@@ -186,11 +186,16 @@ public final class CableMonitor: CableMonitorProtocol {
         }
 
         let registeredNotification = notification
+        // port/refcon 是 IOKit C 指针类型（OpaquePointer / UnsafeMutableRawPointer），
+        // 本身不是 Sendable；装箱后交给 teardown 闭包捕获，消除严格并发检查告警——
+        // 见 IOKitPointerBox 的 @unchecked Sendable 说明。
+        let portBox = IOKitPointerBox(pointer: port)
+        let refconBox = IOKitPointerBox(pointer: refcon)
         return {
-            IOObjectRelease(registeredNotification)                   // a) 注销内核侧兴趣通知
-            IOObjectRelease(service)                                  // b) 释放服务句柄（平衡步骤 2 的 retain）
-            IONotificationPortDestroy(port)                           // c) 销毁端口并解除 queue 挂接（此后不可能再有回调）
-            Unmanaged<DispatchSemaphore>.fromOpaque(refcon).release() // d) 最后平衡 passRetained
+            IOObjectRelease(registeredNotification)                            // a) 注销内核侧兴趣通知
+            IOObjectRelease(service)                                           // b) 释放服务句柄（平衡步骤 2 的 retain）
+            IONotificationPortDestroy(portBox.pointer)                         // c) 销毁端口并解除 queue 挂接（此后不可能再有回调）
+            Unmanaged<DispatchSemaphore>.fromOpaque(refconBox.pointer).release() // d) 最后平衡 passRetained
         }
     }
 
@@ -286,11 +291,14 @@ public final class CableMonitor: CableMonitorProtocol {
 
         let registeredPublish = publishIterator
         let registeredTerminate = terminateIterator
+        // 同上：port/refcon 装箱后再被 teardown 闭包捕获（IOKitPointerBox 说明见电池桥）。
+        let portBox = IOKitPointerBox(pointer: port)
+        let refconBox = IOKitPointerBox(pointer: refcon)
         return {
-            IOObjectRelease(registeredPublish)                        // a) 释放 iterator = 注销 publish 匹配通知
-            IOObjectRelease(registeredTerminate)                      // b) 释放 iterator = 注销 terminate 匹配通知
-            IONotificationPortDestroy(port)                           // c) 销毁端口并解除 queue 挂接（此后不可能再有回调）
-            Unmanaged<DispatchSemaphore>.fromOpaque(refcon).release() // d) 最后平衡 passRetained
+            IOObjectRelease(registeredPublish)                                 // a) 释放 iterator = 注销 publish 匹配通知
+            IOObjectRelease(registeredTerminate)                               // b) 释放 iterator = 注销 terminate 匹配通知
+            IONotificationPortDestroy(portBox.pointer)                         // c) 销毁端口并解除 queue 挂接（此后不可能再有回调）
+            Unmanaged<DispatchSemaphore>.fromOpaque(refconBox.pointer).release() // d) 最后平衡 passRetained
         }
     }
 
@@ -303,7 +311,7 @@ public final class CableMonitor: CableMonitorProtocol {
         await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 Task.detached(priority: .utility) {
-                    semaphore.blockUntilEventOrTimeout(timeout)
+                    _ = semaphore.blockUntilEventOrTimeout(timeout)
                     continuation.resume()
                 }
             }
@@ -338,4 +346,12 @@ private extension DispatchSemaphore {
     func blockUntilEventOrTimeout(_ seconds: TimeInterval) -> Bool {
         wait(timeout: DispatchTime.now() + seconds) == .success
     }
+}
+
+/// IOKit C 指针类型（`IONotificationPortRef`/`OpaquePointer`、`UnsafeMutableRawPointer` 等）
+/// 本身不满足 `Sendable`，但本文件里它们只在单个 teardown 闭包内被捕获、且按类型注释保证
+/// 的"恰好调用一次"时序解引用，不存在并发访问——装箱后用 `@unchecked Sendable` 显式承诺
+/// 这一人工验证的线程安全前提，消除编译器保守告警。
+private struct IOKitPointerBox<Pointer>: @unchecked Sendable {
+    let pointer: Pointer
 }
