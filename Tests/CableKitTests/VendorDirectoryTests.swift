@@ -47,6 +47,20 @@ final class VendorDirectoryTests: XCTestCase {
                        "结构错误应回退空表而非抛错")
     }
 
+    /// loadBundledJSON：候选路径里 bundle 整体不存在时安全返回 nil（不崩溃）。
+    ///
+    /// 回归用例——此前 `shared` 直接调用 SwiftPM 生成的 `Bundle.module`，
+    /// 该访问器在 bundle 整体缺失时会内部 fatalError，绕过任何 guard/try? 防护，
+    /// 在真实打包不完整的 .app 上造成过崩溃（VendorDirectory.swift 崩溃现场：
+    /// closure #1 in variable initialization expression of static NSBundle.module）。
+    func testLoadBundledJSONReturnsNilWhenBundleMissing() {
+        let data = VendorDirectory.loadBundledJSON(
+            bundleFileName: "NoSuchBundle.bundle",
+            candidates: [URL(fileURLWithPath: NSTemporaryDirectory())]
+        )
+        XCTAssertNil(data, "候选路径都找不到 bundle 时应返回 nil，而不是崩溃")
+    }
+
     /// shared：加载随包真实资源 usb-vendors.json。
     /// 该断言依赖 Bundle.module 资源在测试环境可用；不可用时（shared 回退空表）跳过并说明。
     func testSharedLoadsBundledJSON() throws {

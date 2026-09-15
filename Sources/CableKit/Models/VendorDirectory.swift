@@ -13,13 +13,38 @@ import Foundation
 public struct VendorDirectory: Sendable {
     /// 共享实例：随包内置的厂商库。
     public static let shared: VendorDirectory = {
-        guard let url = Bundle.module.url(forResource: "usb-vendors", withExtension: "json"),
-              let data = try? Data(contentsOf: url) else {
+        guard let data = Self.loadBundledJSON() else {
             // Bundle 资源不可用（例如打包配置遗漏）：回退空表，宁缺毋崩。
             return VendorDirectory(entries: [:])
         }
         return VendorDirectory(entries: Self.parse(data))
     }()
+
+    /// 安全定位随包 `usb-vendors.json`。
+    ///
+    /// 不复用 SwiftPM 自动生成的 `Bundle.module`：那个访问器在资源 bundle **整体缺失**
+    /// （而非 bundle 内某个文件缺失）时会执行自带的 `fatalError`——直接终止进程，
+    /// 早于任何调用方的 guard/try? 生效，因此无法被 `shared` 上面这层防护接住
+    /// （2026-09 一次未妥善打包的 .app 在真实设备上复现过此崩溃）。这里手写等价的
+    /// 候选路径查找，用 `FileManager` 逐一探测 bundle 是否存在，全部落空才返回 nil。
+    static func loadBundledJSON(
+        bundleFileName: String = "CableScope_CableKit.bundle",
+        candidates: [URL?] = [
+            Bundle.main.resourceURL,
+            Bundle(for: BundleAnchor.self).resourceURL,
+            Bundle.main.bundleURL,
+        ]
+    ) -> Data? {
+        for candidate in candidates {
+            guard let bundleURL = candidate?.appendingPathComponent(bundleFileName),
+                  FileManager.default.fileExists(atPath: bundleURL.path),
+                  let bundle = Bundle(url: bundleURL),
+                  let resourceURL = bundle.url(forResource: "usb-vendors", withExtension: "json"),
+                  let data = try? Data(contentsOf: resourceURL) else { continue }
+            return data
+        }
+        return nil
+    }
 
     /// VID（16 位 USB 厂商 ID）→ 厂商名。
     private let entries: [UInt32: String]
@@ -59,3 +84,7 @@ public struct VendorDirectory: Sendable {
         return result
     }
 }
+
+/// `Bundle(for:)` 的锚点类：借助其所在 bundle 参与候选路径查找，
+/// 用法等价于 SwiftPM 生成访问器里的私有 `BundleFinder`。
+private final class BundleAnchor {}

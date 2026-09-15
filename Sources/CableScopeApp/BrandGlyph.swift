@@ -14,7 +14,7 @@ enum BrandGlyph {
     /// 认的是 `NSImage.size` 这个属性本身，SwiftUI 这边后续叠加的 `.frame()` 并不能
     /// 覆盖它。所以按目标尺寸直接改写 `size`，而不是指望 `.resizable()+.frame()`。
     static func image(size: CGSize) -> Image {
-        guard let url = Bundle.module.url(forResource: "StatusBarGlyph", withExtension: "pdf"),
+        guard let url = Self.statusBarGlyphURL(),
               let nsImage = NSImage(contentsOf: url) else {
             return Image(systemName: "cable.connector")
         }
@@ -22,4 +22,31 @@ enum BrandGlyph {
         nsImage.isTemplate = true
         return Image(nsImage: nsImage)
     }
+
+    /// 安全定位随包 `StatusBarGlyph.pdf`。
+    ///
+    /// 不复用 SwiftPM 自动生成的 `Bundle.module`：那个访问器在资源 bundle **整体缺失**
+    /// 时会执行自带的 `fatalError`，早于本函数上面的 guard 生效，等同于让「资源缺失时
+    /// 回退 SF Symbol」这条兜底形同虚设（CableKit.VendorDirectory 出过同款真实崩溃）。
+    /// 这里手写等价的候选路径查找，用 `FileManager` 逐一探测 bundle 是否存在，
+    /// 全部落空才返回 nil，交给上面的 guard 走 SF Symbol 兜底。
+    private static func statusBarGlyphURL(
+        bundleFileName: String = "CableScope_CableScopeApp.bundle",
+        candidates: [URL?] = [
+            Bundle.main.resourceURL,
+            Bundle(for: BundleAnchor.self).resourceURL,
+            Bundle.main.bundleURL,
+        ]
+    ) -> URL? {
+        for candidate in candidates {
+            guard let bundleURL = candidate?.appendingPathComponent(bundleFileName),
+                  FileManager.default.fileExists(atPath: bundleURL.path),
+                  let bundle = Bundle(url: bundleURL),
+                  let resourceURL = bundle.url(forResource: "StatusBarGlyph", withExtension: "pdf") else { continue }
+            return resourceURL
+        }
+        return nil
+    }
+
+    private final class BundleAnchor {}
 }
