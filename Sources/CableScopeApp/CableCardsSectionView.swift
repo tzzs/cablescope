@@ -154,6 +154,11 @@ struct CableCardView: View {
             .focusEffectDisabled() // 选中描边即焦点指示，抑制 Full Keyboard Access 下的按钮焦点环
         }
         .buttonStyle(.plain)
+        // 每张卡的 Button 本身也是可获得键盘焦点的目标——跟外层 LazyVGrid 的
+        // .focusable() 叠在一起，就是两层各画一圈环：容器一圈、button 自己再一圈。
+        // 键盘导航（方向键切换选中）已经由外层 onMoveCommand 接管，这里的 Button
+        // 不需要自己再抢一次焦点，点击 action 不受影响。
+        .focusable(false)
         .onHover { isHovering = $0 }
     }
 

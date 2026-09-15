@@ -130,6 +130,73 @@ struct SpeedBadge: View {
     }
 }
 
+/// PD 档位表（档位胶囊 + 当前协商档高亮）：整机概览的"代表性"端口与线缆详情的
+/// "这根线对应的端口"共用同一份渲染逻辑，避免两处各画一套还容易画歪。
+struct PDOOptionsView: View {
+    let pdo: PDOPortPowerSnapshot
+    let sourceLabel: String
+
+    /// `.adaptive` 而不是固定列数：卡片宽度随窗口/侧栏变化，列数跟着自动重排，
+    /// 跟 CSS Grid 的 `auto-fill` 是一回事——档位少时自然铺不满最后一行，不强撑。
+    private let columns = [GridItem(.adaptive(minimum: 108), spacing: 6)]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Label("PD 档位（\(sourceLabel)）", systemImage: "list.number")
+                    .font(.callout)
+                Text("端口上报")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            // 网格胶囊（方案 B，跟用户对比三版方案后选定）：每档做成独立小块，
+            // 铺成二维网格而不是单向 FlowLayout 排队——横向纵向都用得上卡片
+            // 宽度，视觉语言也和"端口信息""已启用传输"两处的胶囊保持一致。
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 6) {
+                ForEach(pdo.options) { phase in
+                    let isWinning = pdo.winningIndex == pdo.options.firstIndex(of: phase)
+                    PDOGridChip(phase: phase, isWinning: isWinning)
+                }
+            }
+            if pdo.winning == nil {
+                Text("当前无协商档（未在取电）")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+}
+
+/// PD 档位网格里的单个胶囊：上行 V/A（次要），下行功率数值（主要，协商档橙色高亮）。
+private struct PDOGridChip: View {
+    let phase: PDOPhase
+    let isWinning: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(phase.voltAmpLabel)
+                .font(.caption2)
+                .foregroundStyle(isWinning ? Color.orange.opacity(0.85) : Color.secondary)
+            HStack(spacing: 3) {
+                if isWinning {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 9))
+                }
+                Text("\(Int(phase.watts.rounded()))W")
+            }
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(isWinning ? Color.orange : Color.primary)
+        }
+        .monospacedDigit()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
+        .background(isWinning ? Color.orange.opacity(0.16) : Color.secondary.opacity(0.1),
+                    in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .combine)
+    }
+}
+
 /// 空状态提示。
 struct EmptyHint: View {
     let text: String

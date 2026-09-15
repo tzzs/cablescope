@@ -21,7 +21,7 @@ public enum EMarkerTrustNote: String, Codable, Sendable, CaseIterable {
     public var summary: String {
         switch self {
         case .zeroVendorID:
-            return "e-marker 未上报厂商 ID（部分低价线缆常见）"
+            return "e-marker 未上报厂商 ID（常见现象，非线缆质量判断依据）"
         case .unknownVendorID:
             return "厂商 ID 不在已知厂商列表中"
         case .reservedCurrentRating:

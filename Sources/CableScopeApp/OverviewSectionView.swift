@@ -126,31 +126,7 @@ struct OverviewSectionView: View {
     private var pdoFooter: some View {
         if let pdo = viewModel.activePDO, !pdo.options.isEmpty {
             Divider()
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) {
-                    Label("PD 档位（\(pdo.sourceName)）", systemImage: "list.number")
-                        .font(.callout)
-                    Text("端口上报")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-                FlowLayout(spacing: 5) {
-                    ForEach(pdo.options) { phase in
-                        let isWinning = pdo.winningIndex == pdo.options.firstIndex(of: phase)
-                        InfoChip(
-                            text: phase.label,
-                            systemImage: isWinning ? "bolt.fill" : nil,
-                            color: isWinning ? .orange : .secondary,
-                            isProminent: isWinning
-                        )
-                    }
-                }
-                if pdo.winning == nil {
-                    Text("当前无协商档（未在取电）")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-            }
+            PDOOptionsView(pdo: pdo, sourceLabel: pdo.sourceName)
         }
     }
 
@@ -226,26 +202,53 @@ struct OverviewSectionView: View {
         let displays = viewModel.snapshot?.displays ?? []
         if !displays.isEmpty {
             Divider()
-            VStack(alignment: .leading, spacing: 6) {
+            // Grid 而不是每行一个 HStack+Spacer：分辨率与刷新率各自独占一列，
+            // 按列对齐而不是整串文字右对齐——"2940×1912·60Hz" 和 "3840×2160·144Hz"
+            // 位数不一样，右对齐整串只会让 "×" 和 "Hz" 的位置继续错开。
+            Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
                 ForEach(displays) { display in
-                    HStack(spacing: 8) {
-                        Image(systemName: display.isMain ? "display.2" : "display")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 18)
-                        Text(display.name ?? "显示器")
-                            .font(.callout)
-                            .lineLimit(1)
-                        if display.isMain {
-                            InfoChip(text: "主显示器", systemImage: "star.fill", color: .blue)
+                    GridRow {
+                        HStack(spacing: 6) {
+                            Image(systemName: display.isMain ? "display.2" : "display")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 18)
+                            Text(display.name ?? "显示器")
+                                .font(.callout)
+                                .lineLimit(1)
+                            if display.isMain {
+                                InfoChip(text: "主显示器", systemImage: "star.fill", color: .blue)
+                            }
                         }
-                        Spacer(minLength: 8)
-                        Text(Self.resolutionText(display))
+                        .gridCellColumns(1)
+
+                        Text(display.resolutionLabel)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
-                        if let linkRateLabel = display.linkRateLabel {
-                            InfoChip(text: linkRateLabel, systemImage: "link", color: .indigo)
+                            .gridColumnAlignment(.trailing)
+
+                        Group {
+                            if let refreshRateHz = display.refreshRateHz {
+                                Text(String(format: "%.0f Hz", refreshRateHz))
+                            } else {
+                                Text("—")
+                            }
                         }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .gridColumnAlignment(.trailing)
+
+                        // 固定占一列，没有链路速率时用透明占位，避免这一行少一格
+                        // 把后面列的对齐带偏（Grid 按位置分列，不是按内容分列）。
+                        Group {
+                            if let linkRateLabel = display.linkRateLabel {
+                                InfoChip(text: linkRateLabel, systemImage: "link", color: .indigo)
+                            } else {
+                                Color.clear.frame(width: 1, height: 1)
+                            }
+                        }
+                        .gridColumnAlignment(.trailing)
                     }
                 }
             }
@@ -261,14 +264,6 @@ struct OverviewSectionView: View {
             if acronyms.contains(lower) { return lower.uppercased() }
             return word.prefix(1).uppercased() + word.dropFirst()
         }.joined(separator: " ")
-    }
-
-    private static func resolutionText(_ display: DisplaySnapshot) -> String {
-        var text = display.resolutionLabel
-        if let refreshRateHz = display.refreshRateHz {
-            text += String(format: " · %.0f Hz", refreshRateHz)
-        }
-        return text
     }
 
     // MARK: 整机评级（合并所有端口，胶囊样式）

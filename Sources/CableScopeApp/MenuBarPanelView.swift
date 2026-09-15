@@ -28,10 +28,15 @@ struct MenuBarLabelView: View {
 struct MenuBarPanelView: View {
     @ObservedObject var viewModel: MonitorViewModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismiss) private var dismiss
 
     // 检查更新：请求进行中防重复点击；结果显示为按钮下方的一行小字，几秒后自动清除
     @State private var isCheckingForUpdate = false
     @State private var updateStatusMessage: String?
+
+    // "在 Dock 显示图标"：默认关闭（纯菜单栏工具形态）。开启时切到 .regular 策略，
+    // Dock 出现图标 + 可从 Cmd-Tab / App Switcher 切换；关闭时切回 .accessory。
+    @AppStorage(AppPreferences.showDockIconKey) private var showDockIcon = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -101,13 +106,10 @@ struct MenuBarPanelView: View {
             Divider()
 
             MenuRowButton(title: "打开 CableScope", systemImage: "macwindow") {
-                openWindow(id: "main")
-                // accessory 形态下打开窗口后主动激活，避免窗口出现在后台。
-                NSApplication.shared.activate(ignoringOtherApps: true)
+                openMainWindow(id: "main")
             }
             MenuRowButton(title: "IOKit 属性检查器", systemImage: "list.bullet.rectangle.portrait") {
-                openWindow(id: "registry")
-                NSApplication.shared.activate(ignoringOtherApps: true)
+                openMainWindow(id: "registry")
             }
             MenuRowButton(title: "检查更新", systemImage: "arrow.down.circle",
                           isInProgress: isCheckingForUpdate) {
@@ -119,19 +121,44 @@ struct MenuBarPanelView: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 8)
             }
+            Toggle(isOn: $showDockIcon) {
+                Label("在 Dock 显示图标", systemImage: "dock.rectangle")
+                    .font(.callout)
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .padding(.horizontal, 8)
+            .onChange(of: showDockIcon) { _, isOn in
+                NSApplication.shared.setActivationPolicy(isOn ? .regular : .accessory)
+            }
             MenuRowButton(title: "退出", systemImage: "power") {
                 NSApplication.shared.terminate(nil)
             }
         }
         .padding(12)
         .frame(width: 250, alignment: .leading)
-        // Esc 关闭面板（HIG：临时面板应支持 Esc）。MenuBarExtra .window 样式
-        // 没有官方关闭 API（FB383/328 仍开放）；面板打开时即为 key window，
-        // 直接对它 performClose 即可。
+        // Esc 关闭面板（HIG：临时面板应支持 Esc）。面板是非激活面板，不一定是
+        // NSApp.keyWindow（试过 performClose(nil) 打到 nil/别的窗口上），用场景
+        // 自带的 \.dismiss 关这个面板场景本身更可靠。
         .onExitCommand {
-            NSApp.keyWindow?.performClose(nil)
+            dismiss()
         }
         .task { viewModel.start() }
+    }
+
+    // MARK: 打开窗口
+
+    /// 从菜单面板跳去打开某个窗口：MenuBarExtra 的 `.window` 样式点按钮后面板不会
+    /// 像原生 NSMenu 那样自动收起。面板本身是非激活面板（不会成为 keyWindow），
+    /// `NSApp.keyWindow?.performClose(nil)` 拿到的是 nil、什么也关不掉——
+    /// 得用 SwiftUI 场景自带的 `\.dismiss` 关闭这个面板场景本身。
+    /// （主窗口本身改用单例的 `Window` scene 而非 `WindowGroup`，见 CableScopeApp：
+    /// 这里就算重复点击也只会前台激活同一个窗口，不会开出多个实例。）
+    @MainActor
+    private func openMainWindow(id: String) {
+        dismiss()
+        openWindow(id: id)
+        NSApplication.shared.activate(ignoringOtherApps: true)
     }
 
     // MARK: 检查更新
