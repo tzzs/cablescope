@@ -179,4 +179,49 @@ public enum PortGrouping {
         guard winningPorts.count == 1, let port = winningPorts.first else { return nil }
         return sessions.first { $0.physicalPortID == port.portID }?.id
     }
+
+    // MARK: - 外接显示器归属（DisplayPort 传输节点直读，不靠猜）
+
+    /// 会话对应的 DisplayPort 传输链路：按 `physicalPortID` 与 `DisplayPortLinkSnapshot.portID`
+    /// 精确匹配（两者同一套 "Port-USB-C@N" 命名）。坞站级联可能让一个物理口同时驱动多台
+    /// 显示器，因此返回数组而非单值；雷雳会话与无 `physicalPortID` 的会话恒为空数组（v1 未做
+    /// 雷雳侧的端口映射）。
+    public static func displayPortLinks(for session: CableSession,
+                                        links: [DisplayPortLinkSnapshot]) -> [DisplayPortLinkSnapshot] {
+        guard let portID = session.physicalPortID else { return [] }
+        return links.filter { $0.portID == portID }
+    }
+
+    /// 把一条 DisplayPort 链路精确匹配到具体的 `CGDirectDisplayID`：EDID Product ID 必须
+    /// 相等，双方都上报厂商时厂商 PNP 码也要一致；命中不唯一或缺身份信息时返回 nil——
+    /// 宁可不归属也不归错，与 `attributablePowerSessionID` 同一套保守哲学。
+    public static func matchedDisplay(for link: DisplayPortLinkSnapshot,
+                                      in displays: [DisplaySnapshot]) -> DisplaySnapshot? {
+        guard let productID = link.productID else { return nil }
+        let candidates = displays.filter { display in
+            !display.isBuiltin && display.modelNumber == productID && vendorMatches(link: link, display: display)
+        }
+        guard candidates.count == 1 else { return nil }
+        return candidates.first
+    }
+
+    /// 双方都上报厂商时要求 PNP 码一致；任一方缺失厂商信息时只按 Product ID 判定。
+    private static func vendorMatches(link: DisplayPortLinkSnapshot, display: DisplaySnapshot) -> Bool {
+        guard let name = link.manufacturerName, let packed = display.vendorNumber else { return true }
+        return pnpCode(fromPackedVendor: packed) == name
+    }
+
+    /// `CGDisplayVendorNumber` 是打包的 EDID 3 字母厂商 PNP 码：每字母 5 bit，A=1，
+    /// 从第 10 位开始每 5 位一个字母。解不出合法字母（超出 A-Z 范围）时返回 nil，
+    /// 避免拿垃圾厂商号去误判匹配。
+    static func pnpCode(fromPackedVendor packed: UInt32) -> String? {
+        let value = UInt16(truncatingIfNeeded: packed)
+        let letters = [(value >> 10) & 0x1F, (value >> 5) & 0x1F, value & 0x1F]
+        var out = ""
+        for code in letters {
+            guard (1...26).contains(code) else { return nil }
+            out.append(Character(UnicodeScalar(UInt8(code) + 0x40))) // 1 -> 'A'
+        }
+        return out
+    }
 }

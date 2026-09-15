@@ -54,7 +54,11 @@ public final class DisplayService: DisplayServiceProtocol {
                 pixelHeight: pixelHeight,
                 refreshRateHz: refreshRate,
                 linkRateLabel: info?.linkRate,
-                isMain: displayID == mainDisplayID
+                isMain: displayID == mainDisplayID,
+                isBuiltin: CGDisplayIsBuiltin(displayID) != 0,
+                vendorNumber: nonSentinel(CGDisplayVendorNumber(displayID)),
+                modelNumber: nonSentinel(CGDisplayModelNumber(displayID)),
+                serialNumber: nonSentinel(CGDisplaySerialNumber(displayID))
             )
         }
         // 主屏排最前，其余按 displayID 稳定排序。
@@ -62,6 +66,13 @@ public final class DisplayService: DisplayServiceProtocol {
             if lhs.isMain != rhs.isMain { return lhs.isMain }
             return lhs.displayID < rhs.displayID
         }
+    }
+
+    /// CGDisplay{Vendor,Model,Serial}Number 共用同一个"未知"哨兵值 0xFFFFFFFF
+    /// （CGDirectDisplay.h：kDisplayVendorIDUnknown / kDisplayProductIDGeneric /
+    /// kDisplaySerialNumberUnknown 均为该值），统一转 nil，不把哨兵值当真实身份参与匹配。
+    private static func nonSentinel(_ value: UInt32) -> UInt32? {
+        value == 0xFFFF_FFFF ? nil : value
     }
 
     /// 名称来源：NSScreen.localizedName（CGDisplayLocalizedName 的官方替代）→ system_profiler `_name`。

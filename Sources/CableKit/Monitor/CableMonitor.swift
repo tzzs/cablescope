@@ -2,10 +2,10 @@ import Dispatch
 import Foundation
 import IOKit
 
-/// 快照监视器：并发组合五个 Service，容错聚合为 `CableSnapshot`，并提供变化检测事件流。
+/// 快照监视器：并发组合六个 Service，容错聚合为 `CableSnapshot`，并提供变化检测事件流。
 ///
 /// 并发模型（混合模式：**IOKit 事件通知驱动 + pollInterval 兜底轮询**）：
-/// - `snapshotNow()` 用 `async let` 并发拉取五个 Service；**单个 Service 失败只降级为
+/// - `snapshotNow()` 用 `async let` 并发拉取六个 Service；**单个 Service 失败只降级为
 ///   空数组/nil，不让整体失败**（协议契约：整机快照不因个别维度异常而抛错）。
 /// - `snapshotStream()` 的等待逻辑：每轮采集后等待"事件信号 OR pollInterval 超时"，
 ///   先到者胜、两者都会触发下一轮采集。事件源三类，任一触发都只是"该重新采集了"，
@@ -62,6 +62,7 @@ public final class CableMonitor: CableMonitorProtocol {
     private let display: DisplayServiceProtocol
     private let thunderbolt: ThunderboltServiceProtocol
     private let ports: PortControllerServiceProtocol
+    private let displayPortTransport: DisplayPortTransportServiceProtocol
 
     /// 兜底轮询间隔（秒）。电源与 USB 插拔分别由 AppleSmartBattery 兴趣通知、IOUSBHostDevice
     /// publish/terminate 匹配通知即时驱动，不受此间隔限制；三类通知都不覆盖的变化（显示器、
@@ -73,12 +74,14 @@ public final class CableMonitor: CableMonitorProtocol {
                 display: DisplayServiceProtocol = DisplayService(),
                 thunderbolt: ThunderboltServiceProtocol = ThunderboltService(),
                 ports: PortControllerServiceProtocol = PortControllerService(),
+                displayPortTransport: DisplayPortTransportServiceProtocol = DisplayPortTransportService(),
                 pollInterval: TimeInterval = 1.5) {
         self.usb = usb
         self.power = power
         self.display = display
         self.thunderbolt = thunderbolt
         self.ports = ports
+        self.displayPortTransport = displayPortTransport
         self.pollInterval = pollInterval
     }
 
@@ -90,6 +93,7 @@ public final class CableMonitor: CableMonitorProtocol {
         async let displays = display.listDisplays()
         async let thunderboltDevices = thunderbolt.listThunderboltDevices()
         async let portSnapshots = ports.listPorts()
+        async let displayPortLinkSnapshots = displayPortTransport.listDisplayPortLinks()
 
         let usb = (try? await usbDevices) ?? []
         let thunderbolt = (try? await thunderboltDevices) ?? []
@@ -101,7 +105,8 @@ public final class CableMonitor: CableMonitorProtocol {
             displays: (try? await displays) ?? [],
             thunderboltDevices: thunderbolt,
             sessions: PortGrouping.buildSessions(usbDevices: usb, thunderboltDevices: thunderbolt, ports: ports),
-            ports: ports
+            ports: ports,
+            displayPortLinks: (try? await displayPortLinkSnapshots) ?? []
         )
     }
 
@@ -328,6 +333,7 @@ public final class CableMonitor: CableMonitorProtocol {
         let thunderboltDevices: [ThunderboltDeviceSnapshot]
         let sessions: [CableSession]
         let ports: [USBCPortSnapshot]
+        let displayPortLinks: [DisplayPortLinkSnapshot]
 
         init(snapshot: CableSnapshot) {
             self.usbDevices = snapshot.usbDevices
@@ -336,6 +342,7 @@ public final class CableMonitor: CableMonitorProtocol {
             self.thunderboltDevices = snapshot.thunderboltDevices
             self.sessions = snapshot.sessions
             self.ports = snapshot.ports
+            self.displayPortLinks = snapshot.displayPortLinks
         }
     }
 }

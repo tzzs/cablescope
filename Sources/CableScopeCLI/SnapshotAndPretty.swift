@@ -35,7 +35,8 @@ extension CableScopeCLI {
         lines.append(powerSection(snapshot.power, ports: snapshot.ports))
         lines.append("")
         lines.append("🔌 线缆端口 (\(snapshot.sessions.count))")
-        lines.append(sessionsSection(snapshot.sessions, ports: snapshot.ports))
+        lines.append(sessionsSection(snapshot.sessions, ports: snapshot.ports,
+                                     displayPortLinks: snapshot.displayPortLinks, displays: snapshot.displays))
         lines.append("")
         lines.append("🖥 显示器")
         lines.append(displaySection(snapshot.displays))
@@ -108,7 +109,9 @@ extension CableScopeCLI {
     }
 
     /// 按物理端口分组输出设备（会话由 PortGrouping 在采集时聚合，hub 下行设备逐级缩进）。
-    private static func sessionsSection(_ sessions: [CableSession], ports: [USBCPortSnapshot]) -> String {
+    private static func sessionsSection(_ sessions: [CableSession], ports: [USBCPortSnapshot],
+                                        displayPortLinks: [DisplayPortLinkSnapshot] = [],
+                                        displays: [DisplaySnapshot] = []) -> String {
         guard !sessions.isEmpty else { return "  未检测到线缆 / 设备" }
         let portsByID = Dictionary(ports.map { ($0.portID, $0) }, uniquingKeysWith: { first, _ in first })
         return sessions.map { session in
@@ -117,6 +120,12 @@ extension CableScopeCLI {
             if let port = session.physicalPortID.flatMap({ portsByID[$0] }),
                let status = portStatusLine(port) {
                 lines.append("    \(status)")
+            }
+
+            // 外接显示器：DisplayPort 传输节点直读归属（PortGrouping.displayPortLinks），
+            // 不再是"检测到 DP 能力但定位不到是哪台屏幕"的旧粗粒度提示。
+            for link in PortGrouping.displayPortLinks(for: session, links: displayPortLinks) {
+                lines.append("    🖥 " + displayLinkLine(link, display: PortGrouping.matchedDisplay(for: link, in: displays)))
             }
 
             for device in session.usbDevices {
@@ -164,6 +173,27 @@ extension CableScopeCLI {
         if port.supportsThunderboltUSB4 { parts.append("USB4/雷雳可用") }
         guard !parts.isEmpty else { return nil }
         return Term.dim("端口：") + parts.joined(separator: " · ")
+    }
+
+    /// 一条 DisplayPort 链路的展示行：优先用匹配到的 CGDirectDisplayID 给出分辨率/刷新率，
+    /// 匹配不唯一（如坞站带两台同型号显示器）时只展示链路自身已知的厂商/型号/链路速率。
+    private static func displayLinkLine(_ link: DisplayPortLinkSnapshot, display: DisplaySnapshot?) -> String {
+        let name: String
+        switch (link.manufacturerName, link.productName) {
+        case let (vendor?, product?): name = "\(vendor) \(product)"
+        case (nil, let product?): name = product
+        case (let vendor?, nil): name = vendor
+        default: name = "外接显示器"
+        }
+        var parts: [String] = []
+        if let display {
+            parts.append(display.resolutionLabel)
+            if let hz = display.refreshRateHz { parts.append(String(format: "%.0f Hz", hz)) }
+        } else {
+            parts.append("分辨率未知")
+        }
+        if let linkRate = link.linkRateDescription { parts.append(linkRate) }
+        return "\(name)  " + parts.joined(separator: " · ")
     }
 
     private static func displaySection(_ displays: [DisplaySnapshot]) -> String {

@@ -189,6 +189,16 @@ public struct DisplaySnapshot: Codable, Hashable, Sendable, Identifiable {
     /// DP 链路速率标签（HBR2 / HBR3 / UHBR10 / UHBR20 ...），尽力而为
     public let linkRateLabel: String?
     public let isMain: Bool
+    /// 是否为内置面板（CGDisplayIsBuiltin）。DisplayPort 传输链路只存在于外接显示器，
+    /// 匹配时（PortGrouping.matchedDisplay）用它排除内置屏，比用 isMain 更准确
+    /// （内置屏未必是主屏，外接屏也可能被设成主屏）。
+    public let isBuiltin: Bool
+    /// EDID 厂商/型号/序列号（CGDisplayVendorNumber/ModelNumber/SerialNumber）。
+    /// 唯一用途是把 `DisplayPortLinkSnapshot`（同样带 EDID 身份）精确匹配到这台
+    /// CGDirectDisplayID——匹配不上时才回退为 nil，不是常规展示字段。
+    public let vendorNumber: UInt32?
+    public let modelNumber: UInt32?
+    public let serialNumber: UInt32?
 
     public init(displayID: UInt32,
                 name: String?,
@@ -196,7 +206,11 @@ public struct DisplaySnapshot: Codable, Hashable, Sendable, Identifiable {
                 pixelHeight: Int,
                 refreshRateHz: Double?,
                 linkRateLabel: String?,
-                isMain: Bool) {
+                isMain: Bool,
+                isBuiltin: Bool = false,
+                vendorNumber: UInt32? = nil,
+                modelNumber: UInt32? = nil,
+                serialNumber: UInt32? = nil) {
         self.displayID = displayID
         self.name = name
         self.pixelWidth = pixelWidth
@@ -204,10 +218,36 @@ public struct DisplaySnapshot: Codable, Hashable, Sendable, Identifiable {
         self.refreshRateHz = refreshRateHz
         self.linkRateLabel = linkRateLabel
         self.isMain = isMain
+        self.isBuiltin = isBuiltin
+        self.vendorNumber = vendorNumber
+        self.modelNumber = modelNumber
+        self.serialNumber = serialNumber
     }
 
     public var id: UInt32 { displayID }
     public var resolutionLabel: String { "\(pixelWidth)×\(pixelHeight)" }
+
+    // 兼容旧 JSON（无 isBuiltin/vendorNumber/modelNumber/serialNumber 键）：
+    // isBuiltin 缺失按 false 处理，其余缺失按未知（nil）处理。
+    private enum CodingKeys: String, CodingKey {
+        case displayID, name, pixelWidth, pixelHeight, refreshRateHz, linkRateLabel, isMain
+        case isBuiltin, vendorNumber, modelNumber, serialNumber
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.displayID = try container.decode(UInt32.self, forKey: .displayID)
+        self.name = try container.decodeIfPresent(String.self, forKey: .name)
+        self.pixelWidth = try container.decode(Int.self, forKey: .pixelWidth)
+        self.pixelHeight = try container.decode(Int.self, forKey: .pixelHeight)
+        self.refreshRateHz = try container.decodeIfPresent(Double.self, forKey: .refreshRateHz)
+        self.linkRateLabel = try container.decodeIfPresent(String.self, forKey: .linkRateLabel)
+        self.isMain = try container.decode(Bool.self, forKey: .isMain)
+        self.isBuiltin = try container.decodeIfPresent(Bool.self, forKey: .isBuiltin) ?? false
+        self.vendorNumber = try container.decodeIfPresent(UInt32.self, forKey: .vendorNumber)
+        self.modelNumber = try container.decodeIfPresent(UInt32.self, forKey: .modelNumber)
+        self.serialNumber = try container.decodeIfPresent(UInt32.self, forKey: .serialNumber)
+    }
 }
 
 /// 雷电设备快照
@@ -267,6 +307,9 @@ public struct CableSnapshot: Codable, Hashable, Sendable, Identifiable {
     public let sessions: [CableSession]
     /// USB-C / MagSafe 物理端口控制器状态（AppleHPM/AppleTC；老机型枚举为空属正常）
     public let ports: [USBCPortSnapshot]
+    /// DisplayPort 传输链路状态（IOPortTransportStateDisplayPort；无外接显示器接入时为空）。
+    /// 按 `physicalPortID` 精确归属外接显示器到具体线缆会话，见 `PortGrouping.displayPortLinks`。
+    public let displayPortLinks: [DisplayPortLinkSnapshot]
 
     public init(id: UUID = UUID(),
                 timestamp: Date = Date(),
@@ -275,7 +318,8 @@ public struct CableSnapshot: Codable, Hashable, Sendable, Identifiable {
                 displays: [DisplaySnapshot],
                 thunderboltDevices: [ThunderboltDeviceSnapshot],
                 sessions: [CableSession] = [],
-                ports: [USBCPortSnapshot] = []) {
+                ports: [USBCPortSnapshot] = [],
+                displayPortLinks: [DisplayPortLinkSnapshot] = []) {
         self.id = id
         self.timestamp = timestamp
         self.usbDevices = usbDevices
@@ -284,12 +328,13 @@ public struct CableSnapshot: Codable, Hashable, Sendable, Identifiable {
         self.thunderboltDevices = thunderboltDevices
         self.sessions = sessions
         self.ports = ports
+        self.displayPortLinks = displayPortLinks
     }
 
-    // 兼容旧 JSON（无 sessions/ports 键）：缺失时视为空数组，由消费方按需用 PortGrouping 现算。
-    // 只自定义解码，编码仍用合成实现（新字段完整写出）。
+    // 兼容旧 JSON（无 sessions/ports/displayPortLinks 键）：缺失时视为空数组，
+    // sessions/ports 由消费方按需用 PortGrouping 现算。只自定义解码，编码仍用合成实现（新字段完整写出）。
     private enum CodingKeys: String, CodingKey {
-        case id, timestamp, usbDevices, power, displays, thunderboltDevices, sessions, ports
+        case id, timestamp, usbDevices, power, displays, thunderboltDevices, sessions, ports, displayPortLinks
     }
 
     public init(from decoder: Decoder) throws {
@@ -302,6 +347,8 @@ public struct CableSnapshot: Codable, Hashable, Sendable, Identifiable {
         self.thunderboltDevices = try container.decode([ThunderboltDeviceSnapshot].self, forKey: .thunderboltDevices)
         self.sessions = try container.decodeIfPresent([CableSession].self, forKey: .sessions) ?? []
         self.ports = try container.decodeIfPresent([USBCPortSnapshot].self, forKey: .ports) ?? []
+        self.displayPortLinks = try container.decodeIfPresent([DisplayPortLinkSnapshot].self,
+                                                               forKey: .displayPortLinks) ?? []
     }
 
     public func toJSON(pretty: Bool = false) throws -> Data {

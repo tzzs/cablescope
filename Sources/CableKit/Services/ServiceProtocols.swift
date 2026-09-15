@@ -27,6 +27,11 @@ public protocol PortControllerServiceProtocol: Sendable {
     func listPorts() async throws -> [USBCPortSnapshot]
 }
 
+public protocol DisplayPortTransportServiceProtocol: Sendable {
+    /// DisplayPort 传输链路状态（IOPortTransportStateDisplayPort；仅在有显示器接入时节点才存在）
+    func listDisplayPortLinks() async throws -> [DisplayPortLinkSnapshot]
+}
+
 public protocol RegistryServiceProtocol: Sendable {
     /// 按任意 IOKit 类名枚举 IORegistry 条目，携带全量原始属性
     func listEntries(matchingClass className: String) async throws -> [RegistryEntrySnapshot]

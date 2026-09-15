@@ -65,25 +65,7 @@ struct SessionDetailSectionView: View {
                     InfoChip(text: headline, systemImage: "cable.connector", color: .blue, isProminent: true)
                 }
 
-                // 哪根线接了外接显示器？macOS 不提供 display↔USB-C 端口的直接映射
-                // （Docs/03 视频传输小节），但端口控制器上报的"已启用传输"里如果
-                // 含 DisplayPort，说明这个口的 DP 交替模式正在工作——这是目前唯一
-                // 能间接定位"是这根线在出视频"的信号，专门拎出来提示、并如实说明局限。
-                if port.transportsProvisioned.contains("DisplayPort") {
-                    // 灰字说明原来常驻占一整行：这是能力边界声明（红线要求——不能
-                    // 声称超过实际读到的数据），但不是每次都需要看，改成 ⓘ 悬停提示，
-                    // 结论一行看完，想知道"为什么定位不到具体是哪台屏幕"再划过去看。
-                    HStack(spacing: 4) {
-                        Label("检测到视频信号（DisplayPort 交替模式已启用）",
-                              systemImage: "display")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.indigo)
-                        Image(systemName: "info.circle")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                            .help("无法定位到具体是哪台显示器/多大分辨率——macOS 不提供这一层映射")
-                    }
-                }
+                displaySection(of: session, fallbackPort: port)
 
                 if port.plugOrientation != nil || port.connectionCount != nil {
                     portMetaRow(port)
@@ -113,6 +95,70 @@ struct SessionDetailSectionView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// 该会话上跑的外接显示器：`IOPortTransportStateDisplayPort` 节点直接归属到物理端口
+    /// （见 PortGrouping.displayPortLinks），不再是"检测到 DP 能力但定位不到是哪台屏幕"的
+    /// 旧提示。分辨率/刷新率来自 EDID 身份匹配（PortGrouping.matchedDisplay）；匹配不唯一
+    /// 时（如坞站带两台同型号显示器）只展示链路本身已知的信息，不瞎连到具体分辨率。
+    @ViewBuilder
+    private func displaySection(of session: CableSession, fallbackPort port: USBCPortSnapshot) -> some View {
+        let links = viewModel.displayLinks(for: session)
+        if !links.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("外接显示器")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                ForEach(links, id: \.link.id) { entry in
+                    displayLinkRow(entry.link, display: entry.display)
+                }
+            }
+        } else if port.transportsProvisioned.contains("DisplayPort") {
+            // 端口报了 DP 能力，但没读到（或没解析出）对应的传输节点——比如节点刚建立还没
+            // 采集到下一轮快照。如实降级为旧的粗粒度提示，而不是假装什么都没发生。
+            HStack(spacing: 4) {
+                Label("检测到视频信号（DisplayPort 交替模式已启用）", systemImage: "display")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.indigo)
+                Image(systemName: "info.circle")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .help("暂未读到该链路的显示器身份信息，稍后会自动补上")
+            }
+        }
+    }
+
+    private func displayLinkRow(_ link: DisplayPortLinkSnapshot, display: DisplaySnapshot?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: "display")
+                .font(.caption2)
+                .foregroundStyle(.indigo)
+            Text(Self.displayLinkName(link))
+                .font(.caption2.weight(.medium))
+            if let display {
+                InfoChip(text: display.resolutionLabel, color: .indigo)
+                if let hz = display.refreshRateHz {
+                    InfoChip(text: "\(Int(hz.rounded())) Hz", color: .indigo)
+                }
+            } else {
+                Text("分辨率暂不可用")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            if let linkRate = link.linkRateDescription {
+                InfoChip(text: linkRate, color: .teal)
+            }
+        }
+    }
+
+    /// 显示器名：优先厂商+型号（"AOC · U27U3XD"），缺失时退回通用文案，不编造。
+    private static func displayLinkName(_ link: DisplayPortLinkSnapshot) -> String {
+        switch (link.manufacturerName, link.productName) {
+        case let (vendor?, name?): return "\(vendor) · \(name)"
+        case (nil, let name?): return name
+        case (let vendor?, nil): return vendor
+        default: return "外接显示器"
         }
     }
 

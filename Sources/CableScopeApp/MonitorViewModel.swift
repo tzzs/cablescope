@@ -161,6 +161,16 @@ final class MonitorViewModel: ObservableObject {
         return snapshot?.ports.first { $0.portID == physicalPortID }
     }
 
+    /// 会话对应的外接显示器：先按物理端口精确匹配 DisplayPort 传输链路（PortGrouping.
+    /// displayPortLinks），再按 EDID 身份把链路匹配到具体的 CGDirectDisplayID（PortGrouping.
+    /// matchedDisplay），取到分辨率/刷新率。display 为 nil 时仍返回 link 本身——至少能展示
+    /// 厂商/型号/链路速率，只是分辨率/刷新率这层匹配不唯一时留空，不瞎连。
+    func displayLinks(for session: CableSession) -> [(link: DisplayPortLinkSnapshot, display: DisplaySnapshot?)] {
+        guard let snapshot else { return [] }
+        return PortGrouping.displayPortLinks(for: session, links: snapshot.displayPortLinks)
+            .map { link in (link, PortGrouping.matchedDisplay(for: link, in: snapshot.displays)) }
+    }
+
     /// 当前协商档的功率（WinningPowerSourceOption；未协商/无端口数据时为 nil）。
     var negotiatedPDOVoltageMV: Int? {
         snapshot?.ports.compactMap { $0.powerSource?.winning?.voltageMV }.max()

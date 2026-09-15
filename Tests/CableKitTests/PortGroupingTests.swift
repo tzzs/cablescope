@@ -242,6 +242,80 @@ final class PortGroupingTests: XCTestCase {
         XCTAssertEqual(sessions.map(\.kind), [.usb, .thunderbolt])
     }
 
+    // MARK: - 外接显示器归属（DisplayPort 传输节点直读）
+
+    /// 真机数值（本机验证）：AOC U27U3XD，vendorNumber=1507 解码为 "AOC"，modelNumber=9987。
+    private func makeExternalDisplay(displayID: UInt32 = 2, modelNumber: UInt32? = 9987,
+                                     vendorNumber: UInt32? = 1507, isBuiltin: Bool = false) -> DisplaySnapshot {
+        DisplaySnapshot(displayID: displayID, name: "U27U3XD", pixelWidth: 3840, pixelHeight: 2160,
+                       refreshRateHz: 144, linkRateLabel: nil, isMain: false, isBuiltin: isBuiltin,
+                       vendorNumber: vendorNumber, modelNumber: modelNumber, serialNumber: 393)
+    }
+
+    private func makeDisplayLink(portID: String? = "Port-USB-C@1", productID: UInt32? = 9987,
+                                 manufacturerName: String? = "AOC") -> DisplayPortLinkSnapshot {
+        DisplayPortLinkSnapshot(portID: portID, isActive: true, isTunneled: false,
+                                linkRateDescription: "8.1 Gbps (HBR3)", manufacturerName: manufacturerName,
+                                productName: "U27U3XD", productID: productID, serialNumber: 393)
+    }
+
+    func testDisplayPortLinksMatchByPhysicalPortID() {
+        let port = makePort(portID: "Port-USB-C@1")
+        let sessions = PortGrouping.buildSessions(usbDevices: [], thunderboltDevices: [], ports: [port])
+        let link = makeDisplayLink(portID: "Port-USB-C@1")
+        let otherLink = makeDisplayLink(portID: "Port-USB-C@2")
+
+        let matched = PortGrouping.displayPortLinks(for: sessions[0], links: [link, otherLink])
+
+        XCTAssertEqual(matched.map(\.portID), ["Port-USB-C@1"], "只匹配 physicalPortID 相同的链路")
+    }
+
+    func testDisplayPortLinksEmptyWhenSessionHasNoPhysicalPortID() {
+        let device = makeUSBDevice(registryID: 1, locationID: 0x14100000, name: "A", bps: nil)
+        let sessions = PortGrouping.buildSessions(usbDevices: [device], thunderboltDevices: [])
+        XCTAssertTrue(PortGrouping.displayPortLinks(for: sessions[0], links: [makeDisplayLink()]).isEmpty,
+                     "无 physicalPortID 的会话（雷雳/未配对 USB）恒不归属显示器链路")
+    }
+
+    func testMatchedDisplayByProductIDAndVendorPNPCode() {
+        let matched = PortGrouping.matchedDisplay(for: makeDisplayLink(), in: [makeExternalDisplay()])
+        XCTAssertEqual(matched?.displayID, 2, "Product ID 与厂商 PNP 码都对得上时精确匹配")
+    }
+
+    func testMatchedDisplayIsNilWhenProductIDDiffers() {
+        let display = makeExternalDisplay(modelNumber: 1234)
+        XCTAssertNil(PortGrouping.matchedDisplay(for: makeDisplayLink(), in: [display]))
+    }
+
+    func testMatchedDisplayIsNilWhenVendorMismatches() {
+        // Product ID 相同但厂商对不上：可能是撞了型号号段的另一款显示器，不瞎连。
+        let display = makeExternalDisplay(vendorNumber: 9999)
+        XCTAssertNil(PortGrouping.matchedDisplay(for: makeDisplayLink(), in: [display]))
+    }
+
+    func testMatchedDisplayIsNilWhenAmbiguous() {
+        // 两台同型号显示器：命中不唯一，宁可不归属也不归错。
+        let a = makeExternalDisplay(displayID: 2)
+        let b = makeExternalDisplay(displayID: 3)
+        XCTAssertNil(PortGrouping.matchedDisplay(for: makeDisplayLink(), in: [a, b]))
+    }
+
+    func testMatchedDisplayExcludesBuiltinPanel() {
+        // 内置屏理论上也可能凑巧共享同一 Product ID（极端边界）：DisplayPort 链路永远是外接的。
+        let builtin = makeExternalDisplay(isBuiltin: true)
+        XCTAssertNil(PortGrouping.matchedDisplay(for: makeDisplayLink(), in: [builtin]))
+    }
+
+    func testMatchedDisplayIsNilWhenLinkHasNoProductID() {
+        let link = makeDisplayLink(productID: nil)
+        XCTAssertNil(PortGrouping.matchedDisplay(for: link, in: [makeExternalDisplay()]))
+    }
+
+    func testPNPCodeDecodesRealVendorNumber() {
+        XCTAssertEqual(PortGrouping.pnpCode(fromPackedVendor: 1507), "AOC", "本机真实 CGDisplayVendorNumber 解码")
+        XCTAssertNil(PortGrouping.pnpCode(fromPackedVendor: 0xFFFF), "解不出合法字母时返回 nil，不误判")
+    }
+
     // MARK: - JSON 兼容（旧数据升级）
 
     func testOldSnapshotJSONWithoutSessionsDecodesEmptySessions() throws {
@@ -258,6 +332,32 @@ final class PortGroupingTests: XCTestCase {
         let snapshot = try CableSnapshot.fromJSON(Data(json.utf8))
         XCTAssertTrue(snapshot.sessions.isEmpty)
         XCTAssertNil(snapshot.power)
+    }
+
+    func testOldSnapshotJSONWithoutDisplayPortLinksDecodesEmpty() throws {
+        let json = """
+        {
+          "id": "DEADBEEF-1234-5678-9ABC-DEF012345678",
+          "timestamp": "2026-09-13T08:00:00Z",
+          "usbDevices": [],
+          "displays": [],
+          "thunderboltDevices": []
+        }
+        """
+        let snapshot = try CableSnapshot.fromJSON(Data(json.utf8))
+        XCTAssertTrue(snapshot.displayPortLinks.isEmpty, "旧 JSON 无 displayPortLinks 键时应解码为空数组")
+    }
+
+    func testOldDisplayJSONWithoutEDIDFieldsDecodesNilAndFalse() throws {
+        let json = #"""
+        {"displayID":1,"name":"Color LCD","pixelWidth":2940,"pixelHeight":1912,
+         "refreshRateHz":60.0,"linkRateLabel":null,"isMain":true}
+        """#
+        let display = try JSONDecoder().decode(DisplaySnapshot.self, from: Data(json.utf8))
+        XCTAssertFalse(display.isBuiltin, "旧 JSON 无 isBuiltin 键时应解码为 false（未知即不当内置屏参与匹配）")
+        XCTAssertNil(display.vendorNumber)
+        XCTAssertNil(display.modelNumber)
+        XCTAssertNil(display.serialNumber)
     }
 
     func testOldThunderboltJSONWithoutReceptaclePortDecodesNil() throws {

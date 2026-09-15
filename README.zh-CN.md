@@ -14,7 +14,7 @@ macOS 菜单栏工具：检测连接数据线（USB-C / 雷电）的**充电速�
 | --- | --- |
 | ⚡ 充电 | 瞬时功率（W）、电压/电流、PD 合同（与瞬时功率分开显示）、PD 档位表（直读，当前协商档标出）、充电瓶颈归因、电量、实时功率曲线（App） |
 | 🔌 传输 | USB 协商速率（USB 2.0 / 3.x / USB4 / 雷电）、设备列表 |
-| 🖥 视频 | 显示器列表、分辨率/刷新率、DP 链路速率（外接显示器时） |
+| 🖥 视频 | 显示器列表、分辨率/刷新率、DP 链路速率；外接显示器可精确归属到具体线缆卡片（DisplayPort 传输节点直读端口归属 + EDID 身份匹配） |
 | 🎛 端口控制器 | Apple Silicon 直读 USB-C 端口控制器（AppleHPM / AppleTC）：端口状态、插拔方向、支持的传输能力（CC / USB2 / USB3 / USB4 / DisplayPort）；Intel/老机型自动降级为推断模式 |
 | 🧬 e-marker | 直读线缆 e-marker 芯片（SOP' Discover Identity）：线缆速度档、3A / 5A 电流评级、厂商 ID + 产品类型 |
 | 🏷 评级 | 基于历史协商峰值的线缆能力卡，持久化到本地（按端口分桶，拔线不清零） |
@@ -85,7 +85,7 @@ scripts/bundle_app.sh  # .app 打包脚本
 
 ## 开发状态
 
-- [x] CableKit 适配层（USB/电源/显示器/雷电 + 快照流 + 评级引擎）— 173/173 测试通过（含 CLI 测试 target）
+- [x] CableKit 适配层（USB/电源/显示器/雷电 + 快照流 + 评级引擎）— 189/189 测试通过（含 CLI 测试 target）
 - [x] CLI 六个子命令（真机验证：PD 合同识别、e-marker 推断、评级持久化）
 - [x] macOS 菜单栏 App（整机概览、每线一卡 + 线缆详情、实时功率曲线、端口评级）
 - [x] IOKit 属性检查器（App 专属窗口 + CLI `properties` 子命令；快照携带全量 `rawProperties`）
@@ -99,9 +99,10 @@ scripts/bundle_app.sh  # .app 打包脚本
 ### 已知限制
 
 - e-marker 直读需要 Apple Silicon（AppleHPM）；Intel/老机型以及无 e-marker 线缆的评级为"基于协商峰值的下限推断"，UI/CLI 均已标注；品牌规格仍不可读取。
-- 显示器与充电功率**无法归属到具体某根线**（macOS 只暴露当前活跃适配器，显示器也没有端口映射数据）：固定挂在整机概览；仅接一根线时充电状态自动提升到该线卡片。
+- 充电功率在多线时**无法归属到具体某根线**（macOS 只暴露当前活跃适配器；多根线同时插着时，除非恰好只有一个端口在协商合同，否则分不清是哪根线在收电）：这种情况下固定挂在整机概览；仅接一根线时充电状态自动提升到该线卡片。
+- 外接显示器**已可**归属到具体某根线：`IOPortTransportStateDisplayPort` 传输节点自己上报归属的 USB-C/MagSafe 端口（`DisplayPortTransportService` + `PortGrouping.displayPortLinks`），再按 EDID 身份匹配到具体的 `CGDirectDisplayID`（`PortGrouping.matchedDisplay`）取到分辨率/刷新率。EDID 匹配不唯一时（如坞站带两台同型号显示器）只展示链路自身已知的厂商/型号信息，不猜分辨率。
 - 端口名暂为技术格式（"USB 端口 0x014" / "雷雳端口 2"），左/右物理方位需要更深层的 registry 端口拓扑工作（v2）。
-- 内置显示器无 DP link rate 字段，`linkRateLabel` 需接外接 DP/雷电显示器才会生效。
+- 内置显示器无 DP link rate 字段，`DisplaySnapshot.linkRateLabel`（system_profiler 尽力而为解析）需接外接 DP/雷电显示器才会生效；线缆卡片上的 DisplayPort 链路速率（`DisplayPortLinkSnapshot.linkRateDescription`）来自专门的传输节点，链路存在时恒可靠有值。
 - `watch`/快照流为事件驱动唤醒（AppleSmartBattery 兴趣通知 + USB 匹配通知）+ 兜底轮询的内容变化检测。
 - `.app` 打包脚本适用于本地使用；App Store/公证分发建议后续迁移 Xcode 工程。
 

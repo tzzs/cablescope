@@ -16,7 +16,7 @@ On most Macs, macOS only sees the *negotiated result* of a cable, never the cabl
 | --- | --- |
 | ⚡ Charging | Instantaneous power (W), voltage/current, PD contract (shown separately from instantaneous power), PD tier table with the currently negotiated tier marked, charging bottleneck attribution, battery level, live power chart (App) |
 | 🔌 Data | Negotiated USB speed (USB 2.0 / 3.x / USB4 / Thunderbolt), device list |
-| 🖥 Video | Display list, resolution/refresh rate, DP link rate (with an external display) |
+| 🖥 Video | Display list, resolution/refresh rate, DP link rate; external displays are attributed to the specific cable's card (DisplayPort transport node reports its own port directly, matched to the display by EDID identity) |
 | 🎛 Port controller | USB-C port controller direct read on Apple Silicon (AppleHPM / AppleTC): port status, plug orientation, supported transports (CC / USB2 / USB3 / USB4 / DisplayPort); Intel and older Macs degrade to inference-only mode |
 | 🧬 E-marker | Direct read of the cable's e-marker chip (SOP' Discover Identity): cable speed class, 3A / 5A current rating, vendor ID + product type |
 | 🏷 Rating | Cable capability card derived from historical negotiation peaks, persisted locally (per-port buckets, peaks survive unplugging) |
@@ -87,7 +87,7 @@ scripts/bundle_app.sh  # .app bundling script
 
 ## Status
 
-- [x] CableKit adapter layer (USB/power/displays/Thunderbolt + snapshot stream + rating engine) — 173/173 tests passing (including the CLI test target)
+- [x] CableKit adapter layer (USB/power/displays/Thunderbolt + snapshot stream + rating engine) — 189/189 tests passing (including the CLI test target)
 - [x] All six CLI subcommands (validated on real hardware: PD contract detection, e-marker inference, rating persistence)
 - [x] macOS menu bar app (system overview, one card per cable with per-cable detail, live power chart, per-port rating)
 - [x] IOKit property inspector (App window + CLI `properties` subcommand; snapshots carry full `rawProperties`)
@@ -101,9 +101,10 @@ scripts/bundle_app.sh  # .app bundling script
 ### Known Limitations
 
 - E-marker direct read requires Apple Silicon (AppleHPM); on Intel/older Macs — and for cables without an e-marker — the rating is a "lower-bound inference from negotiation peaks", labeled as such in both the UI and the CLI. Branded specs still cannot be read.
-- Displays and charging power **cannot be attributed to a specific cable** (macOS only exposes the active adapter and has no display→port mapping): they stay in the system overview. With exactly one cable connected, charging status is promoted onto that cable's card.
+- Charging power **cannot be attributed to a specific cable** in the multi-cable case (macOS only exposes the active adapter, so with several cables plugged in there's no way to tell which one is receiving power unless exactly one port has a negotiated contract): it stays in the system overview then. With exactly one cable connected, charging status is promoted onto that cable's card.
+- External displays **are** attributed to a specific cable: an `IOPortTransportStateDisplayPort` transport node reports its own owning USB-C/MagSafe port directly (`DisplayPortTransportService` + `PortGrouping.displayPortLinks`), and is matched to its `CGDirectDisplayID` by EDID identity (`PortGrouping.matchedDisplay`) to pull in resolution/refresh rate. When that EDID match isn't unique (e.g. a dock driving two identical monitors), only the link's own vendor/model info is shown — no guessed resolution.
 - Physical port labels are technical ("USB 端口 0x014" / "雷雳端口 2"); friendly left/right positions would require registry port-topology work (v2).
-- The built-in display has no DP link rate field; `linkRateLabel` only becomes meaningful when an external DP/Thunderbolt display is connected.
+- The built-in display has no DP link rate field, and `DisplaySnapshot.linkRateLabel` (parsed best-effort from `system_profiler`) only becomes meaningful when an external DP/Thunderbolt display is connected. The per-cable card's DisplayPort link rate (`DisplayPortLinkSnapshot.linkRateDescription`) comes from the dedicated transport node instead and is reliably populated whenever the link exists.
 - `watch`/the snapshot stream use event-driven wake-ups (AppleSmartBattery interest + USB matching notifications) with fallback polling for content-change detection.
 - The `.app` bundling script is intended for local use; App Store/notarized distribution should later move to an Xcode project.
 
