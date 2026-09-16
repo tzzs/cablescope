@@ -96,7 +96,7 @@ struct CableCardView: View {
                     if let power {
                         if power.isCharging, let watts = power.watts, watts > 0 {
                             InfoChip(
-                                text: "⚡ \(watts, format: .number.precision(.fractionLength(1)))W 充电中",
+                                Text("⚡ ") + Text(watts, format: .number.precision(.fractionLength(1))) + Text("W 充电中"),
                                 systemImage: "bolt.fill",
                                 color: .orange,
                                 isProminent: true

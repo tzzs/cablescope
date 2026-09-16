@@ -136,7 +136,7 @@ struct SessionDetailSectionView: View {
             Image(systemName: "display")
                 .font(.caption2)
                 .foregroundStyle(.indigo)
-            Text(Self.displayLinkName(link))
+            Self.displayLinkName(link)
                 .font(.caption2.weight(.medium))
             if let display {
                 InfoChip(verbatim: display.resolutionLabel, color: .indigo)
@@ -155,12 +155,16 @@ struct SessionDetailSectionView: View {
     }
 
     /// 显示器名：优先厂商+型号（"AOC · U27U3XD"），缺失时退回通用文案，不编造。
-    private static func displayLinkName(_ link: DisplayPortLinkSnapshot) -> String {
+    /// 直接返回 `Text` 而不是 `String`：厂商/型号是设备数据（verbatim，不查表），
+    /// "外接显示器"这句兜底文案是真正的模板文案，要能跟语言切换——两种内容按
+    /// `Text + Text` 分别处理，而不是拼成一个 `String` 整体走 `Text(String)` verbatim
+    /// （那样"外接显示器"分支也会跟着永远显示中文，不随语言切换）。
+    private static func displayLinkName(_ link: DisplayPortLinkSnapshot) -> Text {
         switch (link.manufacturerName, link.productName) {
-        case let (vendor?, name?): return "\(vendor) · \(name)"
-        case (nil, let name?): return name
-        case (let vendor?, nil): return vendor
-        default: return "外接显示器"
+        case let (vendor?, name?): return Text(vendor) + Text(" · ") + Text(name)
+        case (nil, let name?): return Text(name)
+        case (let vendor?, nil): return Text(vendor)
+        default: return Text("外接显示器")
         }
     }
 
@@ -288,7 +292,7 @@ struct SessionDetailSectionView: View {
                     .foregroundStyle(.secondary)
                     .frame(width: 18)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(Self.displayName(device))
+                    Self.displayName(device)
                         .font(.callout.weight(.medium))
                         .lineLimit(1)
                     Text(deviceSubtitle(device))
@@ -394,8 +398,12 @@ struct SessionDetailSectionView: View {
     }
 
     /// 产品名 → 厂商名 → "未知设备" 的展示回退链（与 CLI 的 displayName 逻辑一致）。
-    private static func displayName(_ device: USBDeviceSnapshot) -> String {
-        device.productName ?? device.vendorName ?? "未知设备"
+    /// 返回 `Text`：设备名是数据（verbatim），"未知设备"兜底文案要跟语言切换。
+    private static func displayName(_ device: USBDeviceSnapshot) -> Text {
+        if let name = device.productName ?? device.vendorName {
+            return Text(name)
+        }
+        return Text("未知设备")
     }
 
     /// 按产品名猜测设备图标（尽力而为，猜不中用线缆图标兜底）。

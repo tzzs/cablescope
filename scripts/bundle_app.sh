@@ -49,28 +49,35 @@ PLIST
 cp "$BIN_PATH/CableScopeApp" "$APP_DIR/Contents/MacOS/CableScopeApp"
 
 # ---- SwiftPM 资源 bundle（如 CableKit 的 CableScope_CableKit.bundle，内含 usb-vendors.json）----
-# resource_bundle_accessor.swift 用 Bundle.main.bundleURL（.app 包本身，不是 Contents/Resources）
-# 拼接 bundle 名去找它；找不到时回退开发机 .build 里的硬编码绝对路径，
-# 两条路径在其他人机器上都不存在，于是命中其内置 fatalError 崩溃。
-# 因此这里必须把 bundle 平铺复制到 .app 包根目录，而不是 Contents/Resources/。
+# 放进 Contents/Resources/（标准 macOS app bundle 位置）。历史上放在 .app 包根目录
+# 是为了迁就 SwiftPM 生成的 resource_bundle_accessor.swift（用 Bundle.main.bundleURL
+# 查找）——但本项目所有资源查找早已改用自建的安全探测（VendorDirectory/
+# KitLocalization/AppLocalization/BrandGlyph 统一的候选路径列表，均把
+# Bundle.main.resourceURL 排第一位、Bundle.main.bundleURL 只作兜底），不依赖那份
+# 自动生成代码，可以放回标准位置。放根目录还有个真实代价：codesign --deep 对
+# Contents/ 之外的内容一律报 "unsealed contents present in the bundle root" 并以
+# 非零退出码中断整个签名（ad-hoc/正式签名身份下都实测复现过，之前脚本会在这一步
+# 静默提前退出，后面"已生成 App 图标"往后的步骤全部不会执行）；Contents/Resources/
+# 是签名正常覆盖并密封的标准路径，不会有这个问题。
 shopt -s nullglob
 RESOURCE_BUNDLES=("$BIN_PATH"/*.bundle)
 shopt -u nullglob
 if (( ${#RESOURCE_BUNDLES[@]} > 0 )); then
     for bundle in "${RESOURCE_BUNDLES[@]}"; do
-        cp -R "$bundle" "$APP_DIR/"
+        cp -R "$bundle" "$APP_DIR/Contents/Resources/"
         echo "已嵌入资源 bundle：$(basename "$bundle")"
     done
 fi
 
 # ---- App 自身的 .lproj 额外平铺一份到 Contents/Resources/ ----
 # SwiftUI 的 Text/Label(LocalizedStringKey) 默认只认 Bundle.main 自身直接下辖的
-# *.lproj（不会钻进上面那个嵌套的 CableScope_CableScopeApp.bundle 里找）；真正的
-# Xcode 原生 target 打包时资源直接编译进 Contents/Resources，没有这层嵌套，
-# 这里手动补一份形成同等效果——CableScopeApp 自己的 Localizable.xcstrings 才会在
-# 语言切换时生效。只平铺 CableScopeApp 自己的语言目录，CableKit 的文案走的是
-# 自建的 KitLocalization（显式传 locale），不依赖这条路径。
-APP_RESOURCE_BUNDLE="$APP_DIR/CableScope_CableScopeApp.bundle/Contents/Resources"
+# *.lproj（不会钻进上面那个嵌套的 CableScope_CableScopeApp.bundle 里找，即便现在
+# 这个 bundle 本身也在 Contents/Resources/ 下，嵌套关系没变）；真正的 Xcode 原生
+# target 打包时资源直接编译进 Contents/Resources，没有这层嵌套，这里手动补一份
+# 形成同等效果——CableScopeApp 自己的 Localizable.xcstrings 才会在语言切换时生效。
+# 只平铺 CableScopeApp 自己的语言目录，CableKit 的文案走的是自建的 KitLocalization
+# （显式传 locale），不依赖这条路径。
+APP_RESOURCE_BUNDLE="$APP_DIR/Contents/Resources/CableScope_CableScopeApp.bundle/Contents/Resources"
 if [[ -d "$APP_RESOURCE_BUNDLE" ]]; then
     shopt -s nullglob
     for lproj in "$APP_RESOURCE_BUNDLE"/*.lproj; do
@@ -131,7 +138,13 @@ if [[ -n "$CODESIGN_IDENTITY" ]]; then
     codesign --force --deep --sign "$CODESIGN_IDENTITY" \
         --options runtime --timestamp "$APP_DIR"
 else
-    echo "未设置 CODESIGN_IDENTITY，跳过签名（未签名 bundle）"
+    # 至少 ad-hoc 签名（身份 "-"，不需要证书）：完全不签名的 .app 在较新 macOS 上会让
+    # UNUserNotificationCenter.current() 内部校验签名失败，直接抛未捕获的 Objective-C
+    # 异常崩掉整个进程（Swift try/catch 接不住）——本地调试构建也会真的点开设置页触发，
+    # 不是只有分发包才会踩到。ad-hoc 签名不提供身份验证/不能公证，但足够让代码签名校验
+    # 通过，本地调试链路不受影响。
+    echo "未设置 CODESIGN_IDENTITY，使用 ad-hoc 签名（无身份验证，仅避免未签名崩溃）"
+    codesign --force --deep --sign - "$APP_DIR"
 fi
 
 echo "已生成 $APP_DIR"

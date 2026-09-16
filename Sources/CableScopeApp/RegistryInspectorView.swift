@@ -227,7 +227,8 @@ struct RegistryInspectorView: View {
                 selectedEntryID = fresh.first?.registryID
             }
         } catch {
-            errorMessage = "枚举失败：\(error.localizedDescription)"
+            let template = AppLocalization.string("枚举失败：%@", locale: AppPreferences.effectiveLocale())
+            errorMessage = String(format: template, error.localizedDescription)
         }
     }
 

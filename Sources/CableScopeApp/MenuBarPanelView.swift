@@ -72,7 +72,9 @@ struct MenuBarPanelView: View {
                     Text("已接通电源")
                         .font(.title3.weight(.medium))
                     if let contract = viewModel.snapshot?.power?.pdContract {
-                        Text("PD 合同 \(contract.watts, format: .number.precision(.fractionLength(0)))W · 暂未充电")
+                        (Text("PD 合同 ")
+                            + Text(contract.watts, format: .number.precision(.fractionLength(0)))
+                            + Text("W · 暂未充电"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {

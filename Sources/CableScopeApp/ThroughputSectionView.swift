@@ -53,7 +53,12 @@ struct ThroughputSectionView: View {
                         InfoChip(text: "读取 \(Self.speedText(result.readMBps))",
                                  systemImage: "square.and.arrow.down", color: .green)
                     }
-                    Text("\(result.volumeName) · 写出 \(Self.mbText(result.bytesWritten)) · 读出 \(Self.mbText(result.bytesRead)) · 共 \(result.elapsedSeconds, format: .number.precision(.fractionLength(1))) 秒")
+                    // 固定文案片段和数值分开：elapsedSeconds 走 FormatStyle 插值，
+                    // 不经过字符串目录查表（原因同 OverviewSectionView 的系统输入行）。
+                    (Text(result.volumeName) + Text(" · 写出 ") + Text(Self.mbText(result.bytesWritten))
+                        + Text(" · 读出 ") + Text(Self.mbText(result.bytesRead)) + Text(" · 共 ")
+                        + Text(result.elapsedSeconds, format: .number.precision(.fractionLength(1)))
+                        + Text(" 秒"))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -113,9 +118,13 @@ private final class ThroughputSectionModel: ObservableObject {
             do {
                 lastResult = try await ThroughputTester.measure(at: candidate.url)
             } catch let error as ThroughputError {
+                // ThroughputError.description 来自 CableKit，目前没有 locale 感知，
+                // 始终是中文——已知的小缺口，测速失败是低频路径，暂不为此单独
+                // 给 ThroughputTester 接入 KitLocalization。
                 lastError = error.description
             } catch {
-                lastError = "测速失败：\(error.localizedDescription)"
+                let template = AppLocalization.string("测速失败：%@", locale: AppPreferences.effectiveLocale())
+                lastError = String(format: template, error.localizedDescription)
             }
             isRunning = false
         }

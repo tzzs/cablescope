@@ -7,17 +7,15 @@ import Foundation
 /// "要不要发"（按 `AppPreferences` 的总开关/细分开关）和"怎么发"（`UNUserNotificationCenter`）。
 ///
 /// - 冷启动（首个快照）不产生任何事件，规则在 `NotificationDiff` 里，这里不用特殊处理；
-/// - 通知授权懒请求（首次真正要发时才问）；SPM 直接运行（无 bundle）时静默禁用。
+/// - 通知授权懒请求（首次真正要发时才问）；不满足 `NotificationAvailability.isAvailable`
+///   时静默禁用（SwiftPM 裸可执行、或未签名调试构建——两者都会让
+///   `UNUserNotificationCenter.current()` 崩掉整个进程，详见该类型的注释）。
 @MainActor
 final class NotificationController {
     private var baseline: NotificationBaseline?
 
-    /// 是否可用：仅在打包含 bundle ID 时启用（SwiftPM 裸可执行没有，`UNUserNotificationCenter.current()`
-    /// 会因 `bundleProxyForCurrentProcess` 为 nil 直接抛未捕获异常崩掉整个进程）。
-    private nonisolated static var isAvailable: Bool { Bundle.main.bundleIdentifier != nil }
-
     nonisolated static func activate() {
-        guard isAvailable else { return } // SwiftPM 裸可执行（`swift run`/`make run-app`）静默跳过
+        guard NotificationAvailability.isAvailable else { return }
         // 前台（菜单栏形态常驻前台上下文）也要弹横幅，而不是静默入中心。
         UNUserNotificationCenter.current().delegate = ForegroundPresenter.shared
     }
@@ -25,7 +23,7 @@ final class NotificationController {
     func process(snapshot: CableSnapshot,
                 ratingEngine: CableRatingEngineProtocol,
                 port: @escaping (CableSession) -> USBCPortSnapshot?) {
-        guard Self.isAvailable else { return }
+        guard NotificationAvailability.isAvailable else { return }
         let (events, newBaseline) = NotificationDiff.diff(baseline: baseline, snapshot: snapshot,
                                                            ratingEngine: ratingEngine)
         baseline = newBaseline

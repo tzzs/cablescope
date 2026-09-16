@@ -54,7 +54,14 @@ struct OverviewSectionView: View {
             }
 
             if let voltageMV = power.adapterVoltageMV, let amperageMA = power.adapterAmperageMA {
-                Text("系统输入 · \(Double(voltageMV) / 1000, format: .number.precision(.fractionLength(1)))V / \(Double(amperageMA) / 1000, format: .number.precision(.fractionLength(2)))A")
+                // 固定文案片段和数值分开：数值走 FormatStyle 插值，不经过字符串目录查表
+                // （Swift 给 FormatStyle 插值生成的 key 格式没有把握，不敢手写对应译文，
+                // 之前直接整句插值导致这行文字永远显示中文，语言切换对它没有效果）。
+                (Text("系统输入 · ")
+                    + Text(Double(voltageMV) / 1000, format: .number.precision(.fractionLength(1)))
+                    + Text("V / ")
+                    + Text(Double(amperageMA) / 1000, format: .number.precision(.fractionLength(2)))
+                    + Text("A"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()

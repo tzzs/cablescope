@@ -11,6 +11,86 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ rating upgraded" } }
       }
     },
+    " · 写出 " : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : " · wrote " } }
+      }
+    },
+    " · 读出 " : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : " · read " } }
+      }
+    },
+    " · 共 " : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : " · total " } }
+      }
+    },
+    " 秒" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : " sec" } }
+      }
+    },
+    "写入 %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Write %@" } }
+      }
+    },
+    "读取 %@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Read %@" } }
+      }
+    },
+    "测速失败：%@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Test failed: %@" } }
+      }
+    },
+    "枚举失败：%@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enumeration failed: %@" } }
+      }
+    },
+    "系统输入 · " : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "System input · " } }
+      }
+    },
+    "PD 合同 " : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "PD Contract " } }
+      }
+    },
+    "W · 暂未充电" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "W · not charging yet" } }
+      }
+    },
+    "W 充电中" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "W charging" } }
+      }
+    },
+    "PD 合同 %lldW" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "PD Contract %lldW" } }
+      }
+    },
+    "此构建未正确签名，通知功能不可用（正式发布包不受影响）" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This build isn't properly signed, so notifications are unavailable (official releases aren't affected)" } }
+      }
+    },
+    "系统未授权通知，以下开关不会实际生效" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Notifications aren't authorized by the system — the switches below won't actually take effect" } }
+      }
+    },
+    "前往系统设置开启" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open System Settings" } }
+      }
+    },
     "5A e-marker 线" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "5A e-marker cable" } }

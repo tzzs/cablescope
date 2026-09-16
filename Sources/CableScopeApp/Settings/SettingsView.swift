@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 /// 设置页：通用（Dock 图标）/ 外观（主题）/ 语言 / 通知（总开关 + 细分开关）四个 tab。
 ///
@@ -101,9 +102,41 @@ private struct LanguageSettingsTab: View {
 
 private struct NotificationSettingsTab: View {
     @AppStorage(AppPreferences.notificationsEnabledKey) private var notificationsEnabled = true
+    // nil = 还没查到；查到之后如果不是 .authorized/.provisional，说明系统层面就没放行，
+    // 这些开关全打开也不会真的弹出通知——这是"开了开关却没有通知"最常见的实际原因，
+    // 之前完全没有暴露给用户，只能在系统设置里自己排查。
+    @State private var authorizationStatus: UNAuthorizationStatus?
+
+    private var needsAttention: Bool {
+        guard let authorizationStatus else { return false }
+        return authorizationStatus != .authorized && authorizationStatus != .provisional
+    }
 
     var body: some View {
         Form {
+            if !NotificationAvailability.isAvailable {
+                // 未签名调试构建：压根不能碰 UNUserNotificationCenter（会直接崩进程，
+                // 见 NotificationAvailability 的注释），这里只如实说明，不查、不请求授权。
+                Section {
+                    Label("此构建未正确签名，通知功能不可用（正式发布包不受影响）",
+                          systemImage: "exclamationmark.triangle.fill")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(.orange)
+                }
+            } else if needsAttention {
+                Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("系统未授权通知，以下开关不会实际生效", systemImage: "exclamationmark.triangle.fill")
+                            .font(.callout.weight(.medium))
+                            .foregroundStyle(.orange)
+                        Button("前往系统设置开启") {
+                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                    }
+                }
+            }
             Section {
                 Toggle("启用通知", isOn: $notificationsEnabled)
             }
@@ -115,7 +148,35 @@ private struct NotificationSettingsTab: View {
             .disabled(!notificationsEnabled)
         }
         .formStyle(.grouped)
-        .frame(width: settingsWidth, height: 300)
+        .frame(width: settingsWidth, height: needsAttention || !NotificationAvailability.isAvailable ? 400 : 300)
+        .task { await requestAuthorizationIfNeededAndRefresh() }
+        // 用户点"前往系统设置开启"切过去之后，App 会失焦；等他们改完权限切回来、
+        // App 重新变为活跃状态时顺手再查一遍——不然横幅会一直停在"未授权"的旧状态，
+        // 得关掉设置窗口重开才会刷新，用户会以为自己没设置对。
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await refreshAuthorizationStatus() }
+        }
+    }
+
+    @MainActor
+    private func requestAuthorizationIfNeededAndRefresh() async {
+        guard NotificationAvailability.isAvailable else { return }
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        if settings.authorizationStatus == .notDetermined {
+            // 用户主动点进"通知"设置页，本身就是请求权限最自然的时机（Apple 官方指引：
+            // 在上下文里请求授权，比首次启动时自动请求体验更好）——不用等到第一条真实
+            // 通知触发时才弹系统授权框，那时用户很可能根本没在看屏幕，容易错过，
+            // 之后就一直停在"未决定"状态。
+            _ = try? await center.requestAuthorization(options: [.alert, .sound])
+        }
+        await refreshAuthorizationStatus()
+    }
+
+    @MainActor
+    private func refreshAuthorizationStatus() async {
+        guard NotificationAvailability.isAvailable else { return }
+        authorizationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
     }
 }
 

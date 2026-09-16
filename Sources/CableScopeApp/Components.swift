@@ -117,6 +117,22 @@ struct InfoChip: View {
         self.isProminent = isProminent
     }
 
+    /// 第三个初始化器：调用方自己用 `Text("固定模板") + Text(数值, format:) + Text("固定模板")`
+    /// 拼好一个 `Text`。用于"文案里嵌了数字，且数字要走 `FormatStyle` 插值格式化"的场景——
+    /// 直接把整句塞进 `LocalizedStringKey` 插值，字符串目录里要精确写出 Swift 给
+    /// `FormatStyle` 插值生成的 key（未在 Xcode 里实际跑过抽取，格式没有把握对得上，
+    /// 之前踩过同类坑），改成"固定文案片段各自查表 + 数字单独用 FormatStyle 格式化后
+    /// 原样拼接"最稳妥：固定片段是普通字面量，key 就是可见文本本身，翻译对不对一目了然；
+    /// 数字部分完全不经过查表，怎么都不会错。
+    /// 用 `_` 无标签而不是复用 `text:`，避免和上面两个同标签重载产生新的消歧问题
+    /// （`Text` 本身是 `ExpressibleByStringLiteral`，字面量调用可能又落到这个重载上）。
+    init(_ text: Text, systemImage: String? = nil, color: Color = .blue, isProminent: Bool = false) {
+        self.text = text
+        self.systemImage = systemImage
+        self.color = color
+        self.isProminent = isProminent
+    }
+
     var body: some View {
         HStack(spacing: 4) {
             if let systemImage {
