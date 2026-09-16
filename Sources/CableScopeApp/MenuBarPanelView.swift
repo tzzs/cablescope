@@ -129,7 +129,7 @@ struct MenuBarPanelView: View {
                         .foregroundStyle(.secondary)
                         .padding(.top, 2)
                 }
-                MenuRowButton(title: "设置…") {
+                MenuRowButton(title: "设置") {
                     dismiss()
                     openSettings()
                     NSApplication.shared.activate(ignoringOtherApps: true)

@@ -39,8 +39,15 @@ struct SectionCard<Content: View>: View {
 
 /// 充电状态的语义（颜色 / 文案 / 图标），供下面胶囊徽章和工具栏纯图标两种样式共享，
 /// 避免两处各写一份判断逻辑、后续改状态文案漏改一处。
+///
+/// `color` 和 `toolbarColor` 故意分开：`color` 是胶囊徽章用的饱和色（菜单面板里有
+/// 独立底色衬着，不会显突兀）；`toolbarColor` 是主窗口工具栏纯图标用的克制配色——
+/// 默认跟"刷新""IOKit 属性"两个单色按钮同一个 `.secondary` 基调，只在"正在充电"
+/// 这个真正值得一眼看到的状态才上色，而不是常态下就摆一个饱和色图标和旁边两个
+/// 单色按钮拼在一起（HIG 对工具栏的建议是默认走单色、颜色克制使用）。
 private struct ChargingStatus {
     let color: Color
+    let toolbarColor: Color
     let text: LocalizedStringKey
     let icon: String
     let isCharging: Bool
@@ -49,14 +56,14 @@ private struct ChargingStatus {
         self.isCharging = isCharging
         switch (hasData, isCharging, isConnected) {
         case (false, _, _):
-            color = .secondary; text = "等待数据"; icon = "hourglass"
+            color = .secondary; toolbarColor = .secondary; text = "等待数据"; icon = "hourglass"
         case (true, true, _):
-            color = .green; text = "正在充电"; icon = "bolt.fill"
+            color = .green; toolbarColor = .green; text = "正在充电"; icon = "bolt.fill"
         case (true, false, true):
             // "已接通电源"覆盖电池保温、优化充电暂停等 IsCharging=false 但插着电的状态。
-            color = .blue; text = "已接通电源"; icon = "powerplug.fill"
+            color = .blue; toolbarColor = .secondary; text = "已接通电源"; icon = "powerplug.fill"
         case (true, false, false):
-            color = .gray; text = "未接通电源"; icon = "bolt.slash"
+            color = .gray; toolbarColor = .secondary; text = "未接通电源"; icon = "bolt.slash"
         }
     }
 }
@@ -97,7 +104,7 @@ struct ChargingStatusIcon: View {
     var body: some View {
         let status = ChargingStatus(isCharging: isCharging, isConnected: isConnected, hasData: hasData)
         Image(systemName: status.icon)
-            .foregroundStyle(status.color)
+            .foregroundStyle(status.toolbarColor)
             .symbolEffect(.pulse, options: .repeating, isActive: status.isCharging && !reduceMotion)
             .help(status.text)
             .accessibilityLabel(status.text)

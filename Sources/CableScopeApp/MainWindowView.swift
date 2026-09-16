@@ -9,6 +9,7 @@ import SwiftUI
 struct MainWindowView: View {
     @ObservedObject var viewModel: MonitorViewModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -53,6 +54,16 @@ struct MainWindowView: View {
                 }
                 .keyboardShortcut("r", modifiers: .command)
                 .disabled(viewModel.isRefreshing)
+
+                // 设置入口：保留独立 Settings 窗口（四个 tab 不变，符合 macOS 原生 App
+                // 一贯把 Settings 做成独立小窗口的做法），只是把入口从"只能从状态栏菜单
+                // 找"挪到主窗口工具栏里，跟刷新/IOKit 属性平级，不用先绕去菜单栏才能找到。
+                Button {
+                    openSettings()
+                } label: {
+                    Label("设置", systemImage: "gearshape")
+                }
+                .keyboardShortcut(",", modifiers: .command)
             }
         }
     }
