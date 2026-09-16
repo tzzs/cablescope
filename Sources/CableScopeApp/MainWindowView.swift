@@ -3,9 +3,11 @@ import SwiftUI
 /// 主窗口（方案 A）：整机概览卡 + 线缆卡片行 + 选中线详情卡。
 /// 电池 / 输入功率 / 显示器属于整机区；每根线缆一张卡片，点选后下方展示该线详情。
 /// 窗口标题固定为 "CableScope"（Window scene 声明处），正文不再重复渲染同名大标题；
-/// 快照时间戳改用 `.navigationSubtitle` 挂在系统标题栏下方，充电状态与高频操作
-/// （刷新 / IOKit 属性）都提到 `.toolbar` 里——工具栏由 AppKit 承载，不随内容
-/// ScrollView 一起滚动，滚到详情区也不用先滚回顶部才能点刷新。
+/// 快照时间戳改用 `.navigationSubtitle` 挂在系统标题栏下方，高频操作（刷新 / IOKit
+/// 属性 / 设置）都提到 `.toolbar` 里——工具栏由 AppKit 承载，不随内容 ScrollView
+/// 一起滚动，滚到详情区也不用先滚回顶部才能点刷新。充电状态不放进工具栏：它不是
+/// 操作、不可点击，跟两个真按钮摆一起会显得"多出来一个不一样的东西"，而且
+/// System Overview 卡片本身就是打开窗口最先看到的内容，工具栏里再放一份是重复。
 struct MainWindowView: View {
     @ObservedObject var viewModel: MonitorViewModel
     @Environment(\.openWindow) private var openWindow
@@ -25,16 +27,9 @@ struct MainWindowView: View {
         .task { viewModel.start() }
         .navigationSubtitle(subtitleText)
         .toolbar {
-            // 三者放进同一个 .primaryAction 组、统一用纯图标尺寸：窗口较窄时
-            // .principal（居中）会和 .primaryAction（靠右）挤在一起，把彩色胶囊徽章和
-            // 图标按钮并排摆出"三个大小、行为都不一致的按钮"的错觉。改成同尺寸图标后，
-            // 充电状态图标不可点击、无悬停高亮，完整文案移到 .help 提示，
-            // 视觉上读作"一个状态指示 + 两个操作"，不再像同一组按钮。
+            // 统一放进同一个 .primaryAction 组、同尺寸纯图标按钮：三个都是可点击的
+            // 操作，行为和视觉权重一致，不掺一个不可点的状态指示。
             ToolbarItemGroup(placement: .primaryAction) {
-                ChargingStatusIcon(isCharging: viewModel.isCharging,
-                                    isConnected: viewModel.isExternalConnected,
-                                    hasData: viewModel.snapshot != nil)
-
                 Button {
                     openWindow(id: "registry")
                     NSApplication.shared.activate(ignoringOtherApps: true)

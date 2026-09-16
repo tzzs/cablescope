@@ -37,17 +37,10 @@ struct SectionCard<Content: View>: View {
     }
 }
 
-/// 充电状态的语义（颜色 / 文案 / 图标），供下面胶囊徽章和工具栏纯图标两种样式共享，
-/// 避免两处各写一份判断逻辑、后续改状态文案漏改一处。
-///
-/// `color` 和 `toolbarColor` 故意分开：`color` 是胶囊徽章用的饱和色（菜单面板里有
-/// 独立底色衬着，不会显突兀）；`toolbarColor` 是主窗口工具栏纯图标用的克制配色——
-/// 默认跟"刷新""IOKit 属性"两个单色按钮同一个 `.secondary` 基调，只在"正在充电"
-/// 这个真正值得一眼看到的状态才上色，而不是常态下就摆一个饱和色图标和旁边两个
-/// 单色按钮拼在一起（HIG 对工具栏的建议是默认走单色、颜色克制使用）。
+/// 充电状态的语义（颜色 / 文案 / 图标），供菜单面板的胶囊徽章使用，避免徽章之外
+/// 再散落一份同样的判断逻辑。
 private struct ChargingStatus {
     let color: Color
-    let toolbarColor: Color
     let text: LocalizedStringKey
     let icon: String
     let isCharging: Bool
@@ -56,14 +49,14 @@ private struct ChargingStatus {
         self.isCharging = isCharging
         switch (hasData, isCharging, isConnected) {
         case (false, _, _):
-            color = .secondary; toolbarColor = .secondary; text = "等待数据"; icon = "hourglass"
+            color = .secondary; text = "等待数据"; icon = "hourglass"
         case (true, true, _):
-            color = .green; toolbarColor = .green; text = "正在充电"; icon = "bolt.fill"
+            color = .green; text = "正在充电"; icon = "bolt.fill"
         case (true, false, true):
             // "已接通电源"覆盖电池保温、优化充电暂停等 IsCharging=false 但插着电的状态。
-            color = .blue; toolbarColor = .secondary; text = "已接通电源"; icon = "powerplug.fill"
+            color = .blue; text = "已接通电源"; icon = "powerplug.fill"
         case (true, false, false):
-            color = .gray; toolbarColor = .secondary; text = "未接通电源"; icon = "bolt.slash"
+            color = .gray; text = "未接通电源"; icon = "bolt.slash"
         }
     }
 }
@@ -88,26 +81,6 @@ struct ChargingBadge: View {
             // 充电中闪电脉冲（macOS 14+）：用动效传达"正在取电"的活跃状态；
             // 尊重系统的"减弱动态效果"（HIG 无障碍要求，symbolEffect 不会自动降级）。
             .symbolEffect(.pulse, options: .repeating, isActive: status.isCharging && !reduceMotion)
-    }
-}
-
-/// 充电状态的纯图标版本：用于主窗口工具栏，与"刷新""IOKit 属性"两个操作按钮同尺寸的
-/// 图标并排展示。不用 Button 包裹（不可点击、不带悬停高亮），完整文案挪到 .help 提示里——
-/// 这样它在工具栏里读作"一个状态指示图标"而不是"第三个大小、行为都不一样的按钮"。
-struct ChargingStatusIcon: View {
-    let isCharging: Bool
-    let isConnected: Bool
-    let hasData: Bool
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        let status = ChargingStatus(isCharging: isCharging, isConnected: isConnected, hasData: hasData)
-        Image(systemName: status.icon)
-            .foregroundStyle(status.toolbarColor)
-            .symbolEffect(.pulse, options: .repeating, isActive: status.isCharging && !reduceMotion)
-            .help(status.text)
-            .accessibilityLabel(status.text)
     }
 }
 
