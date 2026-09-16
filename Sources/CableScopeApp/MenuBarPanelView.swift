@@ -27,7 +27,9 @@ struct MenuBarLabelView: View {
 struct MenuBarPanelView: View {
     @ObservedObject var viewModel: MonitorViewModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
 
     // 检查更新：请求进行中防重复点击；结果显示为按钮下方的一行小字，几秒后自动清除
     @State private var isCheckingForUpdate = false
@@ -70,7 +72,7 @@ struct MenuBarPanelView: View {
                     Text("已接通电源")
                         .font(.title3.weight(.medium))
                     if let contract = viewModel.snapshot?.power?.pdContract {
-                        Text(String(format: "PD 合同 %.0fW · 暂未充电", contract.watts))
+                        Text("PD 合同 \(contract.watts, format: .number.precision(.fractionLength(0)))W · 暂未充电")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
@@ -127,6 +129,11 @@ struct MenuBarPanelView: View {
                         .foregroundStyle(.secondary)
                         .padding(.top, 2)
                 }
+                MenuRowButton(title: "设置…") {
+                    dismiss()
+                    openSettings()
+                    NSApplication.shared.activate(ignoringOtherApps: true)
+                }
                 MenuRowButton(title: "在 Dock 显示图标", isChecked: showDockIcon) {
                     showDockIcon.toggle()
                     NSApplication.shared.setActivationPolicy(showDockIcon ? .regular : .accessory)
@@ -172,24 +179,24 @@ struct MenuBarPanelView: View {
         isCheckingForUpdate = true
         defer { isCheckingForUpdate = false }
 
-        updateStatusMessage = "正在检查更新…"
+        updateStatusMessage = AppLocalization.string("正在检查更新…", locale: locale)
         let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
 
         do {
             guard let repo = URL(string: UpdateChecker.repositoryURL) else {
-                updateStatusMessage = "网络失败，请稍后再试"
+                updateStatusMessage = AppLocalization.string("网络失败，请稍后再试", locale: locale)
                 return
             }
             // URLSession async 请求在后台执行，不阻塞菜单栏 UI
             let latest = try await UpdateChecker.latestReleaseTag(for: repo)
             if UpdateChecker.isUpdateAvailable(current: current, latest: latest) {
                 updateStatusMessage = nil
-                UpdateChecker.presentUpdateDialog(current: current, latest: latest)
+                UpdateChecker.presentUpdateDialog(current: current, latest: latest, locale: locale)
             } else {
-                showTransientStatus("已是最新")
+                showTransientStatus(AppLocalization.string("已是最新", locale: locale))
             }
         } catch {
-            showTransientStatus("网络失败，请稍后再试")
+            showTransientStatus(AppLocalization.string("网络失败，请稍后再试", locale: locale))
         }
     }
 

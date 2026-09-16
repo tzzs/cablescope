@@ -53,7 +53,7 @@ struct CableCardsSectionView: View {
         return [GridItem(.adaptive(minimum: 220), spacing: 10)]
     }
 
-    private var headerTitle: String {
+    private var headerTitle: LocalizedStringKey {
         viewModel.sessions.isEmpty ? "已连接线缆" : "已连接线缆 (\(viewModel.sessions.count))"
     }
 }
@@ -71,6 +71,7 @@ struct CableCardView: View {
     let action: () -> Void
 
     @State private var isHovering = false
+    @Environment(\.locale) private var locale
 
     private var statusColor: Color {
         if let power, power.isCharging { return .green }
@@ -95,7 +96,7 @@ struct CableCardView: View {
                     if let power {
                         if power.isCharging, let watts = power.watts, watts > 0 {
                             InfoChip(
-                                text: String(format: "⚡ %.1fW 充电中", watts),
+                                text: "⚡ \(watts, format: .number.precision(.fractionLength(1)))W 充电中",
                                 systemImage: "bolt.fill",
                                 color: .orange,
                                 isProminent: true
@@ -106,7 +107,7 @@ struct CableCardView: View {
                     } else if let winning = port?.powerSource?.winning {
                         // 整机电源不可归属到本线（多端口同时有合同等），端口直读的
                         // 协商合同仍能说明"这根线在收电"。
-                        InfoChip(text: String(format: "PD 合同 %.0fW", winning.watts.rounded()),
+                        InfoChip(text: "PD 合同 \(Int(winning.watts.rounded()))W",
                                  systemImage: "bolt.fill", color: .blue)
                     }
                     if let speed = session.topUSBSpeed {
@@ -126,7 +127,7 @@ struct CableCardView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if let rating, rating.sampleCount > 0 {
-                        Text(rating.summary)
+                        Text(rating.summary(locale: locale))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
@@ -162,7 +163,7 @@ struct CableCardView: View {
         .onHover { isHovering = $0 }
     }
 
-    private var deviceSummary: String {
+    private var deviceSummary: LocalizedStringKey {
         guard session.deviceCount > 0 else {
             return port?.powerSource?.winning != nil ? "纯充电连接 · 无数据设备" : "端口无设备"
         }
@@ -180,22 +181,22 @@ struct CableCardView: View {
         let trustNotes = EMarkerTrust.assess(eMarker)
         if let description = eMarker.productTypeDescription {
             InfoChip(
-                text: DiagnosticsEngine.eMarkerDescription(description),
+                verbatim: DiagnosticsEngine.eMarkerDescription(description, locale: locale),
                 systemImage: "cable.connector",
                 color: .indigo
             )
         }
         if let rating = eMarker.decodedCurrentRating, rating != .reserved {
-            InfoChip(text: rating.label, systemImage: "checkmark.seal.fill", color: .orange)
+            InfoChip(verbatim: rating.label, systemImage: "checkmark.seal.fill", color: .orange)
         }
         ForEach(trustNotes, id: \.self) { note in
             switch note {
             case .zeroVendorID:
                 InfoChip(text: "e-marker 未上报厂商", systemImage: "questionmark.circle", color: .gray)
             case .reservedCurrentRating:
-                InfoChip(text: note.summary, systemImage: "questionmark.circle", color: .orange)
+                InfoChip(verbatim: note.summary(locale: locale), systemImage: "questionmark.circle", color: .orange)
             case .unknownVendorID, .missingIdentity:
-                InfoChip(text: note.summary, systemImage: "questionmark.circle", color: .gray)
+                InfoChip(verbatim: note.summary(locale: locale), systemImage: "questionmark.circle", color: .gray)
             }
         }
     }

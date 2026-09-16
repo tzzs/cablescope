@@ -29,8 +29,11 @@ struct ThroughputSectionView: View {
                     Button {
                         model.run()
                     } label: {
-                        Label(model.isRunning ? "测速中（写入 + 读取，各约 5 秒）…" : "开始测速",
-                              systemImage: "play.fill")
+                        if model.isRunning {
+                            Label("测速中（写入 + 读取，各约 5 秒）…", systemImage: "play.fill")
+                        } else {
+                            Label("开始测速", systemImage: "play.fill")
+                        }
                     }
                     .disabled(model.isRunning || model.selectedVolumeID == nil)
 
@@ -50,8 +53,7 @@ struct ThroughputSectionView: View {
                         InfoChip(text: "读取 \(Self.speedText(result.readMBps))",
                                  systemImage: "square.and.arrow.down", color: .green)
                     }
-                    Text("\(result.volumeName) · 写出 \(Self.mbText(result.bytesWritten)) · "
-                         + "读出 \(Self.mbText(result.bytesRead)) · 共 \(String(format: "%.1f", result.elapsedSeconds)) 秒")
+                    Text("\(result.volumeName) · 写出 \(Self.mbText(result.bytesWritten)) · 读出 \(Self.mbText(result.bytesRead)) · 共 \(result.elapsedSeconds, format: .number.precision(.fractionLength(1))) 秒")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }

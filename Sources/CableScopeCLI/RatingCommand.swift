@@ -37,7 +37,7 @@ extension CableScopeCLI {
 
         let rating = engine.overallRating()
         print("🏷 线缆评级（基于 \(rating.sampleCount) 次协商观测）")
-        print("   \(rating.summary)")
+        print("   \(rating.summary(locale: .current))")
         var observed = "   观测窗口："
         if let first = rating.firstSeen {
             observed += "首次 \(Fmt.timeString(first, format: "yyyy-MM-dd HH:mm"))"

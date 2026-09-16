@@ -50,9 +50,10 @@ final class CableRatingEngineTests: XCTestCase {
         XCTAssertFalse(rating.is5ACable)
         XCTAssertEqual(rating.sampleCount, 1)
         XCTAssertEqual(rating.maxRefreshRateHz ?? 0, 60, accuracy: 0.01)
-        XCTAssertFalse(rating.summary.contains("0 Mbps"), "summary 不应把无数据渲染成 0 Mbps")
-        XCTAssertFalse(rating.summary.contains("⚡ 0W"), "summary 不应把无数据渲染成 0W")
-        XCTAssertTrue(rating.summary.contains("未观测到高速 USB 协商"))
+        let summary = rating.summary(locale: Locale(identifier: "zh-Hans"))
+        XCTAssertFalse(summary.contains("0 Mbps"), "summary 不应把无数据渲染成 0 Mbps")
+        XCTAssertFalse(summary.contains("⚡ 0W"), "summary 不应把无数据渲染成 0W")
+        XCTAssertTrue(summary.contains("未观测到高速 USB 协商"))
     }
 
     /// 多端口聚合：各线缆会话独立评级，overall 取跨端口峰值
@@ -158,8 +159,9 @@ final class CableRatingEngineTests: XCTestCase {
         let rating = engine.overallRating()
         XCTAssertEqual(rating.maxRefreshRateHz ?? 0, 120, accuracy: 0.01)
         XCTAssertEqual(rating.maxDisplayLinkRate, "HBR3")
-        XCTAssertTrue(rating.summary.contains("HBR3"))
-        XCTAssertTrue(rating.summary.contains("120Hz"))
+        let summary = rating.summary(locale: Locale(identifier: "zh-Hans"))
+        XCTAssertTrue(summary.contains("HBR3"))
+        XCTAssertTrue(summary.contains("120Hz"))
     }
 
     /// 空引擎：无任何观测时不得产生误导性的 0 值
@@ -169,7 +171,7 @@ final class CableRatingEngineTests: XCTestCase {
         XCTAssertNil(rating.maxUSBBitsPerSecond)
         XCTAssertNil(rating.maxChargingWatts)
         XCTAssertEqual(rating.sampleCount, 0)
-        XCTAssertTrue(rating.summary.contains("未观测到高速 USB 协商"))
+        XCTAssertTrue(rating.summary(locale: Locale(identifier: "zh-Hans")).contains("未观测到高速 USB 协商"))
     }
 
     func testPersistenceRoundTrip() throws {

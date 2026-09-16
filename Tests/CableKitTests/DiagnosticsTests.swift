@@ -1,6 +1,13 @@
 import XCTest
 @testable import CableKit
 
+private extension Character {
+    /// 粗略判定：落在 CJK 统一表意文字区块即视为中文字符（够用于"英文档不应残留中文"的断言）。
+    var isChineseCharacter: Bool {
+        unicodeScalars.contains { (0x4E00...0x9FFF).contains($0.value) }
+    }
+}
+
 /// DiagnosticsEngine 的归因规则测试（表驱动覆盖每个分支）。
 final class DiagnosticsTests: XCTestCase {
 
@@ -34,9 +41,40 @@ final class DiagnosticsTests: XCTestCase {
     func testPausedWhileConnected() {
         // 优化充电暂停：已接通但 IsCharging=false。
         let result = DiagnosticsEngine.diagnoseCharging(power: power(isCharging: false, external: true),
-                                                        adapterMaxWatts: 100)
+                                                        adapterMaxWatts: 100,
+                                                        locale: Locale(identifier: "zh-Hans"))
         XCTAssertEqual(result.verdict, .paused)
+        // 显式传 zh-Hans，断言不受 CI 运行环境系统 locale 影响。
         XCTAssertEqual(result.summary, "已接通电源，未在充电")
+    }
+
+    /// 英文档下应产出非空、不含中文字符的文案（确认翻译条目确实存在，不会漏译静默回退成中文 key）。
+    func testSummariesHaveEnglishTranslations() {
+        let english = Locale(identifier: "en")
+        let cases: [ChargingDiagnostics] = [
+            DiagnosticsEngine.diagnoseCharging(power: nil, adapterMaxWatts: nil, locale: english),
+            DiagnosticsEngine.diagnoseCharging(power: power(isCharging: false, external: false),
+                                               adapterMaxWatts: nil, locale: english),
+            DiagnosticsEngine.diagnoseCharging(power: power(isCharging: false, external: true),
+                                               adapterMaxWatts: 100, locale: english),
+            DiagnosticsEngine.diagnoseCharging(power: power(isCharging: true, external: true, realAmperageMA: 4_800),
+                                               adapterMaxWatts: 100, locale: english),
+            DiagnosticsEngine.diagnoseCharging(
+                power: power(isCharging: true, external: true, realAmperageMA: 3_250,
+                             contractVoltageMV: 20_000, contractAmperageMA: 3_250),
+                adapterMaxWatts: 100, locale: english),
+            DiagnosticsEngine.diagnoseCharging(power: power(isCharging: true, external: true, realAmperageMA: 2_000),
+                                               adapterMaxWatts: nil, locale: english),
+        ]
+        for diagnostics in cases {
+            XCTAssertFalse(diagnostics.summary.isEmpty)
+            XCTAssertFalse(diagnostics.summary.contains(where: \.isChineseCharacter),
+                           "英文档下 summary 不应含中文字符：\(diagnostics.summary)")
+            if let detail = diagnostics.detail {
+                XCTAssertFalse(detail.contains(where: \.isChineseCharacter),
+                               "英文档下 detail 不应含中文字符：\(detail)")
+            }
+        }
     }
 
     func testAdapterMaxOutput() {
@@ -101,7 +139,8 @@ final class DiagnosticsTests: XCTestCase {
         )
         let chargingPower = power(isCharging: true, external: true, realAmperageMA: 4_900)
 
-        let headline = DiagnosticsEngine.portHeadline(port: port, power: chargingPower)
+        let headline = DiagnosticsEngine.portHeadline(port: port, power: chargingPower,
+                                                       locale: Locale(identifier: "zh-Hans"))
         XCTAssertNotNil(headline)
         XCTAssertTrue(headline?.contains("USB-C") ?? false)
         XCTAssertTrue(headline?.contains("⚡") ?? false)
@@ -111,10 +150,18 @@ final class DiagnosticsTests: XCTestCase {
     }
 
     func testEMarkerDescriptionLocalization() {
-        XCTAssertEqual(DiagnosticsEngine.eMarkerDescription("Passive Cable"), "被动线缆")
-        XCTAssertEqual(DiagnosticsEngine.eMarkerDescription("Active Cable"), "主动线缆")
-        XCTAssertEqual(DiagnosticsEngine.eMarkerDescription("EPR Cable"), "EPR 线缆")
-        XCTAssertEqual(DiagnosticsEngine.eMarkerDescription("Unknown Thing"), "Unknown Thing")
+        let zh = Locale(identifier: "zh-Hans")
+        XCTAssertEqual(DiagnosticsEngine.eMarkerDescription("Passive Cable", locale: zh), "被动线缆")
+        XCTAssertEqual(DiagnosticsEngine.eMarkerDescription("Active Cable", locale: zh), "主动线缆")
+        XCTAssertEqual(DiagnosticsEngine.eMarkerDescription("EPR Cable", locale: zh), "EPR 线缆")
+        XCTAssertEqual(DiagnosticsEngine.eMarkerDescription("Unknown Thing", locale: zh), "Unknown Thing")
+    }
+
+    func testEMarkerDescriptionEnglish() {
+        let en = Locale(identifier: "en")
+        XCTAssertEqual(DiagnosticsEngine.eMarkerDescription("Passive Cable", locale: en), "Passive cable")
+        XCTAssertEqual(DiagnosticsEngine.eMarkerDescription("Active Cable", locale: en), "Active cable")
+        XCTAssertEqual(DiagnosticsEngine.eMarkerDescription("EPR Cable", locale: en), "EPR cable")
     }
 
     // MARK: Cable VDO 解码边界

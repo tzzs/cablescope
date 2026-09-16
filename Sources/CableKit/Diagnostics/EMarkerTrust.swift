@@ -17,17 +17,21 @@ public enum EMarkerTrustNote: String, Codable, Sendable, CaseIterable {
     /// 未上报厂商身份（无 VID），无法核对厂商
     case missingIdentity
 
-    /// 面向用户的一句话说明（中文、谨慎措辞，不做真伪判决）。
-    public var summary: String {
+    /// 面向用户的一句话说明（谨慎措辞，不做真伪判决）。
+    ///
+    /// 不给 `locale` 默认值：这句文案直接绑定"用户当前选择的语言"，强制每个调用点
+    /// 显式想清楚 locale 从哪来，避免悄悄退化成系统语言（App 层从 `\.locale`
+    /// environment 取，CLI/测试显式传入）。
+    public func summary(locale: Locale) -> String {
         switch self {
         case .zeroVendorID:
-            return "e-marker 未上报厂商 ID（常见现象，非线缆质量判断依据）"
+            return KitLocalization.string("e-marker 未上报厂商 ID（常见现象，非线缆质量判断依据）", locale: locale)
         case .unknownVendorID:
-            return "厂商 ID 不在已知厂商列表中"
+            return KitLocalization.string("厂商 ID 不在已知厂商列表中", locale: locale)
         case .reservedCurrentRating:
-            return "电流评级为保留值，未标定 3A/5A 能力"
+            return KitLocalization.string("电流评级为保留值，未标定 3A/5A 能力", locale: locale)
         case .missingIdentity:
-            return "e-marker 未提供厂商身份信息，无法核对厂商"
+            return KitLocalization.string("e-marker 未提供厂商身份信息，无法核对厂商", locale: locale)
         }
     }
 }

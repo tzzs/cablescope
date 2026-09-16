@@ -76,13 +76,17 @@ final class EMarkerTrustTests: XCTestCase {
         XCTAssertEqual(notes, [.unknownVendorID, .reservedCurrentRating])
     }
 
-    /// 措辞红线：summary 不得含"假/劣质/山寨"等判决词，也不得为空。
+    /// 措辞红线：summary 不得含"假/劣质/山寨"等判决词，也不得为空——中英文各一份，
+    /// 防止只翻中文、英文文案绕过审查（AGENTS.md 话术红线要求）。
     func testSummariesUseCautiousWording() {
-        for note in EMarkerTrustNote.allCases {
-            XCTAssertFalse(note.summary.isEmpty, "\(note.rawValue) 的 summary 不应为空")
-            for banned in ["假", "劣质", "山寨", "counterfeit", "fake"] {
-                XCTAssertFalse(note.summary.lowercased().contains(banned),
-                               "\(note.rawValue) 的措辞不得含判决词「\(banned)」")
+        for locale in [Locale(identifier: "zh-Hans"), Locale(identifier: "en")] {
+            for note in EMarkerTrustNote.allCases {
+                let text = note.summary(locale: locale)
+                XCTAssertFalse(text.isEmpty, "\(note.rawValue) 的 summary（\(locale.identifier)）不应为空")
+                for banned in ["假", "劣质", "山寨", "counterfeit", "fake", "knockoff"] {
+                    XCTAssertFalse(text.lowercased().contains(banned),
+                                   "\(note.rawValue) 的措辞（\(locale.identifier)）不得含判决词「\(banned)」")
+                }
             }
         }
         XCTAssertEqual(EMarkerTrustNote.allCases.count, 4, "M3 共四类信号")

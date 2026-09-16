@@ -1,0 +1,256 @@
+{
+  "sourceLanguage" : "zh-Hans",
+  "strings" : {
+    "@ %@Hz" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "@ %@Hz"
+          }
+        }
+      }
+    },
+    "e-marker 未上报厂商 ID（常见现象，非线缆质量判断依据）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "e-marker did not report a vendor ID (common, not an indicator of cable quality)"
+          }
+        }
+      }
+    },
+    "e-marker 未提供厂商身份信息，无法核对厂商" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "e-marker did not provide vendor identity information, so the vendor can't be verified"
+          }
+        }
+      }
+    },
+    "EPR 线缆" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "EPR cable"
+          }
+        }
+      }
+    },
+    "PD 合同 %@W 低于适配器可用档 %@W" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PD contract %@W is below the adapter's available %@W tier"
+          }
+        }
+      }
+    },
+    "USB4/雷雳可用" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "USB4 / Thunderbolt available"
+          }
+        }
+      }
+    },
+    "主动线缆" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active cable"
+          }
+        }
+      }
+    },
+    "充电器正按合同满档输出" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Charger is outputting at its full contracted tier"
+          }
+        }
+      }
+    },
+    "厂商 ID 不在已知厂商列表中" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vendor ID is not in the known vendor list"
+          }
+        }
+      }
+    },
+    "常见于优化充电暂停或电池保温（电量接近充满时系统主动放缓）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Common with Optimized Battery Charging or battery conditioning (the system slows down on purpose when nearly full)"
+          }
+        }
+      }
+    },
+    "已接通电源，未在充电" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected, not charging"
+          }
+        }
+      }
+    },
+    "实际抽取 %@W，低于合同 %@W" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drawing %@W, below the %@W contract"
+          }
+        }
+      }
+    },
+    "当前 %@W ≈ PD 合同 %@W" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Now %@W ≈ PD contract %@W"
+          }
+        }
+      }
+    },
+    "未接通电源，使用电池" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not connected, running on battery"
+          }
+        }
+      }
+    },
+    "未观测到高速 USB 协商" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No high-speed USB negotiation observed"
+          }
+        }
+      }
+    },
+    "正在充电（合同读数缺失）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Charging (contract reading unavailable)"
+          }
+        }
+      }
+    },
+    "电池接近充满或系统在限流，属正常现象" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normal when the battery is nearly full or the system is throttling"
+          }
+        }
+      }
+    },
+    "电流评级为保留值，未标定 3A/5A 能力" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current rating is a reserved value; 3A/5A capability isn't specified"
+          }
+        }
+      }
+    },
+    "暂无电源数据" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No power data yet"
+          }
+        }
+      }
+    },
+    "线缆可能限制了协商档位（未标 5A 的线无法请求大电流档）；电池状态也可能影响，仅供参考" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The cable may be limiting the negotiated tier (a cable not rated 5A can't request a high-current tier); battery condition may also be a factor — for reference only"
+          }
+        }
+      }
+    },
+    "被动线缆" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passive cable"
+          }
+        }
+      }
+    },
+    "合同 %@W" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contract %@W"
+          }
+        }
+      }
+    },
+    "⚡ %@W" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚡ %@W"
+          }
+        }
+      }
+    },
+    "⚡ %@W（5A e-marker 线）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚡ %@W (5A e-marker cable)"
+          }
+        }
+      }
+    },
+    "⚡%@W" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚡%@W"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

@@ -36,6 +36,12 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
     <key>LSUIElement</key>               <true/>
     <key>NSHighResolutionCapable</key>   <true/>
     <key>NSHumanReadableCopyright</key>  <string>© 2026 CableScope</string>
+    <key>CFBundleDevelopmentRegion</key> <string>zh-Hans</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>zh-Hans</string>
+        <string>en</string>
+    </array>
 </dict>
 </plist>
 PLIST
@@ -55,6 +61,23 @@ if (( ${#RESOURCE_BUNDLES[@]} > 0 )); then
         cp -R "$bundle" "$APP_DIR/"
         echo "已嵌入资源 bundle：$(basename "$bundle")"
     done
+fi
+
+# ---- App 自身的 .lproj 额外平铺一份到 Contents/Resources/ ----
+# SwiftUI 的 Text/Label(LocalizedStringKey) 默认只认 Bundle.main 自身直接下辖的
+# *.lproj（不会钻进上面那个嵌套的 CableScope_CableScopeApp.bundle 里找）；真正的
+# Xcode 原生 target 打包时资源直接编译进 Contents/Resources，没有这层嵌套，
+# 这里手动补一份形成同等效果——CableScopeApp 自己的 Localizable.xcstrings 才会在
+# 语言切换时生效。只平铺 CableScopeApp 自己的语言目录，CableKit 的文案走的是
+# 自建的 KitLocalization（显式传 locale），不依赖这条路径。
+APP_RESOURCE_BUNDLE="$APP_DIR/CableScope_CableScopeApp.bundle/Contents/Resources"
+if [[ -d "$APP_RESOURCE_BUNDLE" ]]; then
+    shopt -s nullglob
+    for lproj in "$APP_RESOURCE_BUNDLE"/*.lproj; do
+        cp -R "$lproj" "$APP_DIR/Contents/Resources/"
+        echo "已平铺语言目录：$(basename "$lproj")"
+    done
+    shopt -u nullglob
 fi
 
 # ---- 隐私清单（MAS 提审要求；DMG 分发同样无害）----

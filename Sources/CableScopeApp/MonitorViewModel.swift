@@ -184,7 +184,8 @@ final class MonitorViewModel: ObservableObject {
     var chargingDiagnostics: ChargingDiagnostics? {
         guard let power = snapshot?.power else { return nil }
         return DiagnosticsEngine.diagnoseCharging(power: power,
-                                                  adapterMaxWatts: negotiatedPDOWatts)
+                                                  adapterMaxWatts: negotiatedPDOWatts,
+                                                  locale: AppPreferences.effectiveLocale())
     }
 
     /// 展示用的 PD 档位来源：优先取正在协商的端口，否则取档位最多的一份。
@@ -236,8 +237,9 @@ final class MonitorViewModel: ObservableObject {
             // 持久化失败不影响 UI，下次快照会重试。
         }
 
-        // 插拔通知（内容有变化才到 ingest，session 集合变化即插拔事件）。
-        notifications.process(snapshot: snapshot, port: { self.port(for: $0) })
+        // 线缆变化通知（插拔 + 状态变化）：内容有变化才到 ingest；ratingEngine 已完成
+        // 本次 record，传的是记录后的最新评级。
+        notifications.process(snapshot: snapshot, ratingEngine: ratingEngine, port: { self.port(for: $0) })
     }
 
     private func appendPowerSample() {

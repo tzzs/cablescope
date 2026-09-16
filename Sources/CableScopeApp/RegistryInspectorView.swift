@@ -100,7 +100,11 @@ struct RegistryInspectorView: View {
         }
         .overlay {
             if filtered.isEmpty && !isLoading {
-                EmptyHint(text: errorMessage ?? "该类名下没有 registry 条目")
+                if let errorMessage {
+                    EmptyHint(verbatim: errorMessage)
+                } else {
+                    EmptyHint(text: "该类名下没有 registry 条目")
+                }
             }
         }
         .listStyle(.sidebar)
@@ -129,8 +133,10 @@ struct RegistryInspectorView: View {
                     .padding(.vertical, 8)
                 }
             }
+        } else if entries.isEmpty {
+            EmptyHint(text: "等待枚举结果…")
         } else {
-            EmptyHint(text: entries.isEmpty ? "等待枚举结果…" : "在左侧选择一个条目")
+            EmptyHint(text: "在左侧选择一个条目")
         }
     }
 
@@ -157,8 +163,11 @@ struct RegistryInspectorView: View {
                     showCopyConfirmation = false
                 }
             } label: {
-                Label(showCopyConfirmation ? "已拷贝" : "拷贝全部",
-                      systemImage: showCopyConfirmation ? "checkmark" : "doc.on.doc")
+                if showCopyConfirmation {
+                    Label("已拷贝", systemImage: "checkmark")
+                } else {
+                    Label("拷贝全部", systemImage: "doc.on.doc")
+                }
             }
             .disabled(isLoading)
         }

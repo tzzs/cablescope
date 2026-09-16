@@ -2,14 +2,15 @@ import CableKit
 import Foundation
 @preconcurrency import UserNotifications
 
-/// 插拔通知：线缆接入/断开时发一条系统通知（"已连接 USB-C · ⚡98W · 5A 被动线缆"）。
+/// 线缆变化通知：插拔 + "线缆插着不动但状态变了"（开始/停止充电、协商速率提升、
+/// 评级提升）。事件本身由 `CableKit.NotificationDiff`（纯函数，可单测）推断，这里只管
+/// "要不要发"（按 `AppPreferences` 的总开关/细分开关）和"怎么发"（`UNUserNotificationCenter`）。
 ///
-/// - 快照流本身做了内容签名去重，因此 ingest 只在会话集合真实变化时到达；
-/// - 首个快照作为基线，不产生通知（避免每次启动弹一堆"已连接"）；
+/// - 冷启动（首个快照）不产生任何事件，规则在 `NotificationDiff` 里，这里不用特殊处理；
 /// - 通知授权懒请求（首次真正要发时才问）；SPM 直接运行（无 bundle）时静默禁用。
 @MainActor
 final class NotificationController {
-    private var knownSessionIDs: Set<String>?
+    private var baseline: NotificationBaseline?
 
     /// 是否可用：仅在打包含 bundle ID 时启用（SwiftPM 裸可执行没有，`UNUserNotificationCenter.current()`
     /// 会因 `bundleProxyForCurrentProcess` 为 nil 直接抛未捕获异常崩掉整个进程）。
@@ -21,37 +22,70 @@ final class NotificationController {
         UNUserNotificationCenter.current().delegate = ForegroundPresenter.shared
     }
 
-    func process(snapshot: CableSnapshot, port: @escaping (CableSession) -> USBCPortSnapshot?) {
+    func process(snapshot: CableSnapshot,
+                ratingEngine: CableRatingEngineProtocol,
+                port: @escaping (CableSession) -> USBCPortSnapshot?) {
         guard Self.isAvailable else { return }
-        let currentIDs = Set(snapshot.sessions.map(\.id))
+        let (events, newBaseline) = NotificationDiff.diff(baseline: baseline, snapshot: snapshot,
+                                                           ratingEngine: ratingEngine)
+        baseline = newBaseline
+        guard !events.isEmpty else { return }
 
-        guard let known = knownSessionIDs else {
-            knownSessionIDs = currentIDs // 基线
-            return
-        }
-        knownSessionIDs = currentIDs
-
-        let added = snapshot.sessions.filter { !known.contains($0.id) }
-        let removed = known.subtracting(currentIDs)
-
-        for session in added {
-            deliver(title: "已连接 \(session.shortPortLabel)",
-                    body: connectBody(session: session, port: port(session)))
-        }
-        if !removed.isEmpty {
-            let label = removed.count == 1 ? "1 根线缆" : "\(removed.count) 根线缆"
-            deliver(title: "线缆已断开", body: "拔出了 \(label)")
+        let locale = AppPreferences.effectiveLocale()
+        for event in events {
+            deliver(for: event, snapshot: snapshot, port: port, locale: locale)
         }
     }
 
-    private func connectBody(session: CableSession, port: USBCPortSnapshot?) -> String {
+    private func deliver(for event: CableNotificationEvent,
+                         snapshot: CableSnapshot,
+                         port: @escaping (CableSession) -> USBCPortSnapshot?,
+                         locale: Locale) {
+        switch event {
+        case .sessionConnected(let sessionID):
+            guard AppPreferences.isNotificationEnabled(.plugUnplug),
+                  let session = snapshot.sessions.first(where: { $0.id == sessionID }) else { return }
+            let template = AppLocalization.string("已连接 %@", locale: locale)
+            deliver(title: String(format: template, session.shortPortLabel),
+                    body: connectBody(session: session, port: port(session), locale: locale))
+
+        case .sessionDisconnected:
+            guard AppPreferences.isNotificationEnabled(.plugUnplug) else { return }
+            deliver(title: AppLocalization.string("线缆已断开", locale: locale),
+                    body: AppLocalization.string("拔出了 1 根线缆", locale: locale))
+
+        case .chargingStarted:
+            guard AppPreferences.isNotificationEnabled(.chargingStarted) else { return }
+            deliver(title: AppLocalization.string("开始充电", locale: locale), body: "")
+
+        case .chargingStopped:
+            guard AppPreferences.isNotificationEnabled(.chargingStopped) else { return }
+            deliver(title: AppLocalization.string("已停止充电", locale: locale), body: "")
+
+        case .usbSpeedUpgraded(let sessionID, let speed):
+            guard AppPreferences.isNotificationEnabled(.speedUpgraded),
+                  let session = snapshot.sessions.first(where: { $0.id == sessionID }) else { return }
+            let template = AppLocalization.string("%@ 协商速率提升", locale: locale)
+            deliver(title: String(format: template, session.shortPortLabel),
+                    body: "\(speed.generation) \(speed.label)")
+
+        case .ratingUpgraded(let sessionID, let dimension):
+            guard AppPreferences.isNotificationEnabled(.ratingUpgraded),
+                  let session = snapshot.sessions.first(where: { $0.id == sessionID }) else { return }
+            let template = AppLocalization.string("%@ 线缆评级提升", locale: locale)
+            deliver(title: String(format: template, session.shortPortLabel),
+                    body: dimension.localizedDescription(locale: locale))
+        }
+    }
+
+    private func connectBody(session: CableSession, port: USBCPortSnapshot?, locale: Locale) -> String {
         var parts: [String] = []
-        if let headline = DiagnosticsEngine.portHeadline(port: port, power: nil) {
+        if let headline = DiagnosticsEngine.portHeadline(port: port, power: nil, locale: locale) {
             parts.append(headline)
         } else if let speed = session.topUSBSpeed {
             parts.append("\(speed.generation) \(speed.label)")
         } else if session.deviceCount == 0 {
-            parts.append("端口无设备")
+            parts.append(AppLocalization.string("端口无设备", locale: locale))
         }
         return parts.joined(separator: " · ")
     }
@@ -67,6 +101,15 @@ final class NotificationController {
                                                 content: content,
                                                 trigger: nil)
             center.add(request)
+        }
+    }
+}
+
+private extension RatingUpgradeDimension {
+    func localizedDescription(locale: Locale) -> String {
+        switch self {
+        case .fiveAmpConfirmed: return AppLocalization.string("首次确认支持 5A", locale: locale)
+        case .displayLink: return AppLocalization.string("显示器链路规格提升", locale: locale)
         }
     }
 }

@@ -25,8 +25,8 @@ public struct VendorDirectory: Sendable {
     /// 不复用 SwiftPM 自动生成的 `Bundle.module`：那个访问器在资源 bundle **整体缺失**
     /// （而非 bundle 内某个文件缺失）时会执行自带的 `fatalError`——直接终止进程，
     /// 早于任何调用方的 guard/try? 生效，因此无法被 `shared` 上面这层防护接住
-    /// （2026-09 一次未妥善打包的 .app 在真实设备上复现过此崩溃）。这里手写等价的
-    /// 候选路径查找，用 `FileManager` 逐一探测 bundle 是否存在，全部落空才返回 nil。
+    /// （2026-09 一次未妥善打包的 .app 在真实设备上复现过此崩溃）。候选路径探测逻辑
+    /// 与 `KitLocalization`（本地化资源）共用同一份实现，见 `CableKitResourceBundle`。
     static func loadBundledJSON(
         bundleFileName: String = "CableScope_CableKit.bundle",
         candidates: [URL?] = [
@@ -35,15 +35,10 @@ public struct VendorDirectory: Sendable {
             Bundle.main.bundleURL,
         ]
     ) -> Data? {
-        for candidate in candidates {
-            guard let bundleURL = candidate?.appendingPathComponent(bundleFileName),
-                  FileManager.default.fileExists(atPath: bundleURL.path),
-                  let bundle = Bundle(url: bundleURL),
-                  let resourceURL = bundle.url(forResource: "usb-vendors", withExtension: "json"),
-                  let data = try? Data(contentsOf: resourceURL) else { continue }
-            return data
-        }
-        return nil
+        guard let bundle = CableKitResourceBundle.probe(bundleFileName: bundleFileName, candidates: candidates),
+              let resourceURL = bundle.url(forResource: "usb-vendors", withExtension: "json"),
+              let data = try? Data(contentsOf: resourceURL) else { return nil }
+        return data
     }
 
     /// VID（16 位 USB 厂商 ID）→ 厂商名。

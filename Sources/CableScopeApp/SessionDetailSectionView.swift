@@ -6,6 +6,7 @@ import SwiftUI
 struct SessionDetailSectionView: View {
     @ObservedObject var viewModel: MonitorViewModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.locale) private var locale
 
     var body: some View {
         if let session = viewModel.selectedSession {
@@ -61,8 +62,9 @@ struct SessionDetailSectionView: View {
                 }
 
                 if let headline = DiagnosticsEngine.portHeadline(port: port,
-                                                                 power: viewModel.power(for: session)) {
-                    InfoChip(text: headline, systemImage: "cable.connector", color: .blue, isProminent: true)
+                                                                 power: viewModel.power(for: session),
+                                                                 locale: locale) {
+                    InfoChip(verbatim: headline, systemImage: "cable.connector", color: .blue, isProminent: true)
                 }
 
                 displaySection(of: session, fallbackPort: port)
@@ -137,7 +139,7 @@ struct SessionDetailSectionView: View {
             Text(Self.displayLinkName(link))
                 .font(.caption2.weight(.medium))
             if let display {
-                InfoChip(text: display.resolutionLabel, color: .indigo)
+                InfoChip(verbatim: display.resolutionLabel, color: .indigo)
                 if let hz = display.refreshRateHz {
                     InfoChip(text: "\(Int(hz.rounded())) Hz", color: .indigo)
                 }
@@ -147,7 +149,7 @@ struct SessionDetailSectionView: View {
                     .foregroundStyle(.tertiary)
             }
             if let linkRate = link.linkRateDescription {
-                InfoChip(text: linkRate, color: .teal)
+                InfoChip(verbatim: linkRate, color: .teal)
             }
         }
     }
@@ -169,8 +171,11 @@ struct SessionDetailSectionView: View {
                 .foregroundStyle(.tertiary)
             FlowLayout(spacing: 5) {
                 if let orientation = port.plugOrientation {
-                    InfoChip(text: orientation == 1 ? "正向插入" : "反向插入",
-                             systemImage: "arrow.triangle.swap", color: .gray)
+                    if orientation == 1 {
+                        InfoChip(text: "正向插入", systemImage: "arrow.triangle.swap", color: .gray)
+                    } else {
+                        InfoChip(text: "反向插入", systemImage: "arrow.triangle.swap", color: .gray)
+                    }
                 }
                 if let count = port.connectionCount {
                     InfoChip(text: "累计连接 \(count) 次", color: .gray)
@@ -207,20 +212,21 @@ struct SessionDetailSectionView: View {
 
     /// e-marker 明细 chips：速度档 / 电流评级 / VID（未上报时如实说明）+ 可信度提示行。
     private func eMarkerChips(_ eMarker: EMarkerSnapshot) -> some View {
-        let trustLine = EMarkerTrust.assess(eMarker).map(\.summary).joined(separator: "；")
+        let trustLine = EMarkerTrust.assess(eMarker).map { $0.summary(locale: locale) }.joined(separator: "；")
         return VStack(alignment: .leading, spacing: 4) {
             FlowLayout(spacing: 5) {
                 if let speed = eMarker.decodedSpeed {
-                    InfoChip(text: speed.label, color: .purple)
+                    InfoChip(verbatim: speed.label, color: .purple)
                 }
                 if let rating = eMarker.decodedCurrentRating, rating != .reserved {
-                    InfoChip(text: rating.label, color: .orange)
+                    InfoChip(verbatim: rating.label, color: .orange)
                 }
                 if let vendorID = eMarker.vendorID {
-                    InfoChip(
-                        text: vendorID == 0 ? "厂商 ID 未上报" : String(format: "e-marker 厂商 0x%04X", vendorID),
-                        color: .gray
-                    )
+                    if vendorID == 0 {
+                        InfoChip(text: "厂商 ID 未上报", color: .gray)
+                    } else {
+                        InfoChip(text: "e-marker 厂商 \(Self.hexLabel(vendorID))", color: .gray)
+                    }
                 }
             }
             if !trustLine.isEmpty {
@@ -234,20 +240,25 @@ struct SessionDetailSectionView: View {
 
     /// 对端 VID 的展示标签：目录命中返回 "Realtek (0x0BDA)"，未命中返回 "0x1234"。
     private static func partnerVIDLabel(_ vendorID: UInt32) -> String {
-        let hex = String(format: "0x%04X", vendorID)
+        let hex = hexLabel(vendorID)
         guard let name = VendorDirectory.shared.name(forVendorID: vendorID) else { return hex }
         return "\(name) (\(hex))"
     }
 
+    /// VID 的十六进制展示形式，如 "0x05AC"（十六进制数字本身不涉及语言，不用翻译）。
+    private static func hexLabel(_ vendorID: UInt32) -> String {
+        String(format: "0x%04X", vendorID)
+    }
+
     /// 传输能力缩写 → 中文标签。
-    private static func transportLabel(_ raw: String) -> String {
+    private static func transportLabel(_ raw: String) -> LocalizedStringKey {
         switch raw {
         case "CC": return "CC 通信"
         case "USB2": return "USB 2.0"
         case "USB3": return "USB 3.x"
         case "CIO": return "USB4/雷雳"
         case "DisplayPort": return "DisplayPort"
-        default: return raw
+        default: return LocalizedStringKey(raw)
         }
     }
 
@@ -331,13 +342,13 @@ struct SessionDetailSectionView: View {
                     }
                     Spacer(minLength: 8)
                     if let linkSpeedLabel = device.linkSpeedLabel {
-                        InfoChip(text: linkSpeedLabel, systemImage: "link", color: .orange)
+                        InfoChip(verbatim: linkSpeedLabel, systemImage: "link", color: .orange)
                     } else {
                         InfoChip(text: "链路未知", color: .gray)
                     }
                     // 雷雳代际（M3，ThunderboltDeviceSnapshot.generation）：有值时跟在链路速率 chip 后。
                     if let generation = device.generation {
-                        InfoChip(text: generation, color: .purple)
+                        InfoChip(verbatim: generation, color: .purple)
                     }
                 }
                 // 拓扑深度缩进（M6）：与 USB 设备链的 hubDepth 缩进同一视觉模式。
@@ -363,7 +374,7 @@ struct SessionDetailSectionView: View {
                 }
                 FlowLayout(spacing: 5) {
                     InfoChip(
-                        text: rating.summary,
+                        verbatim: rating.summary(locale: locale),
                         color: rating.is5ACable ? .orange : .blue,
                         isProminent: rating.is5ACable
                     )

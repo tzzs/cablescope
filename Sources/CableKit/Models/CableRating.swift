@@ -41,22 +41,29 @@ public struct CableRating: Codable, Hashable, Sendable {
     }
 
     /// 单行摘要，如 "至少 USB4 / 40Gbps ⚡ 100W(5A) 🖥 4K@60"
-    public var summary: String {
+    ///
+    /// 不给 `locale` 默认值：强制调用点显式想清楚当前语言从哪来（同
+    /// `EMarkerTrustNote.summary(locale:)`）。`USBSpeed.generation`/`.label`
+    /// （"USB4"/"HBR3" 这类协议规格术语）保持不译——行业惯例中英文语境下都保留英文原词。
+    public func summary(locale: Locale) -> String {
         var parts: [String] = []
         if let bps = maxUSBBitsPerSecond {
             parts.append(USBSpeed(bitsPerSecond: bps).generation + " " + USBSpeed(bitsPerSecond: bps).label)
         } else {
-            parts.append("未观测到高速 USB 协商")
+            parts.append(KitLocalization.string("未观测到高速 USB 协商", locale: locale))
         }
         if is5ACable, let w = maxChargingWatts, w > 0 {
-            parts.append(String(format: "⚡ %.0fW（5A e-marker 线）", w))
+            parts.append(KitLocalization.string(template: "⚡ %@W（5A e-marker 线）", locale: locale,
+                                                args: KitLocalization.fixedFraction(w, digits: 0)))
         } else if let w = maxChargingWatts, w > 0 {
-            parts.append(String(format: "⚡ %.0fW", w))
+            parts.append(KitLocalization.string(template: "⚡ %@W", locale: locale,
+                                                args: KitLocalization.fixedFraction(w, digits: 0)))
         }
         if let link = maxDisplayLinkRate {
             var video = "🖥 \(link)"
             if let hz = maxRefreshRateHz {
-                video += String(format: " @ %.0fHz", hz)
+                video += " " + KitLocalization.string(template: "@ %@Hz", locale: locale,
+                                                       args: KitLocalization.fixedFraction(hz, digits: 0))
             }
             parts.append(video)
         }

@@ -65,15 +65,17 @@ enum UpdateChecker {
     // MARK: - 更新提示对话框
 
     /// 弹出更新提示："发现新版本 <latest> / 当前 <current 或 开发版>"。
-    /// 用户选择"前往下载页"则打开 GitHub Releases 页面。
+    /// 用户选择"前往下载页"则打开 GitHub Releases 页面。NSAlert 不在 SwiftUI view tree
+    /// 上，拿不到 `\.locale` environment，文案走 `AppLocalization`（显式传当前语言）。
     @MainActor
-    static func presentUpdateDialog(current: String?, latest: String) {
+    static func presentUpdateDialog(current: String?, latest: String, locale: Locale) {
         let alert = NSAlert()
-        alert.messageText = "发现新版本 \(latest)"
-        alert.informativeText = "当前版本：\(current ?? "开发版")"
+        alert.messageText = String(format: AppLocalization.string("发现新版本 %@", locale: locale), latest)
+        let currentLabel = current ?? AppLocalization.string("开发版", locale: locale)
+        alert.informativeText = String(format: AppLocalization.string("当前版本：%@", locale: locale), currentLabel)
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "前往下载页")
-        alert.addButton(withTitle: "以后再说")
+        alert.addButton(withTitle: AppLocalization.string("前往下载页", locale: locale))
+        alert.addButton(withTitle: AppLocalization.string("以后再说", locale: locale))
 
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let releasesPage = URL(string: repositoryURL)?

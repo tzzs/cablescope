@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "CableScope",
+    defaultLocalization: "zh-Hans",
     platforms: [.macOS(.v14)],
     products: [
         // 供 Xcode 工程（xcodegen 生成）与未来外部引用使用

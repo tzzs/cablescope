@@ -8,6 +8,7 @@ import SwiftUI
 /// 固定挂这里；仅接一根线时充电状态会同时提升到该线卡片展示。
 struct OverviewSectionView: View {
     @ObservedObject var viewModel: MonitorViewModel
+    @Environment(\.locale) private var locale
 
     var body: some View {
         SectionCard(title: "整机概览", systemImage: "desktopcomputer",
@@ -53,7 +54,7 @@ struct OverviewSectionView: View {
             }
 
             if let voltageMV = power.adapterVoltageMV, let amperageMA = power.adapterAmperageMA {
-                Text(String(format: "系统输入 · %.1fV / %.2fA", Double(voltageMV) / 1000, Double(amperageMA) / 1000))
+                Text("系统输入 · \(Double(voltageMV) / 1000, format: .number.precision(.fractionLength(1)))V / \(Double(amperageMA) / 1000, format: .number.precision(.fractionLength(2)))A")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
@@ -155,7 +156,7 @@ struct OverviewSectionView: View {
             if let contract = power.pdContract {
                 kvRow(icon: "bolt.fill", title: "PD 合同") {
                     InfoChip(
-                        text: String(
+                        verbatim: String(
                             format: "%.0fV / %.1fA · %.0fW",
                             Double(contract.voltageMV) / 1000,
                             Double(contract.currentMA) / 1000,
@@ -182,7 +183,7 @@ struct OverviewSectionView: View {
 
     /// 概览/详情共用的键值行：定宽图标列 + 标题，右侧任意视图（数值/胶囊）。
     /// 图标列固定宽度让多行标题纵向对齐（与样机 kv 行、显示器行的 18pt 列一致）。
-    private func kvRow<Trailing: View>(icon: String, title: String,
+    private func kvRow<Trailing: View>(icon: String, title: LocalizedStringKey,
                                        @ViewBuilder trailing: () -> Trailing) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
@@ -212,7 +213,13 @@ struct OverviewSectionView: View {
                             Image(systemName: display.isMain ? "display.2" : "display")
                                 .foregroundStyle(.secondary)
                                 .frame(width: 18)
-                            Text(display.name ?? "显示器")
+                            Group {
+                                if let name = display.name {
+                                    Text(name)
+                                } else {
+                                    Text("显示器")
+                                }
+                            }
                                 .font(.callout)
                                 .lineLimit(1)
                             if display.isMain {
@@ -229,7 +236,7 @@ struct OverviewSectionView: View {
 
                         Group {
                             if let refreshRateHz = display.refreshRateHz {
-                                Text(String(format: "%.0f Hz", refreshRateHz))
+                                Text("\(refreshRateHz, format: .number.precision(.fractionLength(0))) Hz")
                             } else {
                                 Text("—")
                             }
@@ -243,7 +250,7 @@ struct OverviewSectionView: View {
                         // 把后面列的对齐带偏（Grid 按位置分列，不是按内容分列）。
                         Group {
                             if let linkRateLabel = display.linkRateLabel {
-                                InfoChip(text: linkRateLabel, systemImage: "link", color: .indigo)
+                                InfoChip(verbatim: linkRateLabel, systemImage: "link", color: .indigo)
                             } else {
                                 Color.clear.frame(width: 1, height: 1)
                             }
@@ -280,7 +287,7 @@ struct OverviewSectionView: View {
                 FlowLayout(spacing: 5) {
                     InfoChip(text: "整机评级 · \(rating.sampleCount) 次观测", color: .gray)
                     InfoChip(
-                        text: rating.summary,
+                        verbatim: rating.summary(locale: locale),
                         color: rating.is5ACable ? .orange : .blue,
                         isProminent: rating.is5ACable
                     )

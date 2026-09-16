@@ -5,12 +5,13 @@ import SwiftUI
 
 /// 分区卡片容器。`caption` 为标题旁的灰色说明文字（可选）。
 struct SectionCard<Content: View>: View {
-    private let title: String
+    private let title: LocalizedStringKey
     private let systemImage: String
-    private let caption: String?
+    private let caption: LocalizedStringKey?
     private let content: Content
 
-    init(title: String, systemImage: String, caption: String? = nil, @ViewBuilder content: () -> Content) {
+    init(title: LocalizedStringKey, systemImage: String, caption: LocalizedStringKey? = nil,
+         @ViewBuilder content: () -> Content) {
         self.title = title
         self.systemImage = systemImage
         self.caption = caption
@@ -40,7 +41,7 @@ struct SectionCard<Content: View>: View {
 /// 避免两处各写一份判断逻辑、后续改状态文案漏改一处。
 private struct ChargingStatus {
     let color: Color
-    let text: String
+    let text: LocalizedStringKey
     let icon: String
     let isCharging: Bool
 
@@ -104,18 +105,44 @@ struct ChargingStatusIcon: View {
 }
 
 /// 通用信息胶囊。
+///
+/// 两个初始化器故意用**不同的参数标签**区分，而不是靠 Swift 重载消歧猜字面量/变量：
+/// `text:`（`LocalizedStringKey`，字面量走 App 字符串目录查表）vs `verbatim:`（`String`，
+/// 运行期动态拼出、已经按当前语言生成好的内容——如 CableKit 的 `rating.summary(locale:)`、
+/// 设备型号名——原样展示，不二次查表）。
+///
+/// **踩过的坑**：最初仿照 `Text(_:)` 写成两个同名 `text:` 重载（`LocalizedStringKey` +
+/// 泛型 `<S: StringProtocol>`），指望 Swift 像处理 `Text("字面量")` 那样自动优先选中
+/// `LocalizedStringKey`。实测（真机截图对比）发现完全不生效——所有字面量调用都静默走了
+/// `StringProtocol`/verbatim 分支，导致对应文案在切换语言后纹丝不动。`Text` 自己能这样
+/// 消歧，不代表自定义类型的多参数、带默认值的初始化器也能——不能指望这条捷径，
+/// 显式标签是唯一可靠的写法。
 struct InfoChip: View {
-    let text: String
+    private let text: Text
     var systemImage: String? = nil
     var color: Color = .blue
     var isProminent: Bool = false
+
+    init(text: LocalizedStringKey, systemImage: String? = nil, color: Color = .blue, isProminent: Bool = false) {
+        self.text = Text(text)
+        self.systemImage = systemImage
+        self.color = color
+        self.isProminent = isProminent
+    }
+
+    init(verbatim text: String, systemImage: String? = nil, color: Color = .blue, isProminent: Bool = false) {
+        self.text = Text(text)
+        self.systemImage = systemImage
+        self.color = color
+        self.isProminent = isProminent
+    }
 
     var body: some View {
         HStack(spacing: 4) {
             if let systemImage {
                 Image(systemName: systemImage)
             }
-            Text(text)
+            text
         }
         .font(.caption)
         .fontWeight(isProminent ? .bold : .medium)
@@ -223,14 +250,18 @@ private struct PDOGridChip: View {
     }
 }
 
-/// 空状态提示。
+/// 空状态提示（同 `InfoChip`：字面量走 `LocalizedStringKey` 查表，运行期动态文案走
+/// `String` verbatim）。
 struct EmptyHint: View {
-    let text: String
+    private let text: Text
+
+    init(text: LocalizedStringKey) { self.text = Text(text) }
+    init(verbatim text: String) { self.text = Text(text) }
 
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "tray")
-            Text(text)
+            text
         }
         .font(.callout)
         .foregroundStyle(.secondary)
@@ -248,7 +279,7 @@ struct EmptyHint: View {
 /// 电量行等）保持同一条外边界；但文字/勾选标记相对这条外边界额外留了内边距，
 /// 避免像早期版本那样文字直接贴着高亮矩形的左右边缘，没有呼吸空间。
 struct MenuRowButton: View {
-    let title: String
+    let title: LocalizedStringKey
     /// 动作进行中（如"检查更新"轮询期间）在行尾显示小号进度指示。
     var isInProgress: Bool = false
     /// 当前是否为选中状态——贴近原生 NSMenu 里"可勾选菜单项"的做法（行尾一个

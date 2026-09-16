@@ -37,6 +37,8 @@ targets:
         CFBundleDisplayName: CableScope
         CFBundleShortVersionString: $(MARKETING_VERSION)
         LSUIElement: true
+        CFBundleDevelopmentRegion: zh-Hans
+        CFBundleLocalizations: [zh-Hans, en]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cablescope.app
