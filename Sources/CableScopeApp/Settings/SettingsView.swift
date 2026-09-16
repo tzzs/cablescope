@@ -1,21 +1,42 @@
 import SwiftUI
 
 /// 设置页：通用（Dock 图标）/ 外观（主题）/ 语言 / 通知（总开关 + 细分开关）四个 tab。
+///
+/// 每个 tab 的内容量差别很大（"通用"只有一个开关，"通知"有六行），按 HIG 对 macOS
+/// 设置窗口的要求——"窗口应随当前 pane 的内容量调整尺寸，用户不用自己拉大窗口看更多
+/// 内容"——**不）**给整个 TabView 套一个统一的大 frame，而是每个 tab 自己声明贴合内容的
+/// 尺寸，配合 CableScopeApp.swift 里 `Settings` scene 的 `.windowResizability(.contentSize)`，
+/// 切 tab 时窗口跟着重新收放，不会有大片空白。
 struct SettingsView: View {
+    // 记住上次停留的 tab（HIG："设置窗口应恢复最近查看的 pane"）；用 UserDefaults 持久化，
+    // 比 HIG 最低要求（仅本次会话内记住）更进一步，跨次启动也保留。
+    @AppStorage("settingsSelectedTab") private var selectedTab: SettingsTab = .general
+
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             GeneralSettingsTab()
                 .tabItem { Label("通用", systemImage: "gearshape") }
+                .tag(SettingsTab.general)
             AppearanceSettingsTab()
                 .tabItem { Label("外观", systemImage: "paintbrush") }
+                .tag(SettingsTab.appearance)
             LanguageSettingsTab()
                 .tabItem { Label("语言", systemImage: "globe") }
+                .tag(SettingsTab.language)
             NotificationSettingsTab()
                 .tabItem { Label("通知", systemImage: "bell") }
+                .tag(SettingsTab.notifications)
         }
-        .frame(width: 420, height: 280)
     }
 }
+
+private enum SettingsTab: String {
+    case general, appearance, language, notifications
+}
+
+/// 统一宽度：原生设置窗口切 tab 时通常只有高度随内容变化，宽度保持稳定，
+/// 避免每次切换 tab 窗口左右也跟着抖动。
+private let settingsWidth: CGFloat = 360
 
 private struct GeneralSettingsTab: View {
     // 同一个 UserDefaults key，与 MenuBarPanelView 里的"在 Dock 显示图标"行天然同步——
@@ -24,12 +45,15 @@ private struct GeneralSettingsTab: View {
 
     var body: some View {
         Form {
-            Toggle("在 Dock 显示图标", isOn: $showDockIcon)
-                .onChange(of: showDockIcon) { _, newValue in
-                    NSApplication.shared.setActivationPolicy(newValue ? .regular : .accessory)
-                }
+            Section {
+                Toggle("在 Dock 显示图标", isOn: $showDockIcon)
+                    .onChange(of: showDockIcon) { _, newValue in
+                        NSApplication.shared.setActivationPolicy(newValue ? .regular : .accessory)
+                    }
+            }
         }
-        .padding(20)
+        .formStyle(.grouped)
+        .frame(width: settingsWidth, height: 100)
     }
 }
 
@@ -38,15 +62,17 @@ private struct AppearanceSettingsTab: View {
 
     var body: some View {
         Form {
-            Picker("外观", selection: $theme) {
-                Text("跟随系统").tag(AppPreferences.Theme.system)
-                Text("浅色").tag(AppPreferences.Theme.light)
-                Text("深色").tag(AppPreferences.Theme.dark)
+            Section {
+                Picker("外观", selection: $theme) {
+                    Text("跟随系统").tag(AppPreferences.Theme.system)
+                    Text("浅色").tag(AppPreferences.Theme.light)
+                    Text("深色").tag(AppPreferences.Theme.dark)
+                }
+                .pickerStyle(.segmented)
             }
-            .pickerStyle(.inline)
-            .labelsHidden()
         }
-        .padding(20)
+        .formStyle(.grouped)
+        .frame(width: settingsWidth, height: 100)
     }
 }
 
@@ -55,18 +81,21 @@ private struct LanguageSettingsTab: View {
 
     var body: some View {
         Form {
-            Picker("语言", selection: $language) {
-                Text("跟随系统").tag(AppPreferences.Language.system)
-                Text("简体中文").tag(AppPreferences.Language.zhHans)
-                Text("English").tag(AppPreferences.Language.english)
+            Section {
+                Picker("语言", selection: $language) {
+                    Text("跟随系统").tag(AppPreferences.Language.system)
+                    Text("简体中文").tag(AppPreferences.Language.zhHans)
+                    Text("English").tag(AppPreferences.Language.english)
+                }
+                .pickerStyle(.segmented)
+            } footer: {
+                Text("部分窗口标题栏文字可能需要重新打开窗口才会切换语言。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .pickerStyle(.inline)
-            .labelsHidden()
-            Text("部分窗口标题栏文字可能需要重新打开窗口才会切换语言。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
-        .padding(20)
+        .formStyle(.grouped)
+        .frame(width: settingsWidth, height: 130)
     }
 }
 
@@ -75,7 +104,9 @@ private struct NotificationSettingsTab: View {
 
     var body: some View {
         Form {
-            Toggle("启用通知", isOn: $notificationsEnabled)
+            Section {
+                Toggle("启用通知", isOn: $notificationsEnabled)
+            }
             Section {
                 ForEach(AppPreferences.NotificationKind.allCases) { kind in
                     NotificationKindToggleRow(kind: kind)
@@ -83,7 +114,8 @@ private struct NotificationSettingsTab: View {
             }
             .disabled(!notificationsEnabled)
         }
-        .padding(20)
+        .formStyle(.grouped)
+        .frame(width: settingsWidth, height: 300)
     }
 }
 

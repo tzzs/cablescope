@@ -53,10 +53,14 @@ struct CableScopeApp: App {
 
         // 偏好设置：语言/主题/通知/Dock 图标。accessory 策略下没有标准菜单栏，
         // Cmd+, 不会自动生效，入口在 MenuBarPanelView 的菜单行列表里显式调用 openSettings()。
+        // .contentSize：窗口尺寸锁定为每个 tab 各自的内容尺寸（HIG 原话"设置窗口应随当前
+        // pane 的内容量调整大小，用户不用自己拉大窗口"），副作用是缩放按钮自动变灰——
+        // 符合 HIG"设置窗口的最小化/缩放按钮应为灰色"的要求（无需大小可调，自然不需要放大）。
         Settings {
             SettingsView()
                 .appEnvironment(language: language, theme: theme)
         }
+        .windowResizability(.contentSize)
     }
 
     private var mainWindow: some Scene {
