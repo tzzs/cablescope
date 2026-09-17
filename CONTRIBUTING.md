@@ -12,12 +12,14 @@ swift test                             # run all test targets
 swift run CableScopeCLI pretty         # human-readable snapshot of the current state
 swift run CableScopeCLI snapshot --pretty
 swift run CableScopeApp                # menu bar app (unbundled)
+./scripts/check_layering.sh            # verify no IOKit/CoreGraphics/system_profiler calls outside CableKit
 ```
 
-Two kinds of tests live in `Tests/`:
+Three test targets live in `Tests/`:
 
-- **Fixture tests** parse captured real-device IORegistry samples. They are deterministic and must pass on any machine, regardless of what is plugged in.
-- **Smoke tests** (`RealEnvironmentSmokeTests`) call the real services and never assume any specific hardware exists — they must pass on an empty machine too.
+- **Fixture tests** (`CableKitTests`) parse captured real-device IORegistry samples. They are deterministic and must pass on any machine, regardless of what is plugged in.
+- **Smoke tests** (`RealEnvironmentSmokeTests`, also in `CableKitTests`) call the real services and never assume any specific hardware exists — they must pass on an empty machine too.
+- **App-layer tests** (`CableScopeAppTests`) cover the pure logic above CableKit (`UpdateChecker` version comparison, `AppPreferences` notification gating, a `MonitorViewModel` smoke test against a real `CableMonitor`). If a test touches `UserDefaults.standard`, it must back up and restore every key it uses.
 
 ## The codebase in one minute
 
@@ -37,7 +39,7 @@ The layering rule is simple: **all system access lives in CableKit**. The CLI an
 
 ## Pull requests
 
-- Keep the layering: no IOKit / CoreGraphics / `system_profiler` calls in `CableScopeCLI` or `CableScopeApp`.
+- Keep the layering: no IOKit / CoreGraphics / `system_profiler` calls in `CableScopeCLI` or `CableScopeApp`. `./scripts/check_layering.sh` enforces this automatically (also runs in CI).
 - **New parsing logic must ship with fixture tests built from real-device samples.** See the existing parser tests under `Tests/CableKitTests/` (e.g. `PortParsingTests`, `PowerParsingTests`) for the pattern: capture the real IORegistry properties, embed them as fixtures, assert the parsed result. If you could not capture a real sample, say so in the PR description.
 - **Keep both READMEs in sync**: user-facing changes to `README.md` must be mirrored in `README.zh-CN.md` (same information, Chinese wording), and vice versa. Update `Docs/` when behavior or data sources change.
 - Run `swift test` before pushing; all tests must pass.
@@ -86,7 +88,7 @@ Please include:
 欢迎参与贡献！要点：
 
 - **本地跑**：`swift build` / `swift test`；试玩数据用 `swift run CableScopeCLI pretty`。冒烟测试不假设任何外设存在，空机器也能跑通。
-- **分层红线**：只有 `CableKit` 允许碰 IOKit / 系统接口；CLI 与 App 只消费值类型。
+- **分层红线**：只有 `CableKit` 允许碰 IOKit / 系统接口；CLI 与 App 只消费值类型；`./scripts/check_layering.sh` 会自动检查（CI 同步执行）。
 - **PR 要求**：新增解析逻辑必须带真机 fixture 测试；`usb-vendors.json` 一条 JSON 记录一个真实 VID 并注明来源；`README.md` 与 `README.zh-CN.md` 必须同步修改。
 - **提交信息**：遵循 [Conventional Commits](https://www.conventionalcommits.org/) 规范，格式 `<type>(<scope>): <description>`；type 用 `feat`/`fix`/`docs`/`test`/`build`/`chore`（视情况可加 `refactor`/`perf`），scope 为改动模块（`kit`/`app`/`cli`/`widget`/`design`/`roadmap` 等），description 沿用现有习惯写中文；破坏性变更在 type/scope 后加 `!` 并/或补 `BREAKING CHANGE:` footer。
 - **措辞红线**：不给"假线"判决；凡非直读的能力结论一律用"至少支持 / 可能"表述。

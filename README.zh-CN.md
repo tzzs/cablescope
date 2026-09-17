@@ -78,10 +78,12 @@ Sources/
 ├── CableScopeCLI/     # 命令行工具
 └── CableScopeApp/     # SwiftUI 菜单栏 App（MenuBarExtra + 主窗口 + Swift Charts 功率曲线）
 Tests/
-├── CableKitTests/       # 130 个测试：数据契约、按端口分桶评级引擎 + 旧格式迁移、端口分组、解析器（真机样例回归）、诊断、厂商库、评级存储 + 真机冒烟
-└── CableScopeCLITests/  # 43 个测试：参数解析（含 throughput）、格式化、watch 快照差异计算
+├── CableKitTests/       # 162 个测试：数据契约、按端口分桶评级引擎 + 旧格式迁移、端口分组、解析器（真机样例回归）、诊断、厂商库、评级存储、IORegistry 检查器 + 真机冒烟
+├── CableScopeCLITests/  # 43 个测试：参数解析（含 throughput）、格式化、watch 快照差异计算
+└── CableScopeAppTests/  # 16 个测试：更新检查版本号比较、通知偏好开关逻辑、MonitorViewModel 对真实 CableMonitor 的冒烟测试
 Docs/                  # 数据获取指南 / 优化路线图
-scripts/bundle_app.sh  # .app 打包脚本
+scripts/bundle_app.sh     # .app 打包脚本
+scripts/check_layering.sh # 分层规则检查（CableKit 之外禁止直接碰 IOKit/CoreGraphics/system_profiler）
 ```
 
 ## 数据来源（详见 [Docs/03-数据获取指南.md](Docs/03-数据获取指南.md)）
@@ -93,7 +95,7 @@ scripts/bundle_app.sh  # .app 打包脚本
 
 ## 开发状态
 
-- [x] CableKit 适配层（USB/电源/显示器/雷电 + 快照流 + 评级引擎）— 189/189 测试通过（含 CLI 测试 target）
+- [x] CableKit 适配层（USB/电源/显示器/雷电 + 快照流 + 评级引擎）— 221/221 测试通过（含 CLI 与 App 测试 target）
 - [x] CLI 六个子命令（真机验证：PD 合同识别、e-marker 推断、评级持久化）
 - [x] macOS 菜单栏 App（整机概览、每线一卡 + 线缆详情、实时功率曲线、端口评级）
 - [x] IOKit 属性检查器（App 专属窗口 + CLI `properties` 子命令；快照携带全量 `rawProperties`）

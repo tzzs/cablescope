@@ -80,10 +80,12 @@ Sources/
 ├── CableScopeCLI/     # Command-line tool
 └── CableScopeApp/     # SwiftUI menu bar app (MenuBarExtra + main window + Swift Charts power chart)
 Tests/
-├── CableKitTests/       # 130 tests: data contracts, per-port rating engine + migration, grouping, parsers (real-device samples), diagnostics, vendor directory, rating store + live smoke tests
-└── CableScopeCLITests/  # 43 tests: argument parsing (incl. throughput), formatting, watch snapshot diffing
+├── CableKitTests/       # 162 tests: data contracts, per-port rating engine + migration, grouping, parsers (real-device samples), diagnostics, vendor directory, rating store, registry inspector + live smoke tests
+├── CableScopeCLITests/  # 43 tests: argument parsing (incl. throughput), formatting, watch snapshot diffing
+└── CableScopeAppTests/  # 16 tests: update-checker version comparison, notification-preference gating, MonitorViewModel smoke test against a real CableMonitor
 Docs/                  # Data-source guide (IOKit) & optimization roadmap
-scripts/bundle_app.sh  # .app bundling script
+scripts/bundle_app.sh     # .app bundling script
+scripts/check_layering.sh # enforces the layering rule (no IOKit/CoreGraphics/system_profiler outside CableKit)
 ```
 
 ## Data Sources (see [Docs/03-数据获取指南.md](Docs/03-数据获取指南.md) for details)
@@ -95,7 +97,7 @@ scripts/bundle_app.sh  # .app bundling script
 
 ## Status
 
-- [x] CableKit adapter layer (USB/power/displays/Thunderbolt + snapshot stream + rating engine) — 189/189 tests passing (including the CLI test target)
+- [x] CableKit adapter layer (USB/power/displays/Thunderbolt + snapshot stream + rating engine) — 221/221 tests passing (including the CLI and App test targets)
 - [x] All six CLI subcommands (validated on real hardware: PD contract detection, e-marker inference, rating persistence)
 - [x] macOS menu bar app (system overview, one card per cable with per-cable detail, live power chart, per-port rating)
 - [x] IOKit property inspector (App window + CLI `properties` subcommand; snapshots carry full `rawProperties`)
