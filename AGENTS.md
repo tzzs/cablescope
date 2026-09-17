@@ -79,6 +79,15 @@ Two kinds of tests live in `Tests/`, both required to pass on any machine (inclu
 - **Fixture tests** parse captured real-device IORegistry samples (e.g. `PortParsingTests`, `PowerParsingTests`) — deterministic regardless of what's plugged in. **New parsing logic must ship with a fixture test built from a real-device sample**; if you couldn't capture one, say so explicitly.
 - **Smoke tests** (`RealEnvironmentSmokeTests`) call the real services directly and must not assume any specific hardware is present — they exercise the "no device/no data" degrade path.
 
+## Release process
+
+Two independent GitHub Actions workflows cover the release path:
+
+- **[release-please.yml](.github/workflows/release-please.yml)** (push to `main`) maintains a standing "release PR" from Conventional Commits history (`release-please-config.json` + `.release-please-manifest.json`, `release-type: simple`, `skip-github-release: true` — it only bumps `CHANGELOG.md` and tags, it never creates the GitHub Release itself). Merging that PR pushes a `vX.Y.Z` tag, which is what actually triggers the build/publish workflow below.
+- **[release.yml](.github/workflows/release.yml)** (push tag `v*`) builds, signs, notarizes, creates the GitHub Release with assets, and syncs the Homebrew tap — unchanged by release-please.
+
+**`RELEASE_PLEASE_TOKEN` is required, not optional.** release-please pushes commits/tags using this token; if it fell back to the default `GITHUB_TOKEN`, the resulting tag push would silently *not* trigger `release.yml` (GitHub Actions' recursive-trigger protection blocks workflows from triggering other workflows when they run under `GITHUB_TOKEN`) — a release PR would merge, look successful, and never actually publish anything. `release-please.yml` therefore fails the job explicitly (`::error::` + `exit 1`) when the secret is missing, instead of skipping. This is intentionally different from `release.yml`'s other secrets (signing cert, notarization credentials, `HOMEBREW_TAP_TOKEN`), which stay skip-when-missing by design so unsigned/unnotarized releases still work without a full Apple developer setup.
+
 ## PR/change checklist
 
 - No IOKit / CoreGraphics / `system_profiler` calls outside `CableKit` (the layering rule above).
