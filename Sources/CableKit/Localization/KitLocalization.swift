@@ -18,6 +18,11 @@ enum CableKitResourceBundle {
             Bundle.main.resourceURL,
             Bundle(for: BundleAnchor.self).resourceURL,
             Bundle.main.bundleURL,
+            // `swift test` 在部分工具链下不会把资源 bundle 拷贝进 .xctest 自己的
+            // Contents/Resources，而是与 .xctest 平级放在构建产物目录里（CI 的
+            // macOS runner 复现过，本机较新工具链会拷贝进去所以本地测试曾经掩盖了这个问题）。
+            // 退到 .xctest/可执行文件所在目录的上一级，与该产物目录同级去找。
+            Bundle(for: BundleAnchor.self).bundleURL.deletingLastPathComponent(),
         ]
     ) -> Bundle? {
         for candidate in candidates {
