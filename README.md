@@ -24,9 +24,17 @@ On most Macs, macOS only sees the *negotiated result* of a cable, never the cabl
 | 🔔 Notifications | Plug/unplug system notifications (UNUserNotificationCenter); silently disabled when running unbundled |
 | 🔬 IOKit inspector | Full raw IORegistry properties for any class (USB devices, battery, display connects, Thunderbolt ports, …) — App window + CLI subcommand; snapshots and JSON output carry `rawProperties` for each device |
 
+## Installation
+
+```bash
+brew install --cask tzzs/tap/cablescope
+```
+
+This installs the notarized `CableScope.app` from the [latest GitHub release](https://github.com/tzzs/cablescope/releases). The cask in [tzzs/homebrew-tap](https://github.com/tzzs/homebrew-tap) is updated automatically on every release.
+
 ## Quick Start
 
-Requires macOS 14+ and a Swift 5.10+ toolchain (Xcode 15+).
+For building from source, requires macOS 14+ and a Swift 5.10+ toolchain (Xcode 15+).
 
 ```bash
 # CLI: human-readable output

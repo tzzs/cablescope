@@ -22,9 +22,17 @@ macOS 菜单栏工具：检测连接数据线（USB-C / 雷电）的**充电速�
 | 🔔 通知 | 插拔系统通知（UNUserNotificationCenter）；未打包运行（无 bundle）时静默禁用 |
 | 🔬 IOKit 检查器 | 任意 IOKit 类的 IORegistry **全量原始属性**（USB 设备、电池、显示器连接、雷电端口…）：App 专属窗口 + CLI 子命令；快照 JSON 亦携带各设备 `rawProperties` |
 
+## 安装
+
+```bash
+brew install --cask tzzs/tap/cablescope
+```
+
+这会安装已公证（notarized）的 `CableScope.app`，来自 [最新 GitHub Release](https://github.com/tzzs/cablescope/releases)。[tzzs/homebrew-tap](https://github.com/tzzs/homebrew-tap) 中的 cask 会在每次发版时自动更新，无需手动维护。
+
 ## 快速开始
 
-要求：macOS 14+，Swift 5.10+ 工具链（Xcode 15+）。
+如需从源码构建，要求：macOS 14+，Swift 5.10+ 工具链（Xcode 15+）。
 
 ```bash
 # CLI：人类可读输出

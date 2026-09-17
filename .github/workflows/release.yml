@@ -107,3 +107,41 @@ jobs:
             "$DMG" \
             ".build/release/CableScopeCLI"
           echo "已上传 ${DMG} 与 CableScopeCLI 二进制。"
+
+      # 把 CableScope.app 的 cask 同步到独立 tap 仓库 tzzs/homebrew-tap，
+      # 让用户能用 `brew install --cask tzzs/tap/cablescope` 一条命令安装。
+      # 需要 HOMEBREW_TAP_TOKEN（对该 tap 仓库有 contents:write 权限的 PAT）；
+      # 缺失时跳过，不让整个发布流水线失败。
+      - name: Update Homebrew tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [[ -z "${HOMEBREW_TAP_TOKEN:-}" ]]; then
+            echo "::notice::缺少 HOMEBREW_TAP_TOKEN secret，跳过同步 Homebrew tap。"
+            exit 0
+          fi
+          set -euo pipefail
+          DMG="build/CableScope-${VERSION}.dmg"
+          SHA256="$(shasum -a 256 "$DMG" | awk '{print $1}')"
+
+          rm -rf /tmp/homebrew-tap
+          git clone --depth 1 \
+            "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/tzzs/homebrew-tap.git" \
+            /tmp/homebrew-tap
+
+          cp Packaging/homebrew/cablescope.rb /tmp/homebrew-tap/Casks/cablescope.rb
+          sed -i '' "s/version \".*\"/version \"${VERSION}\"/" /tmp/homebrew-tap/Casks/cablescope.rb
+          sed -i '' "s/sha256 .*/sha256 \"${SHA256}\"/" /tmp/homebrew-tap/Casks/cablescope.rb
+
+          cd /tmp/homebrew-tap
+          git config user.name "cablescope-release-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add Casks/cablescope.rb
+          if git diff --cached --quiet; then
+            echo "cask 无变化，跳过提交。"
+          else
+            git commit -m "chore: bump cablescope cask to v${VERSION}"
+            git push
+            echo "已更新 tzzs/homebrew-tap 的 cask 到 v${VERSION}（sha256=${SHA256}）。"
+          fi
