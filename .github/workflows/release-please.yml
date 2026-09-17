@@ -1,0 +1,40 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Maintain release PR / tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # release-please 用这个 token 打 tag 和推送 commit；用默认 GITHUB_TOKEN 打的 tag
+      # 不会触发其它 workflow（GitHub Actions 的递归触发保护），会导致 tag 已创建但
+      # release.yml 永远不会跑，且不易被发现。所以这里必须显式要求一个具备
+      # contents:write + pull-requests:write 权限的 PAT，缺失时直接报错终止，
+      # 不做静默跳过。
+      - name: Require RELEASE_PLEASE_TOKEN
+        env:
+          RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          if [[ -z "${RELEASE_PLEASE_TOKEN:-}" ]]; then
+            echo "::error::缺少 RELEASE_PLEASE_TOKEN secret。默认 GITHUB_TOKEN 打的 tag 不会触发 release.yml，必须在仓库 secrets 中配置一个具备 contents:write 和 pull-requests:write 权限的 PAT（RELEASE_PLEASE_TOKEN），否则发布链路会在这里中断。"
+            exit 1
+          fi
+
+      - name: Release please
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
