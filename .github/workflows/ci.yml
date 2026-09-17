@@ -22,6 +22,9 @@ jobs:
       - name: Show toolchain
         run: swift --version
 
+      - name: Check layering (no direct system access outside CableKit)
+        run: ./scripts/check_layering.sh
+
       - name: Build (debug)
         run: swift build
 
