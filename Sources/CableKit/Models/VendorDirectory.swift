@@ -33,6 +33,10 @@ public struct VendorDirectory: Sendable {
             Bundle.main.resourceURL,
             Bundle(for: BundleAnchor.self).resourceURL,
             Bundle.main.bundleURL,
+            // 见 KitLocalization.CableKitResourceBundle.probe 同款候选路径的说明：
+            // 部分工具链下 `swift test` 不会把资源 bundle 拷进 .xctest 自己的 Resources，
+            // 而是放在与 .xctest 同级的构建产物目录里。
+            Bundle(for: BundleAnchor.self).bundleURL.deletingLastPathComponent(),
         ]
     ) -> Data? {
         guard let bundle = CableKitResourceBundle.probe(bundleFileName: bundleFileName, candidates: candidates),

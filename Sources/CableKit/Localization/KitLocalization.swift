@@ -3,8 +3,9 @@ import Foundation
 // MARK: - CableKit 自身的本地化文案生成
 //
 // CableKit 是纯函数库，不依赖 SwiftUI，没有 `\.locale` environment 可用；调用方
-// （App/CLI）必须显式传入 `Locale`。文案载体是 `Sources/CableKit/Resources/Localizable.xcstrings`，
-// 用现有中文原句直接当 key。
+// （App/CLI）必须显式传入 `Locale`。文案载体是 `Sources/CableKit/Resources/en.lproj/Localizable.strings`
+// （经典 .strings 表，非 .xcstrings——部分 SwiftPM 工具链不会把 .xcstrings 编译成 .strings，
+// 见该文件顶部注释），用现有中文原句直接当 key。
 
 /// 安全定位 CableKit 自己的 SwiftPM 资源 bundle。
 ///
@@ -18,6 +19,11 @@ enum CableKitResourceBundle {
             Bundle.main.resourceURL,
             Bundle(for: BundleAnchor.self).resourceURL,
             Bundle.main.bundleURL,
+            // `swift test` 在部分工具链下不会把资源 bundle 拷贝进 .xctest 自己的
+            // Contents/Resources，而是与 .xctest 平级放在构建产物目录里（CI 的
+            // macOS runner 复现过，本机较新工具链会拷贝进去所以本地测试曾经掩盖了这个问题）。
+            // 退到 .xctest/可执行文件所在目录的上一级，与该产物目录同级去找。
+            Bundle(for: BundleAnchor.self).bundleURL.deletingLastPathComponent(),
         ]
     ) -> Bundle? {
         for candidate in candidates {
