@@ -78,9 +78,9 @@ Sources/
 ├── CableScopeCLI/     # 命令行工具
 └── CableScopeApp/     # SwiftUI 菜单栏 App（MenuBarExtra + 主窗口 + Swift Charts 功率曲线）
 Tests/
-├── CableKitTests/       # 162 个测试：数据契约、按端口分桶评级引擎 + 旧格式迁移、端口分组、解析器（真机样例回归）、诊断、厂商库、评级存储、IORegistry 检查器 + 真机冒烟
+├── CableKitTests/       # 168 个测试：数据契约、按端口分桶评级引擎 + 旧格式迁移、端口分组、解析器（真机样例回归）、诊断、厂商库、评级存储、IORegistry 检查器、profiler 缓存 + 真机冒烟
 ├── CableScopeCLITests/  # 43 个测试：参数解析（含 throughput）、格式化、watch 快照差异计算
-└── CableScopeAppTests/  # 16 个测试：更新检查版本号比较、通知偏好开关逻辑、MonitorViewModel 对真实 CableMonitor 的冒烟测试
+└── CableScopeAppTests/  # 30 个测试：更新检查版本号比较、通知偏好开关逻辑、英文本地化、视图层文案格式化、MonitorViewModel 对真实 CableMonitor 的冒烟测试
 Docs/                  # 数据获取指南 / 优化路线图
 scripts/bundle_app.sh     # .app 打包脚本
 scripts/check_layering.sh # 分层规则检查（CableKit 之外禁止直接碰 IOKit/CoreGraphics/system_profiler）
@@ -95,7 +95,7 @@ scripts/check_layering.sh # 分层规则检查（CableKit 之外禁止直接碰 
 
 ## 开发状态
 
-- [x] CableKit 适配层（USB/电源/显示器/雷电 + 快照流 + 评级引擎）— 221/221 测试通过（含 CLI 与 App 测试 target）
+- [x] CableKit 适配层（USB/电源/显示器/雷电 + 快照流 + 评级引擎）— 241/241 测试通过（含 CLI 与 App 测试 target）
 - [x] CLI 六个子命令（真机验证：PD 合同识别、e-marker 推断、评级持久化）
 - [x] macOS 菜单栏 App（整机概览、每线一卡 + 线缆详情、实时功率曲线、端口评级）
 - [x] IOKit 属性检查器（App 专属窗口 + CLI `properties` 子命令；快照携带全量 `rawProperties`）
@@ -114,6 +114,7 @@ scripts/check_layering.sh # 分层规则检查（CableKit 之外禁止直接碰 
 - 端口名暂为技术格式（"USB 端口 0x014" / "雷雳端口 2"），左/右物理方位需要更深层的 registry 端口拓扑工作（v2）。
 - 内置显示器无 DP link rate 字段，`DisplaySnapshot.linkRateLabel`（system_profiler 尽力而为解析）需接外接 DP/雷电显示器才会生效；线缆卡片上的 DisplayPort 链路速率（`DisplayPortLinkSnapshot.linkRateDescription`）来自专门的传输节点，链路存在时恒可靠有值。
 - `watch`/快照流为事件驱动唤醒（AppleSmartBattery 兴趣通知 + USB 匹配通知）+ 兜底轮询的内容变化检测。
+- 两处 `system_profiler` 读取（显示器信息、雷雳拓扑）带缓存，以保证常驻菜单栏的开销足够低（实测 `watch` 每 20 秒的 CPU 从 3.15s 降到 0.40s）。显示器变化会立即失效缓存（缓存 key 就是在线显示器 ID 集合），但新接入的**雷雳设备**最多需要 5 秒才会出现——雷雳没有同等便宜的变化探针。
 - `.app` 打包脚本适用于本地使用；App Store/公证分发建议后续迁移 Xcode 工程。
 
 ## 参与贡献

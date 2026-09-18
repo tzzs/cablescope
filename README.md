@@ -80,9 +80,9 @@ Sources/
 ├── CableScopeCLI/     # Command-line tool
 └── CableScopeApp/     # SwiftUI menu bar app (MenuBarExtra + main window + Swift Charts power chart)
 Tests/
-├── CableKitTests/       # 162 tests: data contracts, per-port rating engine + migration, grouping, parsers (real-device samples), diagnostics, vendor directory, rating store, registry inspector + live smoke tests
+├── CableKitTests/       # 168 tests: data contracts, per-port rating engine + migration, grouping, parsers (real-device samples), diagnostics, vendor directory, rating store, registry inspector, profiler caching + live smoke tests
 ├── CableScopeCLITests/  # 43 tests: argument parsing (incl. throughput), formatting, watch snapshot diffing
-└── CableScopeAppTests/  # 16 tests: update-checker version comparison, notification-preference gating, MonitorViewModel smoke test against a real CableMonitor
+└── CableScopeAppTests/  # 30 tests: update-checker version comparison, notification-preference gating, English localization, view-layer formatting, MonitorViewModel smoke test against a real CableMonitor
 Docs/                  # Data-source guide (IOKit) & optimization roadmap
 scripts/bundle_app.sh     # .app bundling script
 scripts/check_layering.sh # enforces the layering rule (no IOKit/CoreGraphics/system_profiler outside CableKit)
@@ -97,7 +97,7 @@ scripts/check_layering.sh # enforces the layering rule (no IOKit/CoreGraphics/sy
 
 ## Status
 
-- [x] CableKit adapter layer (USB/power/displays/Thunderbolt + snapshot stream + rating engine) — 221/221 tests passing (including the CLI and App test targets)
+- [x] CableKit adapter layer (USB/power/displays/Thunderbolt + snapshot stream + rating engine) — 241/241 tests passing (including the CLI and App test targets)
 - [x] All six CLI subcommands (validated on real hardware: PD contract detection, e-marker inference, rating persistence)
 - [x] macOS menu bar app (system overview, one card per cable with per-cable detail, live power chart, per-port rating)
 - [x] IOKit property inspector (App window + CLI `properties` subcommand; snapshots carry full `rawProperties`)
@@ -116,6 +116,7 @@ scripts/check_layering.sh # enforces the layering rule (no IOKit/CoreGraphics/sy
 - Physical port labels are technical ("USB 端口 0x014" / "雷雳端口 2"); friendly left/right positions would require registry port-topology work (v2).
 - The built-in display has no DP link rate field, and `DisplaySnapshot.linkRateLabel` (parsed best-effort from `system_profiler`) only becomes meaningful when an external DP/Thunderbolt display is connected. The per-cable card's DisplayPort link rate (`DisplayPortLinkSnapshot.linkRateDescription`) comes from the dedicated transport node instead and is reliably populated whenever the link exists.
 - `watch`/the snapshot stream use event-driven wake-ups (AppleSmartBattery interest + USB matching notifications) with fallback polling for content-change detection.
+- The two `system_profiler`-backed reads (display metadata, Thunderbolt topology) are cached so the always-on menu bar app stays cheap (measured: 3.15s → 0.40s of CPU per 20s of `watch`). Display changes invalidate the cache immediately (the online display-ID set is the cache key), but a newly attached **Thunderbolt** device can take up to 5s to appear, since there is no equally cheap change probe for it.
 - The `.app` bundling script is intended for local use; App Store/notarized distribution should later move to an Xcode project.
 
 ## Contributing

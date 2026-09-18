@@ -19,7 +19,14 @@ Three test targets live in `Tests/`:
 
 - **Fixture tests** (`CableKitTests`) parse captured real-device IORegistry samples. They are deterministic and must pass on any machine, regardless of what is plugged in.
 - **Smoke tests** (`RealEnvironmentSmokeTests`, also in `CableKitTests`) call the real services and never assume any specific hardware exists — they must pass on an empty machine too.
-- **App-layer tests** (`CableScopeAppTests`) cover the pure logic above CableKit (`UpdateChecker` version comparison, `AppPreferences` notification gating, a `MonitorViewModel` smoke test against a real `CableMonitor`). If a test touches `UserDefaults.standard`, it must back up and restore every key it uses.
+- **App-layer tests** (`CableScopeAppTests`) cover the pure logic above CableKit (`UpdateChecker` version comparison, `AppPreferences` notification gating, view-layer formatting helpers, English localization, a `MonitorViewModel` smoke test against a real `CableMonitor`). If a test touches `UserDefaults.standard`, it must back up and restore every key it uses.
+
+If you touch resources or localization, run the suite under **both** build engines — CI uses the classic one and it behaves differently:
+
+```bash
+swift test
+swift test --build-system native --scratch-path /tmp/native-check
+```
 
 ## The codebase in one minute
 
@@ -44,6 +51,15 @@ The layering rule is simple: **all system access lives in CableKit**. The CLI an
 - **Keep both READMEs in sync**: user-facing changes to `README.md` must be mirrored in `README.zh-CN.md` (same information, Chinese wording), and vice versa. Update `Docs/` when behavior or data sources change.
 - Run `swift test` before pushing; all tests must pass.
 - **Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)**: `<type>(<scope>): <description>`. Types used in this repo: `feat`, `fix`, `docs`, `test`, `build`, `chore` (add `refactor`/`perf` when applicable); scope is the affected area (`kit`, `app`, `cli`, `widget`, `design`, `roadmap`, …), omitted only for cross-cutting changes. Descriptions are written in Chinese, matching existing history. A breaking change adds `!` after the type/scope and/or a `BREAKING CHANGE:` footer.
+
+### Adding user-facing strings
+
+English translations live in hand-maintained classic tables, keyed by the Chinese source string:
+
+- `Sources/CableKit/Resources/en.lproj/Localizable.strings`
+- `Sources/CableScopeApp/Resources/en.lproj/Localizable.strings`
+
+**Never convert these to `.xcstrings` (String Catalog).** The classic SwiftPM build engine used by CI and the release workflow doesn't compile String Catalogs — it copies the raw JSON, `en.lproj` never gets produced, and every English string silently degrades to the Chinese key in shipped builds without any step failing. Also note that a `String` interpolated into a `LocalizedStringKey` is substituted as `%@` and is *not* looked up again, so any fallback text inside such a value must go through `AppLocalization`/`KitLocalization` explicitly.
 
 ### Vendor database entries (`usb-vendors.json`)
 

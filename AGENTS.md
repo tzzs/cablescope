@@ -54,6 +54,15 @@ Consumers depend on the protocols in `Services/ServiceProtocols.swift`, not conc
 
 `CableMonitor.snapshotStream()` yields an initial snapshot immediately, then re-samples on "event signal OR pollInterval timeout, whichever comes first" (default poll interval 1.5s). Three IOKit notification sources feed the same `DispatchSemaphore`: `AppleSmartBattery` interest notification (near-zero-latency power/charge changes), and USB device publish/terminate matching notifications (plug/unplug). Anything not covered by these (e.g. display/Thunderbolt topology changes) falls back to the poll interval. Content-signature deduplication (excluding id/timestamp) means only real changes get yielded. See the doc comment at the top of `Sources/CableKit/Monitor/CableMonitor.swift` for the full lifecycle/ownership rationale (why `DispatchSemaphore` over `AsyncStream` racing, notification port teardown order, etc.) before touching this file.
 
+### system_profiler cost and the `TTLCache`
+
+`DisplayService` and `ThunderboltService` are the only services that shell out to `system_profiler` (measured: ~0.15s for `SPDisplaysDataType`, ~0.05s for `SPThunderboltDataType`). Because `CableMonitor` re-samples every poll interval, running them unconditionally cost ~15% of a core continuously in a 24/7 menu bar app. Both now wrap that call in `Services/TTLCache.swift` — "cheap change probe + TTL ceiling":
+
+- `DisplayService` keys the cache on the **online display ID set** (`CGGetOnlineDisplayList`, no subprocess), so plugging/unplugging a display invalidates it instantly; the 30s TTL is only a ceiling for changes the key can't see (e.g. a resolution switch altering the DP link rate).
+- `ThunderboltService` has no equally cheap, verified change probe, so its key is constant and it degrades to pure TTL (5s) — a newly attached Thunderbolt device can take up to one TTL to appear.
+
+Measured effect: `CableScopeCLI watch` over 20s went from 3.15s to 0.40s of CPU (including subprocesses). **If you add another `system_profiler`-backed read, give it the same treatment**, and keep the parsing pure/fixture-tested as usual.
+
 ### Multi-cable sessions (`PortGrouping.swift`)
 
 Physical cables are inferred, not directly enumerable, so devices/ports are grouped into per-cable "sessions":
@@ -66,6 +75,20 @@ Physical cables are inferred, not directly enumerable, so devices/ports are grou
 ### Rating engine (`Rating/CableRatingEngine.swift`)
 
 Pure Swift, no IOKit dependency, fully unit-testable. Rates a cable from **historical negotiation peaks**, bucketed per session id (`"usb-0x014"`, port-controller node id, or `"tb-2"`) — peaks only ever increase, they never reset on unplug. Key inference rule: a PD contract negotiating ≥ 20V/5A implies a 5A e-marker chip. Full bucketing/attribution rules are documented in `Docs/03-数据获取指南.md` and in the file's header comment; read both before changing bucket semantics.
+
+## Localization: classic `.strings` only, never `.xcstrings`
+
+Both modules ship their English table as a hand-maintained `Resources/en.lproj/Localizable.strings`, with the Chinese source string as the key:
+
+- `Sources/CableKit/Resources/en.lproj/Localizable.strings` (looked up by `KitLocalization`, explicit `locale:` parameter)
+- `Sources/CableScopeApp/Resources/en.lproj/Localizable.strings` (SwiftUI `Text`/`LocalizedStringKey` via `Bundle.main` after `bundle_app.sh` flattens it, plus `AppLocalization` for AppKit-layer code)
+
+**Do not reintroduce `.xcstrings`.** The classic SwiftPM build engine (what CI and the release workflow use) does not compile String Catalogs — it copies the raw JSON, so `en.lproj` never exists, every English lookup silently falls back to the Chinese key, and `bundle_app.sh`'s lproj-flattening step skips silently without failing the build. This bit CableKit (5401f72) and then the App layer (whose entire English UI was affected in release builds until it was migrated too). `AppLocalizationTests` / `DiagnosticsTests` assert real English output so a regression fails CI instead of shipping.
+
+Two further traps, both already fixed but easy to reintroduce:
+
+- When resolving the resource bundle, probe the nested `CableScope_*.bundle` **first** and only fall back to `Bundle.main` — under `swift test`, `Bundle.main` is the xctest runner, which has its own `en.lproj` and will happily answer every lookup with the key itself.
+- A `String` interpolated into a `LocalizedStringKey` (e.g. `"写入 \(speedText(...))"`) is substituted as `%@` and **is not looked up again**. Any Chinese fallback text inside such a value must be localized explicitly via `AppLocalization`/`KitLocalization`.
 
 ## Wording red lines (from CONTRIBUTING.md — enforced in review)
 
@@ -80,7 +103,9 @@ Three test targets live in `Tests/`, all required to pass on any machine (includ
 
 - **Fixture tests** (`Tests/CableKitTests`) parse captured real-device IORegistry samples (e.g. `PortParsingTests`, `PowerParsingTests`) — deterministic regardless of what's plugged in. **New parsing logic must ship with a fixture test built from a real-device sample**; if you couldn't capture one, say so explicitly.
 - **Smoke tests** (`RealEnvironmentSmokeTests`, also in `CableKitTests`) call the real services directly and must not assume any specific hardware is present — they exercise the "no device/no data" degrade path. `RegistryServiceTests` follows the same rule for the generic IORegistry inspector, with a handful of fully deterministic cases (empty/unknown class name) that need no hardware at all.
-- **App-layer tests** (`Tests/CableScopeAppTests`, `@testable import CableScopeApp`) cover the pure logic that lives above CableKit: `UpdateChecker`'s semantic-version comparison, `AppPreferences`'s notification-gating rules (each test backs up/restores the `UserDefaults.standard` keys it touches), and a `MonitorViewModel` smoke test using a real `CableMonitor` with an injected `ratingsURL` (a temp file) so it never touches the user's real `~/Library/Application Support/CableScope/ratings.json`.
+- **App-layer tests** (`Tests/CableScopeAppTests`, `@testable import CableScopeApp`) cover the pure logic that lives above CableKit: `UpdateChecker`'s semantic-version comparison, `AppPreferences`'s notification-gating rules (each test backs up/restores the `UserDefaults.standard` keys it touches), view-layer formatting helpers (`ViewFormattingTests`), English localization (`AppLocalizationTests` — see the localization section below), and a `MonitorViewModel` smoke test using a real `CableMonitor` with an injected `ratingsURL` (a temp file) so it never touches the user's real `~/Library/Application Support/CableScope/ratings.json`.
+
+Localization and resource-bundle behavior differs between SwiftPM build engines, and CI uses the classic one. When touching resources or localization, verify with **both**: `swift test` and `swift test --build-system native --scratch-path /tmp/native-check`.
 
 ## PR/change checklist
 
