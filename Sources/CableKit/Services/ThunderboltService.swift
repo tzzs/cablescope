@@ -15,12 +15,22 @@ import Foundation
 ///   收集 receptacle 子树中所有带 `device_name_key` 的节点。
 /// - `receptacle_status_key == "receptacle_no_devices_connected"` 的 receptacle 无设备；
 ///   全部为空时返回空数组（当前无雷电外设的场景已实测）。
-public final class ThunderboltService: ThunderboltServiceProtocol {
-    public init() {}
+public final class ThunderboltService: ThunderboltServiceProtocol, @unchecked Sendable {
+    /// `system_profiler` 结果的缓存。与 DisplayService 不同，雷雳没有同等便宜可靠的变化
+    /// 探针（IORegistry 雷雳节点在插拔时的行为未在真机验证过，不敢据此判缓存失效），
+    /// 因此 key 恒定、退化为纯 TTL：最坏情况新接入的雷雳设备延迟一个 TTL 才出现在 UI 上。
+    /// 换来的是子进程不再按兜底轮询间隔（1.5s）重启。线程安全由 TTLCache 保证。
+    private let profilerCache: TTLCache<Int, [ThunderboltDeviceSnapshot]>
+
+    /// - Parameter cacheTTL: `system_profiler` 结果的缓存上限（秒），`<= 0` 关闭缓存。
+    public init(cacheTTL: TimeInterval = 5) {
+        self.profilerCache = TTLCache(ttl: cacheTTL)
+    }
 
     public func listThunderboltDevices() async throws -> [ThunderboltDeviceSnapshot] {
-        await Task.detached(priority: .utility) {
-            Self.readThunderboltDevices()
+        let cache = profilerCache
+        return await Task.detached(priority: .utility) {
+            cache.value(for: 0) { Self.readThunderboltDevices() }
         }.value
     }
 

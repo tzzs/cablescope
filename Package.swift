@@ -43,5 +43,10 @@ let package = Package(
             dependencies: ["CableScopeCLI"],
             path: "Tests/CableScopeCLITests"
         ),
+        .testTarget(
+            name: "CableScopeAppTests",
+            dependencies: ["CableScopeApp", "CableKit"],
+            path: "Tests/CableScopeAppTests"
+        ),
     ]
 )

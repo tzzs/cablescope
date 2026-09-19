@@ -242,15 +242,17 @@ struct SessionDetailSectionView: View {
         }
     }
 
-    /// 对端 VID 的展示标签：目录命中返回 "Realtek (0x0BDA)"，未命中返回 "0x1234"。
-    private static func partnerVIDLabel(_ vendorID: UInt32) -> String {
+    /// 对端 VID 的展示标签：目录命中返回 "Realtek (0x0BDA)"，未命中返回 "0x1234"
+    /// （internal 便于单测）。
+    static func partnerVIDLabel(_ vendorID: UInt32) -> String {
         let hex = hexLabel(vendorID)
         guard let name = VendorDirectory.shared.name(forVendorID: vendorID) else { return hex }
         return "\(name) (\(hex))"
     }
 
-    /// VID 的十六进制展示形式，如 "0x05AC"（十六进制数字本身不涉及语言，不用翻译）。
-    private static func hexLabel(_ vendorID: UInt32) -> String {
+    /// VID 的十六进制展示形式，如 "0x05AC"（十六进制数字本身不涉及语言，不用翻译；
+    /// internal 便于单测）。
+    static func hexLabel(_ vendorID: UInt32) -> String {
         String(format: "0x%04X", vendorID)
     }
 
