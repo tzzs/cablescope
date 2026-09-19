@@ -1,31 +1,58 @@
-name: Release
+# 构建、打包并把产物发布到已存在的 GitHub Release 上。
+#
+# 名字叫 Publish 而不是 Release，是因为 Release 本身由 release-please 创建
+# （连同 tag）；本 workflow 只负责把 DMG 与 CLI 二进制挂上去、并同步 Homebrew tap。
+# 仓库里并排站着 "Release Please" 时，叫 Release 极易看错。
+name: Publish
 
 on:
   push:
     tags:
       - 'v*'
+  # 手动入口，用于补发或重跑：tag 触发的 workflow 用的是 **tag 所指向那个 commit
+  # 上的** workflow 文件，所以 release.yml 自身的修复对已存在的旧 tag 永远不生效
+  # （v0.2.0 就是这么变成空壳 release 的）。手动触发时 workflow 取自默认分支、
+  # 源码取自指定 tag，既能用上最新逻辑，又不必重打或移动 tag。
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布的 tag（例如 v0.2.0）'
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 jobs:
   release:
-    name: Build, package, notarize & publish
+    name: Build, package & publish artifacts
     runs-on: macos-15
     timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          # 手动触发时检出指定 tag 的源码；tag 触发时就是该 tag 本身
+          ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
 
-      # tag v0.2.0 -> 版本号 0.2.0（写入 App Info.plist 与 DMG 文件名）
+      # tag v0.2.0 -> 版本号 0.2.0（写入 App Info.plist 与 DMG 文件名）。
+      # 手动触发时 GITHUB_REF_NAME 是分支名，所以要优先取 inputs.tag。
       - name: Derive version from tag
         id: version
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          set -euo pipefail
+          TAG="${INPUT_TAG:-$GITHUB_REF_NAME}"
+          case "$TAG" in
+            v*) ;;
+            *) echo "::error::tag 必须以 v 开头，收到的是 '${TAG}'"; exit 1 ;;
+          esac
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Releasing CableScope ${VERSION} (tag ${GITHUB_REF_NAME})"
+          echo "Publishing CableScope ${VERSION} (tag ${TAG})"
 
       - name: Swift release build
         run: swift build -c release
@@ -102,7 +129,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${{ steps.version.outputs.tag }}"
           DMG="build/CableScope-${VERSION}.dmg"
           test -f "$DMG"
           test -f ".build/release/CableScopeCLI"
@@ -120,6 +147,22 @@ jobs:
               ".build/release/CableScopeCLI"
           fi
           echo "已上传 ${DMG} 与 CableScopeCLI 二进制。"
+
+          # 未公证时在 Release 正文里追加一条提示：用户下载后会被 Gatekeeper 拦，
+          # 这件事必须在下载页就看得见，而不是装完才发现。
+          # 幂等：靠 HTML 注释 marker 防止手动重跑时重复追加。
+          if [[ "${NOTARIZED:-false}" != "true" ]]; then
+            MARKER="<!-- cablescope:unnotarized -->"
+            BODY="$(gh release view "$TAG" --json body --jq .body)"
+            if printf '%s' "$BODY" | grep -qF "$MARKER"; then
+              echo "Release ${TAG} 正文已有未公证提示，跳过。"
+            else
+              # printf 的格式串用单引号：正文里含反引号，双引号下会被当成命令替换执行。
+              NOTE="$(printf '\n\n%s\n> **This DMG is not notarized.** macOS will refuse to open it on first launch - allow it under System Settings > Privacy & Security > "Open Anyway". Or install the command-line version with `brew install tzzs/tap/cablescope-cli`, which builds from source and needs no signing.\n>\n> **此 DMG 未经 Apple 公证。** 首次打开会被 macOS 拦下，请在「系统设置 - 隐私与安全性」中点「仍要打开」。或改用 `brew install tzzs/tap/cablescope-cli` 安装命令行版本，它从源码构建、无需签名。' "$MARKER")"
+              gh release edit "$TAG" --notes "${BODY}${NOTE}"
+              echo "已在 Release ${TAG} 正文追加未公证提示。"
+            fi
+          fi
 
       # 把 Homebrew 包同步到独立 tap 仓库 tzzs/homebrew-tap。两个包对应两个产品，
       # 同步条件不同：
@@ -140,7 +183,7 @@ jobs:
             exit 0
           fi
           set -euo pipefail
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${{ steps.version.outputs.tag }}"
 
           rm -rf /tmp/homebrew-tap
           git clone --depth 1 \
