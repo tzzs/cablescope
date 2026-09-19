@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/tzzs/cablescope/compare/v0.2.0...v0.2.1) (2026-09-19)
+
+
+### Bug Fixes
+
+* **build:** 修复发版链路断点，release-please 恢复打 tag 与建 Release ([16a4a58](https://github.com/tzzs/cablescope/commit/16a4a5887b7ea9ebd54a45a4f1d702f9fefe1e97))
+* **build:** 修复发版链路断点，release-please 恢复打 tag 与建 Release ([ff09b5e](https://github.com/tzzs/cablescope/commit/ff09b5e516ecaada6a8034f4465195a92eebb7c1))
+
 ## [0.2.0](https://github.com/tzzs/cablescope/compare/v0.1.0...v0.2.0) (2026-09-17)
 
 
