@@ -94,6 +94,20 @@ final class RealEnvironmentSmokeTests: XCTestCase {
         XCTAssertEqual(Set(ports.map(\.portID)).count, ports.count)
     }
 
+    func testRegistryServiceSmoke() async throws {
+        let service = RegistryService()
+        for wellKnown in RegistryService.wellKnownClasses {
+            let entries = try await service.listEntries(matchingClass: wellKnown.className)
+            // 空结果合法（当前机器可能没有该类的实例）；有结果时校验结构完整性与截断上限
+            XCTAssertLessThanOrEqual(entries.count, RegistryService.maxEntries)
+            for entry in entries {
+                XCTAssertFalse(entry.className.isEmpty)
+            }
+            // registryID 稳定排序，不应有重复条目
+            XCTAssertEqual(Set(entries.map(\.registryID)).count, entries.count)
+        }
+    }
+
     func testCableMonitorSnapshotNowSmoke() async throws {
         let monitor = CableMonitor()
         let snapshot = try await monitor.snapshotNow()

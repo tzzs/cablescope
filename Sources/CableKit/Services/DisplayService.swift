@@ -14,19 +14,31 @@ import AppKit
 ///   的稳定字段"的通用规则尽力解析（外接 DisplayPort 显示器在部分系统版本会出现此类字段），
 ///   找不到即返回 nil，不编造。JSON 按 `_spdisplays_displayID` 与 CGDirectDisplayID 关联
 ///   （hex/decimal 双解释注册）。
-public final class DisplayService: DisplayServiceProtocol {
-    public init() {}
+public final class DisplayService: DisplayServiceProtocol, @unchecked Sendable {
+    /// `system_profiler` 结果的缓存：key 是在线显示器 ID 集合（纯 CG 调用，无子进程），
+    /// 插拔显示器时 key 立即变化 → 立即重读；没插拔时一直命中，子进程不再每轮重启。
+    /// TTL 是「显示器没插拔但链路参数可能变了」（如切换分辨率影响 DP 链路速率）的兜底上限。
+    /// 线程安全由 TTLCache 自身保证，故整类标 `@unchecked Sendable`。
+    private let profilerCache: TTLCache<Set<CGDirectDisplayID>, [CGDirectDisplayID: ProfilerDisplayInfo]>
+
+    /// - Parameter profilerCacheTTL: `system_profiler` 结果的缓存上限（秒），`<= 0` 关闭缓存。
+    public init(profilerCacheTTL: TimeInterval = 30) {
+        self.profilerCache = TTLCache(ttl: profilerCacheTTL)
+    }
 
     public func listDisplays() async throws -> [DisplaySnapshot] {
-        // system_profiler 子进程调用（~1-2s）与 CG 枚举都放 detached 上下文。
-        await Task.detached(priority: .utility) {
-            Self.readDisplays()
+        // system_profiler 子进程调用与 CG 枚举都放 detached 上下文。
+        let cache = profilerCache
+        return await Task.detached(priority: .utility) {
+            Self.readDisplays(profilerCache: cache)
         }.value
     }
 
     // MARK: - 同步读取核心
 
-    private static func readDisplays() -> [DisplaySnapshot] {
+    private static func readDisplays(
+        profilerCache: TTLCache<Set<CGDirectDisplayID>, [CGDirectDisplayID: ProfilerDisplayInfo]>
+    ) -> [DisplaySnapshot] {
         var displayIDs = [CGDirectDisplayID](repeating: 0, count: 16)
         var count: UInt32 = 0
         let err = CGGetOnlineDisplayList(UInt32(displayIDs.count), &displayIDs, &count)
@@ -34,7 +46,7 @@ public final class DisplayService: DisplayServiceProtocol {
         let onlineIDs = Array(displayIDs.prefix(Int(count)))
 
         let mainDisplayID = CGMainDisplayID()
-        let profilerInfo = systemProfilerDisplayInfo()
+        let profilerInfo = profilerCache.value(for: Set(onlineIDs)) { systemProfilerDisplayInfo() }
 
         return onlineIDs.map { displayID -> DisplaySnapshot in
             var pixelWidth = 0

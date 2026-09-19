@@ -1,8 +1,12 @@
+import CableKit
 import Foundation
 import SwiftUI
 
 /// App 侧轻量偏好设置（UserDefaults 持久化）：Dock 图标、语言、主题、通知开关。
 /// 单独拆出常量键避免散落在各 View/Controller 文件里硬编码字符串。
+///
+/// 语言/主题的 key 与 raw 值取自 `CableKit.SharedAppPreferences`——Widget 进程要按
+/// App 的 bundle ID 读这两项偏好，两边必须用同一份字符串，故以 CableKit 那份为准。
 enum AppPreferences {
     // MARK: 在 Dock 显示图标
 
@@ -19,17 +23,14 @@ enum AppPreferences {
         case system, zhHans, english
         var id: Self { self }
 
-        /// `.system` 用 `autoupdatingCurrent` 而非 `.current`：只有前者能在"跟随系统"档位下
-        /// 不重启就响应系统语言变化。
+        /// "跟随系统"用 `autoupdatingCurrent` 而非 `.current`：只有前者能在该档位下
+        /// 不重启就响应系统语言变化。其余档位走 `SharedAppPreferences` 的映射，
+        /// 与 Widget 读到的结果保证一致。
         var resolvedLocale: Locale {
-            switch self {
-            case .system: return .autoupdatingCurrent
-            case .zhHans: return Locale(identifier: "zh-Hans")
-            case .english: return Locale(identifier: "en")
-            }
+            SharedAppPreferences.locale(forLanguageRawValue: rawValue) ?? .autoupdatingCurrent
         }
     }
-    static let languageKey = "appLanguage"
+    static let languageKey = SharedAppPreferences.languageKey
 
     /// 拿不到 SwiftUI `\.locale` environment 的地方（`NotificationController`/`UpdateChecker`
     /// 等 AppKit/系统层代码）用这个取当前生效语言。
@@ -44,15 +45,16 @@ enum AppPreferences {
         case system, light, dark
         var id: Self { self }
 
+        /// 映射同样走 `SharedAppPreferences`，与 Widget 读到的结果保证一致。
         var resolvedColorScheme: ColorScheme? {
-            switch self {
-            case .system: return nil
+            switch SharedAppPreferences.appearance(forThemeRawValue: rawValue) {
             case .light: return .light
             case .dark: return .dark
+            case nil: return nil
             }
         }
     }
-    static let themeKey = "appTheme"
+    static let themeKey = SharedAppPreferences.themeKey
 
     // MARK: 通知
 

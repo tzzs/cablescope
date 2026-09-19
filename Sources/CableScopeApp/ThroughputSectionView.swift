@@ -8,6 +8,7 @@ import SwiftUI
 /// Displays 的处理方式一致——没有可靠归属时不强行归属），因此改为独立区域，列出全部候选卷由用户手动选择。
 struct ThroughputSectionView: View {
     @StateObject private var model = ThroughputSectionModel()
+    @Environment(\.locale) private var locale
 
     var body: some View {
         SectionCard(title: "吞吐实测", systemImage: "speedometer",
@@ -48,9 +49,9 @@ struct ThroughputSectionView: View {
 
                 if let result = model.lastResult {
                     FlowLayout(spacing: 5) {
-                        InfoChip(text: "写入 \(Self.speedText(result.writeMBps))",
+                        InfoChip(text: "写入 \(Self.speedText(result.writeMBps, locale: locale))",
                                  systemImage: "square.and.arrow.up", color: .blue)
-                        InfoChip(text: "读取 \(Self.speedText(result.readMBps))",
+                        InfoChip(text: "读取 \(Self.speedText(result.readMBps, locale: locale))",
                                  systemImage: "square.and.arrow.down", color: .green)
                     }
                     // 固定文案片段和数值分开：elapsedSeconds 走 FormatStyle 插值，
@@ -73,11 +74,19 @@ struct ThroughputSectionView: View {
         .task { model.reloadCandidates() }
     }
 
-    private static func speedText(_ mbps: Double?) -> String {
-        mbps.map { String(format: "%.1f MB/s", $0) } ?? "无有效数据"
+    /// 速率展示文案（internal 便于单测）。
+    ///
+    /// 无读数时的回退文案必须显式走 `AppLocalization`：它是作为 `%@` 值插进
+    /// `"写入 %@"` 这个 LocalizedStringKey 的，插进去的字符串本身不会再被 SwiftUI 查表
+    /// ——早先直接返回中文字面量，导致英文界面显示成 "Write 无有效数据"（译文表里其实
+    /// 有 "No valid data"，只是永远走不到）。数字部分有意不随 locale 变进制/分隔符。
+    static func speedText(_ mbps: Double?, locale: Locale) -> String {
+        guard let mbps else { return AppLocalization.string("无有效数据", locale: locale) }
+        return String(format: "%.1f MB/s", mbps)
     }
 
-    private static func mbText(_ bytes: Int64) -> String {
+    /// 容量展示文案（internal 便于单测）。纯数字 + 单位，不涉及翻译。
+    static func mbText(_ bytes: Int64) -> String {
         String(format: "%.1f MB", Double(bytes) / 1_000_000)
     }
 }

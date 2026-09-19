@@ -22,6 +22,9 @@ jobs:
       - name: Show toolchain
         run: swift --version
 
+      - name: Check layering (no direct system access outside CableKit)
+        run: ./scripts/check_layering.sh
+
       - name: Build (debug)
         run: swift build
 
@@ -29,3 +32,21 @@ jobs:
         # 部分用例含真机冒烟（USB-C / 电池 / IORegistry），在空环境的 runner 上
         # 会走"无设备/无数据"降级分支，属合法结果，不应失败。
         run: swift test
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Build Xcode-only targets
+        # CableScopeWidget 不在 Package.swift 里，上面的 swift build/test 从不编译它——
+        # CableKit 的 API 变化能一路绿灯合并，直到有人手工重新生成 Xcode 工程才炸。
+        # 这一步守住 Xcode 构建路径：Widget（Debug）+ App 的 AppStore config
+        # （sandbox entitlements 那条 MAS 路径，此前也只有手工验证过）。
+        # 不签名：CI 没有证书，这里只要编译通过即可。
+        run: |
+          xcodegen generate
+          xcodebuild -project CableScope.xcodeproj -scheme CableScopeWidget \
+            -configuration Debug -destination 'platform=macOS' \
+            build CODE_SIGNING_ALLOWED=NO
+          xcodebuild -project CableScope.xcodeproj -scheme CableScopeApp \
+            -configuration AppStore -destination 'platform=macOS' \
+            build CODE_SIGNING_ALLOWED=NO

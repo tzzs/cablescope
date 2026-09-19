@@ -1,0 +1,20 @@
+/* CableScopeWidget 英文译文表；中文原文（简体，源语言）直接作为 key。
+   与 CableKit / CableScopeApp 同样用手工维护的经典 .strings，不用 .xcstrings
+   （理由见 AGENTS.md「Localization」章节）。
+
+   Widget 是独立 bundle：这里的条目只覆盖 widget 自己的 SwiftUI 文案；端口头条那类
+   文案由 CableKit 生成，走 CableKit 自己的译文表。两者都靠 WidgetPreferences 读到的
+   App 语言偏好驱动。 */
+
+"充电功率" = "Charging Power";
+"当前充电功率、PD 协商档与各端口线缆头条，约每 15 分钟刷新。" = "Current charging power, the negotiated PD tier and a per-port cable headline. Refreshes about every 15 minutes.";
+"充电中" = "Charging";
+"已暂停" = "Paused";
+"已接通电源" = "Plugged in";
+"使用电池" = "On battery";
+"打开 CableScope 查看线缆详情" = "Open CableScope for cable details";
+"暂无端口数据" = "No port data";
+/* Text("协商档 \(Int(...))W") 的插值 key：Int 插值生成 %lld，占位符必须原样保留 */
+"协商档 %lldW" = "Negotiated %lldW";
+"老机型或无 USB-C 控制器读数" = "Older Mac, or no USB-C controller readings";
+"现场读取" = "Live read";

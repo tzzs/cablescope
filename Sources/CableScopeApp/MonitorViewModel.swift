@@ -45,9 +45,16 @@ final class MonitorViewModel: ObservableObject {
 
     init(monitor: CableMonitor = CableMonitor(), ratingsURL: URL? = nil) {
         self.monitor = monitor
-        self.ratingsURL = ratingsURL ?? RatingStore.canonicalURL
-        // RatingStore 内含旧 app-ratings.json 的幂等迁移（App/CLI 统一到 ratings.json）。
-        self.ratingEngine = RatingStore.loadEngine()
+        if let ratingsURL {
+            // 注入自定义路径（单测用）：加载与保存都走该路径，不做 legacy 迁移——
+            // 迁移只对生产环境的 canonical/legacy 默认路径组合有意义。
+            self.ratingsURL = ratingsURL
+            self.ratingEngine = (try? CableRatingEngine.load(from: ratingsURL)) ?? CableRatingEngine()
+        } else {
+            self.ratingsURL = RatingStore.canonicalURL
+            // RatingStore 内含旧 app-ratings.json 的幂等迁移（App/CLI 统一到 ratings.json）。
+            self.ratingEngine = RatingStore.loadEngine()
+        }
         self.rating = ratingEngine.overallRating()
     }
 

@@ -12,6 +12,29 @@ import WidgetKit
 // - IOKit 是"现场读取"，不适合预生成多条未来 entry：时间线固定 1 条，
 //   15 分钟后请求系统刷新（.after）。
 
+// MARK: - App 偏好联动
+//
+// Widget 有自己的 bundle ID，`UserDefaults.standard` 读到的是 widget 自己的域，
+// 看不见 App 的语言/主题设置——此前 widget 因此完全跟随系统，用户在 App 里选的
+// 语言和主题对它无效。这里按 App 的 bundle ID 读它的偏好域（细节与沙盒降级说明见
+// `CableKit.SharedAppPreferences`）。读不到时两项都是 nil ＝ 跟随系统，即改动前的行为。
+
+enum WidgetPreferences {
+    /// App 选定的语言；nil ＝ 跟随系统（不覆盖 `\.locale`）。
+    static var locale: Locale? {
+        SharedAppPreferences.locale(from: SharedAppPreferences.appDefaults())
+    }
+
+    /// App 选定的深浅色；nil ＝ 跟随系统（不覆盖 `\.colorScheme`）。
+    static var colorScheme: ColorScheme? {
+        switch SharedAppPreferences.appearance(from: SharedAppPreferences.appDefaults()) {
+        case .light: return .light
+        case .dark: return .dark
+        case nil: return nil
+        }
+    }
+}
+
 /// 一次时间线采集的结果。字段全部可缺省（IOKit 受限时降级）。
 struct ChargingEntry: TimelineEntry {
     let date: Date
@@ -69,7 +92,11 @@ struct ChargingProvider: TimelineProvider {
     // MARK: 采集
 
     /// 组合两路读取 → entry。单路失败只降级对应字段。
-    static func collectEntry(date: Date) async -> ChargingEntry {
+    ///
+    /// - Parameter locale: 头条文案的语言。默认取 App 的语言偏好；App 选"跟随系统"或
+    ///   读不到偏好时回退 `.current`（＝ CableKit 侧的原默认行为）。
+    static func collectEntry(date: Date,
+                             locale: Locale = WidgetPreferences.locale ?? .current) async -> ChargingEntry {
         async let powerTask = readPower()
         async let portsTask = readPorts()
         let power = await powerTask
@@ -80,9 +107,11 @@ struct ChargingProvider: TimelineProvider {
         }
 
         // 端口头条：medium 逐行展示；置顶条优先取正在收电（winning）的端口。
-        let headlines = ports.compactMap { DiagnosticsEngine.portHeadline(port: $0, power: power) }
+        let headlines = ports.compactMap {
+            DiagnosticsEngine.portHeadline(port: $0, power: power, locale: locale)
+        }
         let winningPort = ports.first { $0.powerSource?.winning != nil }
-        let topHeadline = DiagnosticsEngine.portHeadline(port: winningPort, power: power)
+        let topHeadline = DiagnosticsEngine.portHeadline(port: winningPort, power: power, locale: locale)
             ?? headlines.first
 
         return ChargingEntry(
@@ -132,6 +161,16 @@ struct ChargingWidgetEntryView: View {
     let entry: ChargingEntry
 
     var body: some View {
+        content
+            // App 偏好联动：nil 时不覆盖 environment，即保持跟随系统。
+            .environment(\.locale, WidgetPreferences.locale ?? Locale.autoupdatingCurrent)
+            .environment(\.colorScheme, WidgetPreferences.colorScheme ?? systemColorScheme)
+    }
+
+    @Environment(\.colorScheme) private var systemColorScheme
+
+    @ViewBuilder
+    private var content: some View {
         switch family {
         case .systemMedium:
             MediumContent(entry: entry)
