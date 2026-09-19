@@ -27,11 +27,31 @@ On most Macs, macOS only sees the *negotiated result* of a cable, never the cabl
 
 ## Installation
 
+CableScope ships as **two separate products** — install either, or both. They share the same `CableKit` data layer but are distributed independently and do not conflict.
+
+**Menu bar app**
+
 ```bash
 brew install --cask tzzs/tap/cablescope
 ```
 
-This installs the notarized `CableScope.app` from the [latest GitHub release](https://github.com/tzzs/cablescope/releases). The cask in [tzzs/homebrew-tap](https://github.com/tzzs/homebrew-tap) is updated automatically on every release.
+Installs `CableScope.app` — shown as **CableScope** in Finder and Launchpad — into `/Applications`, from the notarized DMG attached to the [latest GitHub release](https://github.com/tzzs/cablescope/releases).
+
+> The cask is published only once a notarized build exists. Until then, use the CLI below, or download the DMG straight from the releases page and allow it under System Settings → Privacy & Security on first launch.
+
+**Command-line tool**
+
+```bash
+brew install tzzs/tap/cablescope-cli
+```
+
+Builds from source on your machine and installs the `cablescope` command. Needs an Xcode 15+ toolchain at build time, but no code signing — so it is available regardless of the app's signing status.
+
+```bash
+cablescope pretty
+```
+
+Both the cask and the formula in [tzzs/homebrew-tap](https://github.com/tzzs/homebrew-tap) are updated automatically on every release.
 
 ## Quick Start
 
@@ -107,7 +127,7 @@ scripts/check_layering.sh # enforces the layering rule (no IOKit/CoreGraphics/sy
 - [x] Real-world USB throughput measurement (CLI `throughput` subcommand + App "Throughput" section: read/write benchmark on a mounted volume)
 - [x] IOKit notifications to replace polling (AppleSmartBattery interest + USB matching notifications with polling fallback)
 - [x] App icon (classic Assets.car appiconset + Icon Composer Liquid Glass layers, both Xcode and SwiftPM/DMG paths)
-- [ ] Official distribution (notarized DMG release; tag `v0.1.0` cut locally, GitHub Secrets and the actual signed release still pending)
+- [ ] Official distribution — release automation is live (release-please → tag → build/publish → Homebrew tap sync) and the CLI formula needs no signing; the notarized app release still awaits the Apple Developer secrets (`APPLE_ID` / `APPLE_TEAM_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `DEVELOPER_ID_APPLICATION`)
 
 ### Known Limitations
 

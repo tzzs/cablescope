@@ -15,7 +15,7 @@ cask "cablescope" do
   desc "USB-C / Thunderbolt 数据线检测菜单栏工具（充电、传输速率、e-marker、线缆评级）"
   homepage "https://github.com/tzzs/cablescope"
 
-  depends_on macos: ">= :ventura"
+  depends_on macos: ">= :sonoma"
 
   app "CableScope.app"
 

@@ -25,11 +25,31 @@ macOS 菜单栏工具：检测连接数据线（USB-C / 雷电）的**充电速�
 
 ## 安装
 
+CableScope 提供**两个独立的产品**，可以只装其一，也可以都装。二者共用 `CableKit` 数据层，但分发渠道彼此独立，互不冲突。
+
+**菜单栏 App**
+
 ```bash
 brew install --cask tzzs/tap/cablescope
 ```
 
-这会安装已公证（notarized）的 `CableScope.app`，来自 [最新 GitHub Release](https://github.com/tzzs/cablescope/releases)。[tzzs/homebrew-tap](https://github.com/tzzs/homebrew-tap) 中的 cask 会在每次发版时自动更新，无需手动维护。
+从 [最新 GitHub Release](https://github.com/tzzs/cablescope/releases) 的已公证（notarized）DMG 安装 `CableScope.app` 到 `/Applications`，在访达与启动台中显示为 **CableScope**。
+
+> cask 只有在存在已公证构建时才会发布。在那之前请改用下面的 CLI，或直接从 Release 页面下载 DMG，首次打开时在「系统设置 → 隐私与安全性」中放行。
+
+**命令行工具**
+
+```bash
+brew install tzzs/tap/cablescope-cli
+```
+
+在你的机器上从源码编译，安装 `cablescope` 命令。编译期需要 Xcode 15+ 工具链，但**不需要任何代码签名** —— 因此不受 App 签名状态影响，随时可用。
+
+```bash
+cablescope pretty
+```
+
+[tzzs/homebrew-tap](https://github.com/tzzs/homebrew-tap) 中的 cask 与 formula 都会在每次发版时自动更新，无需手动维护。
 
 ## 快速开始
 
@@ -105,7 +125,7 @@ scripts/check_layering.sh # 分层规则检查（CableKit 之外禁止直接碰 
 - [x] USB 实测吞吐（CLI `throughput` 子命令 + App「吞吐实测」区：挂载卷读写测速）
 - [x] IOKit 通知替代轮询（AppleSmartBattery 兴趣通知 + USB 匹配通知 + 轮询兜底的混合模式）
 - [x] App 图标（经典 Assets.car appiconset + Icon Composer Liquid Glass 分层，Xcode 与 SwiftPM/DMG 两路均已接入）
-- [ ] 正式分发（公证签名发布；本地已打 tag `v0.1.0`，GitHub Secrets 与实际签名发布仍待执行）
+- [ ] 正式分发 —— 发版自动化已跑通（release-please → tag → 构建发布 → 同步 Homebrew tap），CLI 的 formula 不需要签名即可发布；已公证的 App 发布仍待配置 Apple 开发者 secrets（`APPLE_ID` / `APPLE_TEAM_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `DEVELOPER_ID_APPLICATION`）
 
 ### 已知限制
 
