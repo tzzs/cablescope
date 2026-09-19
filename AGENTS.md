@@ -138,6 +138,39 @@ Two independent GitHub Actions workflows cover the release path:
 
 **`RELEASE_PLEASE_TOKEN` is required, not optional.** release-please pushes commits/tags using this token; if it fell back to the default `GITHUB_TOKEN`, the resulting tag push would silently *not* trigger `release.yml` (GitHub Actions' recursive-trigger protection blocks workflows from triggering other workflows when they run under `GITHUB_TOKEN`) — a release PR would merge, look successful, and never actually publish anything. `release-please.yml` therefore fails the job explicitly (`::error::` + `exit 1`) when the secret is missing, instead of skipping. This is intentionally different from `release.yml`'s other secrets (signing cert, notarization credentials, `HOMEBREW_TAP_TOKEN`), which stay skip-when-missing by design so unsigned/unnotarized releases still work without a full Apple developer setup. One consequence is enforced in the workflow: **an unnotarized DMG is never synced to the Homebrew tap**, because `brew install --cask` of an unnotarized app is blocked by Gatekeeper — the DMG still ships on the GitHub Release, but the tap stays on the last installable version.
 
+## Homebrew distribution
+
+CableScope ships as **two independent packages**, because the app and the CLI have different trust models — a cask distributes a pre-built binary (Gatekeeper applies quarantine, so it must be notarized), while a formula builds from source on the user's machine (no signing involved at all).
+
+| | `Casks/cablescope.rb` | `Formula/cablescope-cli.rb` |
+| --- | --- | --- |
+| Product | `CableScope.app` → `/Applications` | `cablescope` command → `bin` |
+| Source | notarized DMG from the GitHub Release | source tarball of the tag, built locally |
+| Needs Apple Developer secrets | **yes** | no |
+| Synced by `release.yml` | only when notarization succeeded | always |
+
+Templates live in `Packaging/homebrew/`; `release.yml` copies them into `tzzs/homebrew-tap`, substituting the version/URL and hashes. **Three names are deliberately different and none of them should be "unified":** package token `cablescope-cli` (must not collide with the cask's `cablescope` token inside one tap — Homebrew only gives core-tap formulae the "formula wins" shortcut, third-party taps stay ambiguous), command name `cablescope` (short to type), SwiftPM target `CableScopeCLI` (a source-level identifier that should never appear in a user's install command).
+
+**The formula must install the executable and `CableScope_CableKit.bundle` into the same directory (`libexec`), never `bin` directly.** CableKit's resources (`usb-vendors.json`, the English `.strings`) live in that separate bundle, and when the binary is invoked through Homebrew's symlink in `bin`, `Bundle.main` does *not* resolve the symlink — it reports `bin/`. Of `CableKitResourceBundle.probe()`'s four candidates, only #2 (`Bundle(for:).resourceURL`, which goes through the dyld image path and *does* resolve) lands on `libexec/`. Verified empirically:
+
+```
+❌  1 main.resourceURL            → .../bin/CableScope_CableKit.bundle
+✅  2 Bundle(for:).resourceURL    → .../libexec/CableScope_CableKit.bundle
+❌  3 main.bundleURL              → .../bin/CableScope_CableKit.bundle
+❌  4 Bundle(for:).bundleURL/..   → .../CableScope_CableKit.bundle
+```
+
+Lint both templates with Homebrew's own linter before changing them:
+
+```bash
+brew style Packaging/homebrew/cablescope-cli.rb Packaging/homebrew/cablescope.rb
+```
+
+`Style/FrozenStringLiteralComment` is a known false positive here and should be ignored — it fires only because these files live in `Packaging/homebrew/` instead of a tap's `Formula/`/`Casks/` directory; real tap formulae carry no such comment. Everything else it reports is real.
+
+That candidate was originally added for a `swift test` toolchain quirk and only incidentally covers the Homebrew layout. Trimming the candidate list as "redundant" would silently degrade brew-installed CLIs — no vendor names, English UI falling back to Chinese — **without any error**, since `probe()` is designed to return nil rather than fail. The formula's `test do` block cannot catch this either (see the note in the file).
+
+
 ## PR/change checklist
 
 - No IOKit / CoreGraphics / `system_profiler` calls outside `CableKit` (the layering rule above) — `./scripts/check_layering.sh` enforces this in CI; run it locally before pushing if you touched `CableScopeCLI`/`CableScopeApp`/`CableScopeWidget`.

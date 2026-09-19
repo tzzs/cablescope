@@ -121,13 +121,15 @@ jobs:
           fi
           echo "已上传 ${DMG} 与 CableScopeCLI 二进制。"
 
-      # 把 CableScope.app 的 cask 同步到独立 tap 仓库 tzzs/homebrew-tap，
-      # 让用户能用 `brew install --cask tzzs/tap/cablescope` 一条命令安装。
+      # 把 Homebrew 包同步到独立 tap 仓库 tzzs/homebrew-tap。两个包对应两个产品，
+      # 同步条件不同：
+      #   Formula/cablescope-cli.rb  CLI —— 在用户机器上从源码编译，产物不带
+      #                              quarantine、不需要签名，所以**总是**同步。
+      #   Casks/cablescope.rb        App —— 分发预编译 DMG，cask 装未公证 App 会被
+      #                              Gatekeeper 拦下，所以**仅在公证成功时**同步；
+      #                              否则宁可让 tap 停在上一个可用版本。
       # 需要 HOMEBREW_TAP_TOKEN（对该 tap 仓库有 contents:write 权限的 PAT）；
       # 缺失时跳过，不让整个发布流水线失败。
-      #
-      # 未公证的 DMG 一律不同步：cask 装未公证 App 会被 Gatekeeper 拦下，
-      # 用户拿到的是一条走不通的安装路径 —— 宁可 tap 停在上一个可用版本。
       - name: Update Homebrew tap
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
@@ -137,31 +139,50 @@ jobs:
             echo "::notice::缺少 HOMEBREW_TAP_TOKEN secret，跳过同步 Homebrew tap。"
             exit 0
           fi
-          if [[ "${NOTARIZED:-false}" != "true" ]]; then
-            echo "::warning::本次 DMG 未经公证，跳过同步 Homebrew tap（cask 装未公证 App 会被 Gatekeeper 拦下）。DMG 仍会挂在 GitHub Release 上。"
-            exit 0
-          fi
           set -euo pipefail
-          DMG="build/CableScope-${VERSION}.dmg"
-          SHA256="$(shasum -a 256 "$DMG" | awk '{print $1}')"
+          TAG="${GITHUB_REF_NAME}"
 
           rm -rf /tmp/homebrew-tap
           git clone --depth 1 \
             "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/tzzs/homebrew-tap.git" \
             /tmp/homebrew-tap
 
-          cp Packaging/homebrew/cablescope.rb /tmp/homebrew-tap/Casks/cablescope.rb
-          sed -i '' "s/version \".*\"/version \"${VERSION}\"/" /tmp/homebrew-tap/Casks/cablescope.rb
-          sed -i '' "s/sha256 .*/sha256 \"${SHA256}\"/" /tmp/homebrew-tap/Casks/cablescope.rb
+          # --- formula（CLI）---
+          # 哈希取 GitHub 按 tag 自动生成的源码 tarball，与签名/公证无关。
+          # formula 不写 version stanza：Homebrew 从 tag URL 自行推导版本号。
+          TARBALL_URL="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${TAG}.tar.gz"
+          curl -fsSL "$TARBALL_URL" -o /tmp/cablescope-src.tar.gz
+          SRC_SHA256="$(shasum -a 256 /tmp/cablescope-src.tar.gz | awk '{print $1}')"
+
+          mkdir -p /tmp/homebrew-tap/Formula
+          FORMULA=/tmp/homebrew-tap/Formula/cablescope-cli.rb
+          cp Packaging/homebrew/cablescope-cli.rb "$FORMULA"
+          sed -i '' "s|^  url \".*\"|  url \"${TARBALL_URL}\"|" "$FORMULA"
+          sed -i '' "s|^  sha256 \".*\"|  sha256 \"${SRC_SHA256}\"|" "$FORMULA"
+          echo "formula 已更新到 ${TAG}（源码 sha256=${SRC_SHA256}）"
+
+          # --- cask（App）---
+          if [[ "${NOTARIZED:-false}" == "true" ]]; then
+            DMG="build/CableScope-${VERSION}.dmg"
+            DMG_SHA256="$(shasum -a 256 "$DMG" | awk '{print $1}')"
+            mkdir -p /tmp/homebrew-tap/Casks
+            CASK=/tmp/homebrew-tap/Casks/cablescope.rb
+            cp Packaging/homebrew/cablescope.rb "$CASK"
+            sed -i '' "s/version \".*\"/version \"${VERSION}\"/" "$CASK"
+            sed -i '' "s/sha256 .*/sha256 \"${DMG_SHA256}\"/" "$CASK"
+            echo "cask 已更新到 v${VERSION}（DMG sha256=${DMG_SHA256}）"
+          else
+            echo "::warning::本次 DMG 未经公证，跳过更新 cask（装未公证 App 会被 Gatekeeper 拦下）。DMG 仍挂在 GitHub Release 上，CLI 的 formula 不受影响、已正常更新。"
+          fi
 
           cd /tmp/homebrew-tap
           git config user.name "cablescope-release-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add Casks/cablescope.rb
+          git add -A
           if git diff --cached --quiet; then
-            echo "cask 无变化，跳过提交。"
+            echo "tap 无变化，跳过提交。"
           else
-            git commit -m "chore: bump cablescope cask to v${VERSION}"
+            git commit -m "chore: bump cablescope to ${TAG}"
             git push
-            echo "已更新 tzzs/homebrew-tap 的 cask 到 v${VERSION}（sha256=${SHA256}）。"
+            echo "已推送 tzzs/homebrew-tap。"
           fi
