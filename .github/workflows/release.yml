@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -70,6 +70,7 @@ jobs:
           DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          echo "NOTARIZED=false" >> "$GITHUB_ENV"
           if [[ -z "${APPLE_ID:-}" || -z "${APPLE_TEAM_ID:-}" || -z "${APPLE_APP_SPECIFIC_PASSWORD:-}" || -z "${DEVELOPER_ID_APPLICATION:-}" ]]; then
             echo "::notice::公证 secrets 缺失（APPLE_ID / APPLE_TEAM_ID / APPLE_APP_SPECIFIC_PASSWORD / DEVELOPER_ID_APPLICATION），跳过签名与公证，发布未公证 DMG。"
             exit 0
@@ -89,9 +90,13 @@ jobs:
           echo "装订公证票据（stapler）…"
           xcrun stapler staple "$DMG"
           xcrun stapler validate "$DMG"
+          echo "NOTARIZED=true" >> "$GITHUB_ENV"
           echo "公证完成。"
 
-      - name: Create GitHub release and upload artifacts
+      # 正常路径下 GitHub Release 已由 release-please 在打 tag 时一并创建（release notes
+      # 取自 CHANGELOG.md），这里只往上面挂资产 —— 所以不能用 gh release create，那会因
+      # 「已存在」直接失败。tag 是手工推的（补发、重跑）时 Release 不存在，才回落到创建。
+      - name: Upload release artifacts
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
@@ -101,17 +106,28 @@ jobs:
           DMG="build/CableScope-${VERSION}.dmg"
           test -f "$DMG"
           test -f ".build/release/CableScopeCLI"
-          gh release create "$TAG" \
-            --title "CableScope ${TAG}" \
-            --generate-notes \
-            "$DMG" \
-            ".build/release/CableScopeCLI"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release ${TAG} 已存在（release-please 创建），上传资产。"
+            gh release upload "$TAG" --clobber \
+              "$DMG" \
+              ".build/release/CableScopeCLI"
+          else
+            echo "::notice::Release ${TAG} 不存在（tag 可能是手工推送的），改为直接创建。"
+            gh release create "$TAG" \
+              --title "CableScope ${TAG}" \
+              --generate-notes \
+              "$DMG" \
+              ".build/release/CableScopeCLI"
+          fi
           echo "已上传 ${DMG} 与 CableScopeCLI 二进制。"
 
       # 把 CableScope.app 的 cask 同步到独立 tap 仓库 tzzs/homebrew-tap，
       # 让用户能用 `brew install --cask tzzs/tap/cablescope` 一条命令安装。
       # 需要 HOMEBREW_TAP_TOKEN（对该 tap 仓库有 contents:write 权限的 PAT）；
       # 缺失时跳过，不让整个发布流水线失败。
+      #
+      # 未公证的 DMG 一律不同步：cask 装未公证 App 会被 Gatekeeper 拦下，
+      # 用户拿到的是一条走不通的安装路径 —— 宁可 tap 停在上一个可用版本。
       - name: Update Homebrew tap
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
@@ -119,6 +135,10 @@ jobs:
         run: |
           if [[ -z "${HOMEBREW_TAP_TOKEN:-}" ]]; then
             echo "::notice::缺少 HOMEBREW_TAP_TOKEN secret，跳过同步 Homebrew tap。"
+            exit 0
+          fi
+          if [[ "${NOTARIZED:-false}" != "true" ]]; then
+            echo "::warning::本次 DMG 未经公证，跳过同步 Homebrew tap（cask 装未公证 App 会被 Gatekeeper 拦下）。DMG 仍会挂在 GitHub Release 上。"
             exit 0
           fi
           set -euo pipefail

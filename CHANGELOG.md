@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.2.0](https://github.com/tzzs/cablescope/compare/CableScope-v0.1.0...CableScope-v0.2.0) (2026-09-17)
+## [0.2.0](https://github.com/tzzs/cablescope/compare/v0.1.0...v0.2.0) (2026-09-17)
 
 
 ### Features
