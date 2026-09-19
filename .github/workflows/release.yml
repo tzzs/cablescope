@@ -176,6 +176,7 @@ jobs:
       - name: Update Homebrew tap
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           if [[ -z "${HOMEBREW_TAP_TOKEN:-}" ]]; then
@@ -185,6 +186,16 @@ jobs:
           set -euo pipefail
           TAG="${{ steps.version.outputs.tag }}"
 
+          # 手动补发旧 tag 时不能动 tap：Homebrew 包永远应该指向最新版本，
+          # 把 tap 同步到一个更老的 tag 等于给所有用户降级。
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            LATEST="$(gh release view --json tagName --jq .tagName)"
+            if [[ "$TAG" != "$LATEST" ]]; then
+              echo "::notice::手动补发的 ${TAG} 不是最新 release（${LATEST}），跳过同步 Homebrew tap，避免把 tap 降级。产物仍已挂到 ${TAG} 上。"
+              exit 0
+            fi
+          fi
+
           rm -rf /tmp/homebrew-tap
           git clone --depth 1 \
             "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/tzzs/homebrew-tap.git" \
@@ -193,16 +204,22 @@ jobs:
           # --- formula（CLI）---
           # 哈希取 GitHub 按 tag 自动生成的源码 tarball，与签名/公证无关。
           # formula 不写 version stanza：Homebrew 从 tag URL 自行推导版本号。
-          TARBALL_URL="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${TAG}.tar.gz"
-          curl -fsSL "$TARBALL_URL" -o /tmp/cablescope-src.tar.gz
-          SRC_SHA256="$(shasum -a 256 /tmp/cablescope-src.tar.gz | awk '{print $1}')"
+          #
+          # 模板是随源码一起检出的，补发旧 tag 时可能还不存在（formula 是后加的）。
+          if [[ -f Packaging/homebrew/cablescope-cli.rb ]]; then
+            TARBALL_URL="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${TAG}.tar.gz"
+            curl -fsSL "$TARBALL_URL" -o /tmp/cablescope-src.tar.gz
+            SRC_SHA256="$(shasum -a 256 /tmp/cablescope-src.tar.gz | awk '{print $1}')"
 
-          mkdir -p /tmp/homebrew-tap/Formula
-          FORMULA=/tmp/homebrew-tap/Formula/cablescope-cli.rb
-          cp Packaging/homebrew/cablescope-cli.rb "$FORMULA"
-          sed -i '' "s|^  url \".*\"|  url \"${TARBALL_URL}\"|" "$FORMULA"
-          sed -i '' "s|^  sha256 \".*\"|  sha256 \"${SRC_SHA256}\"|" "$FORMULA"
-          echo "formula 已更新到 ${TAG}（源码 sha256=${SRC_SHA256}）"
+            mkdir -p /tmp/homebrew-tap/Formula
+            FORMULA=/tmp/homebrew-tap/Formula/cablescope-cli.rb
+            cp Packaging/homebrew/cablescope-cli.rb "$FORMULA"
+            sed -i '' "s|^  url \".*\"|  url \"${TARBALL_URL}\"|" "$FORMULA"
+            sed -i '' "s|^  sha256 \".*\"|  sha256 \"${SRC_SHA256}\"|" "$FORMULA"
+            echo "formula 已更新到 ${TAG}（源码 sha256=${SRC_SHA256}）"
+          else
+            echo "::notice::${TAG} 的源码中没有 formula 模板，跳过 formula 同步。"
+          fi
 
           # --- cask（App）---
           if [[ "${NOTARIZED:-false}" == "true" ]]; then
@@ -215,7 +232,7 @@ jobs:
             sed -i '' "s/sha256 .*/sha256 \"${DMG_SHA256}\"/" "$CASK"
             echo "cask 已更新到 v${VERSION}（DMG sha256=${DMG_SHA256}）"
           else
-            echo "::warning::本次 DMG 未经公证，跳过更新 cask（装未公证 App 会被 Gatekeeper 拦下）。DMG 仍挂在 GitHub Release 上，CLI 的 formula 不受影响、已正常更新。"
+            echo "::warning::本次 DMG 未经公证，跳过更新 cask（装未公证 App 会被 Gatekeeper 拦下）。DMG 仍挂在 GitHub Release 上；CLI 的 formula 不依赖签名，同步与否见上面的 formula 日志。"
           fi
 
           cd /tmp/homebrew-tap
