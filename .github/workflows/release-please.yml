@@ -18,9 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      # release-please 用这个 token 打 tag 和推送 commit；用默认 GITHUB_TOKEN 打的 tag
-      # 不会触发其它 workflow（GitHub Actions 的递归触发保护），会导致 tag 已创建但
-      # release.yml 永远不会跑，且不易被发现。所以这里必须显式要求一个具备
+      # release-please 用这个 token 创建 Release/tag 和推送 commit；用默认 GITHUB_TOKEN
+      # 打的 tag 不会触发其它 workflow（GitHub Actions 的递归触发保护），会导致 tag 已创建
+      # 但 release.yml 永远不会跑，且不易被发现。所以这里必须显式要求一个具备
       # contents:write + pull-requests:write 权限的 PAT，缺失时直接报错终止，
       # 不做静默跳过。
       - name: Require RELEASE_PLEASE_TOKEN
@@ -32,8 +32,16 @@ jobs:
             exit 1
           fi
 
+      # v5 = node24 运行时（v4 是 node20，已被 GitHub 标记弃用）；输入参数与 v4 相同。
+      #
+      # 注意：release-please 的 tag 是「创建 GitHub Release」这一步的副产物。配置里
+      # 一旦打开 skip-github-release，tag 也跟着不会产生，release PR 会停在
+      # 「已合并但未打 tag」状态，之后每次 push 都直接
+      # 「There are untagged, merged release PRs outstanding - aborting」，
+      # 连新的 release PR 都不再生成。所以 release-please-config.json 里
+      # 不要再打开 skip-github-release。
       - name: Release please
-        uses: googleapis/release-please-action@v4
+        uses: googleapis/release-please-action@v5
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
