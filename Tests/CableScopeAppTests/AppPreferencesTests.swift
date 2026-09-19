@@ -1,3 +1,4 @@
+import CableKit
 @testable import CableScopeApp
 import SwiftUI
 import XCTest
@@ -65,11 +66,38 @@ final class AppPreferencesTests: XCTestCase {
         XCTAssertFalse(AppPreferences.isNotificationEnabled(.ratingUpgraded))
     }
 
+    // MARK: - 与 CableKit 共享契约的漂移守卫
+
+    /// Widget 进程按 App 的 bundle ID 读这两项偏好，两边的 key 与 raw 值必须完全一致。
+    /// 任何一侧改了字符串（改 case 名、加档位），这里立刻失败——否则表现是 widget
+    /// 静默读不到偏好、悄悄退回跟随系统，没有任何报错。
+    func testPreferenceKeysMatchSharedContract() {
+        XCTAssertEqual(AppPreferences.languageKey, SharedAppPreferences.languageKey)
+        XCTAssertEqual(AppPreferences.themeKey, SharedAppPreferences.themeKey)
+    }
+
+    func testLanguageRawValuesMatchSharedContract() {
+        XCTAssertEqual(AppPreferences.Language.allCases.map(\.rawValue).sorted(),
+                       SharedAppPreferences.Language.allCases.map(\.rawValue).sorted())
+    }
+
+    func testThemeRawValuesMatchSharedContract() {
+        // App 侧比 CableKit 多一个 system（"跟随系统"在 CableKit 那边用 nil 表达）。
+        let appThemes = Set(AppPreferences.Theme.allCases.map(\.rawValue))
+        let sharedAppearances = Set(SharedAppPreferences.Appearance.allCases.map(\.rawValue))
+        XCTAssertEqual(appThemes, sharedAppearances.union(["system"]))
+    }
+
     // MARK: - Language / Theme 解析
 
     func testLanguageResolvedLocale() {
         XCTAssertEqual(AppPreferences.Language.zhHans.resolvedLocale.identifier, "zh-Hans")
         XCTAssertEqual(AppPreferences.Language.english.resolvedLocale.identifier, "en")
+    }
+
+    func testLanguageSystemFollowsAutoupdatingLocale() {
+        // "跟随系统"必须是 autoupdatingCurrent，否则系统语言改了要重启 App 才生效。
+        XCTAssertEqual(AppPreferences.Language.system.resolvedLocale, .autoupdatingCurrent)
     }
 
     func testThemeResolvedColorScheme() {
