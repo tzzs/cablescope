@@ -21,6 +21,7 @@ On most Macs, macOS only sees the *negotiated result* of a cable, never the cabl
 | 🧬 E-marker | Direct read of the cable's e-marker chip (SOP' Discover Identity): cable speed class, 3A / 5A current rating, vendor ID + product type |
 | 🏷 Rating | Cable capability card derived from historical negotiation peaks, persisted locally (per-port buckets, peaks survive unplugging) |
 | 🧵 Multi-cable | Devices aggregated into per-port cable sessions (USB root-port grouping + Thunderbolt receptacles): one card per cable in the main window with a selectable per-cable detail, one line per cable in the menu bar, port-grouped CLI output |
+| 🧩 Widget | Desktop widget (power/battery, per-port headlines); follows the app's language and theme settings |
 | 🔔 Notifications | Plug/unplug system notifications (UNUserNotificationCenter); silently disabled when running unbundled |
 | 🔬 IOKit inspector | Full raw IORegistry properties for any class (USB devices, battery, display connects, Thunderbolt ports, …) — App window + CLI subcommand; snapshots and JSON output carry `rawProperties` for each device |
 
@@ -80,9 +81,9 @@ Sources/
 ├── CableScopeCLI/     # Command-line tool
 └── CableScopeApp/     # SwiftUI menu bar app (MenuBarExtra + main window + Swift Charts power chart)
 Tests/
-├── CableKitTests/       # 168 tests: data contracts, per-port rating engine + migration, grouping, parsers (real-device samples), diagnostics, vendor directory, rating store, registry inspector, profiler caching + live smoke tests
+├── CableKitTests/       # 176 tests: data contracts, per-port rating engine + migration, grouping, parsers (real-device samples), diagnostics, vendor directory, rating store, registry inspector, profiler caching + live smoke tests
 ├── CableScopeCLITests/  # 43 tests: argument parsing (incl. throughput), formatting, watch snapshot diffing
-└── CableScopeAppTests/  # 30 tests: update-checker version comparison, notification-preference gating, English localization, view-layer formatting, MonitorViewModel smoke test against a real CableMonitor
+└── CableScopeAppTests/  # 34 tests: update-checker version comparison, notification-preference gating, English localization, view-layer formatting, MonitorViewModel smoke test against a real CableMonitor
 Docs/                  # Data-source guide (IOKit) & optimization roadmap
 scripts/bundle_app.sh     # .app bundling script
 scripts/check_layering.sh # enforces the layering rule (no IOKit/CoreGraphics/system_profiler outside CableKit)
@@ -97,7 +98,7 @@ scripts/check_layering.sh # enforces the layering rule (no IOKit/CoreGraphics/sy
 
 ## Status
 
-- [x] CableKit adapter layer (USB/power/displays/Thunderbolt + snapshot stream + rating engine) — 241/241 tests passing (including the CLI and App test targets)
+- [x] CableKit adapter layer (USB/power/displays/Thunderbolt + snapshot stream + rating engine) — 253/253 tests passing (including the CLI and App test targets)
 - [x] All six CLI subcommands (validated on real hardware: PD contract detection, e-marker inference, rating persistence)
 - [x] macOS menu bar app (system overview, one card per cable with per-cable detail, live power chart, per-port rating)
 - [x] IOKit property inspector (App window + CLI `properties` subcommand; snapshots carry full `rawProperties`)

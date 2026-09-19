@@ -19,6 +19,7 @@ macOS 菜单栏工具：检测连接数据线（USB-C / 雷电）的**充电速�
 | 🧬 e-marker | 直读线缆 e-marker 芯片（SOP' Discover Identity）：线缆速度档、3A / 5A 电流评级、厂商 ID + 产品类型 |
 | 🏷 评级 | 基于历史协商峰值的线缆能力卡，持久化到本地（按端口分桶，拔线不清零） |
 | 🧵 多线缆 | 设备按物理端口聚合为线缆会话（USB 根端口分组 + 雷雳 receptacle 编号）：主窗口每线一张卡片 + 可切换的详情区，菜单栏每线一行，CLI 输出按端口分组 |
+| 🧩 Widget | 桌面小组件（功率/电量、各端口头条）；跟随 App 的语言与主题设置 |
 | 🔔 通知 | 插拔系统通知（UNUserNotificationCenter）；未打包运行（无 bundle）时静默禁用 |
 | 🔬 IOKit 检查器 | 任意 IOKit 类的 IORegistry **全量原始属性**（USB 设备、电池、显示器连接、雷电端口…）：App 专属窗口 + CLI 子命令；快照 JSON 亦携带各设备 `rawProperties` |
 
@@ -78,9 +79,9 @@ Sources/
 ├── CableScopeCLI/     # 命令行工具
 └── CableScopeApp/     # SwiftUI 菜单栏 App（MenuBarExtra + 主窗口 + Swift Charts 功率曲线）
 Tests/
-├── CableKitTests/       # 168 个测试：数据契约、按端口分桶评级引擎 + 旧格式迁移、端口分组、解析器（真机样例回归）、诊断、厂商库、评级存储、IORegistry 检查器、profiler 缓存 + 真机冒烟
+├── CableKitTests/       # 176 个测试：数据契约、按端口分桶评级引擎 + 旧格式迁移、端口分组、解析器（真机样例回归）、诊断、厂商库、评级存储、IORegistry 检查器、profiler 缓存 + 真机冒烟
 ├── CableScopeCLITests/  # 43 个测试：参数解析（含 throughput）、格式化、watch 快照差异计算
-└── CableScopeAppTests/  # 30 个测试：更新检查版本号比较、通知偏好开关逻辑、英文本地化、视图层文案格式化、MonitorViewModel 对真实 CableMonitor 的冒烟测试
+└── CableScopeAppTests/  # 34 个测试：更新检查版本号比较、通知偏好开关逻辑、英文本地化、视图层文案格式化、MonitorViewModel 对真实 CableMonitor 的冒烟测试
 Docs/                  # 数据获取指南 / 优化路线图
 scripts/bundle_app.sh     # .app 打包脚本
 scripts/check_layering.sh # 分层规则检查（CableKit 之外禁止直接碰 IOKit/CoreGraphics/system_profiler）
@@ -95,7 +96,7 @@ scripts/check_layering.sh # 分层规则检查（CableKit 之外禁止直接碰 
 
 ## 开发状态
 
-- [x] CableKit 适配层（USB/电源/显示器/雷电 + 快照流 + 评级引擎）— 241/241 测试通过（含 CLI 与 App 测试 target）
+- [x] CableKit 适配层（USB/电源/显示器/雷电 + 快照流 + 评级引擎）— 253/253 测试通过（含 CLI 与 App 测试 target）
 - [x] CLI 六个子命令（真机验证：PD 合同识别、e-marker 推断、评级持久化）
 - [x] macOS 菜单栏 App（整机概览、每线一卡 + 线缆详情、实时功率曲线、端口评级）
 - [x] IOKit 属性检查器（App 专属窗口 + CLI `properties` 子命令；快照携带全量 `rawProperties`）
