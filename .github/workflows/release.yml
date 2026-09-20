@@ -133,10 +133,13 @@ jobs:
           DMG="build/CableScope-${VERSION}.dmg"
           test -f "$DMG"
           test -f ".build/release/CableScopeCLI"
+          # scripts/install.sh 靠这个校验文件做完整性检查（curl 一行安装的供应链防线）
+          shasum -a 256 "$DMG" | awk '{print $1}' > "${DMG}.sha256"
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release ${TAG} 已存在（release-please 创建），上传资产。"
             gh release upload "$TAG" --clobber \
               "$DMG" \
+              "${DMG}.sha256" \
               ".build/release/CableScopeCLI"
           else
             echo "::notice::Release ${TAG} 不存在（tag 可能是手工推送的），改为直接创建。"
@@ -144,9 +147,10 @@ jobs:
               --title "CableScope ${TAG}" \
               --generate-notes \
               "$DMG" \
+              "${DMG}.sha256" \
               ".build/release/CableScopeCLI"
           fi
-          echo "已上传 ${DMG} 与 CableScopeCLI 二进制。"
+          echo "已上传 ${DMG}、${DMG}.sha256 与 CableScopeCLI 二进制。"
 
           # 未公证时在 Release 正文里追加一条提示：用户下载后会被 Gatekeeper 拦，
           # 这件事必须在下载页就看得见，而不是装完才发现。
