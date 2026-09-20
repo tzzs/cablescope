@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/tzzs/cablescope/compare/v0.3.0...v0.4.0) (2026-09-20)
+
+
+### Features
+
+* **build:** 新增 App 的 Homebrew formula，源码构建绕开公证依赖 ([ba87dfd](https://github.com/tzzs/cablescope/commit/ba87dfd46bf58766718015be0387568da7589048))
+* **build:** 新增 App 的 Homebrew formula，源码构建绕开公证依赖 ([fc8cac2](https://github.com/tzzs/cablescope/commit/fc8cac23d19eba867d96e26a9c9db2a94a2ea976))
+
 ## [0.3.0](https://github.com/tzzs/cablescope/compare/v0.2.1...v0.3.0) (2026-09-19)
 
 
