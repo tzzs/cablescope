@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0](https://github.com/tzzs/cablescope/compare/v0.2.1...v0.3.0) (2026-09-19)
+
+
+### Features
+
+* **build:** 发布流水线改名 Publish，新增手动补发入口与未公证提示 ([a1f91ed](https://github.com/tzzs/cablescope/commit/a1f91ed14b663c1f1e01e7a7ba8aa5efad6f6274))
+* **build:** 发布流水线改名 Publish，新增手动补发入口与未公证提示 ([2eba35b](https://github.com/tzzs/cablescope/commit/2eba35b832028634cc34e5928696aef846e410b1))
+* **build:** 新增 CLI 的 Homebrew formula，App 与 CLI 分作两个独立包 ([488f89a](https://github.com/tzzs/cablescope/commit/488f89a645f3ee4a26e6e3c100dd218673f77b73))
+* **build:** 新增 CLI 的 Homebrew formula，App 与 CLI 分作两个独立包 ([25f096f](https://github.com/tzzs/cablescope/commit/25f096f1d6b64a7a38c98627c823b438025569eb))
+
+
+### Bug Fixes
+
+* **build:** 手动补发路径加两道护栏 ([84b0121](https://github.com/tzzs/cablescope/commit/84b01218636e10191f4e983e35c0d7331abf315e))
+* **build:** 手动补发路径加两道护栏，避免降级 tap 与缺模板时炸掉 ([9ef504e](https://github.com/tzzs/cablescope/commit/9ef504e64838e411741d5e072d71dff0a6ded7c7))
+
 ## [0.2.1](https://github.com/tzzs/cablescope/compare/v0.2.0...v0.2.1) (2026-09-19)
 
 
