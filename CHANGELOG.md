@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.1](https://github.com/tzzs/cablescope/compare/v0.4.0...v0.4.1) (2026-09-20)
+
+
+### Bug Fixes
+
+* **test:** 只读目录测速用例显式钉死 locale，消除英文 CI 上的非确定性断言 ([ada4658](https://github.com/tzzs/cablescope/commit/ada46585e368e40ddf4f80e30a2036985786d8cd))
+* 修复切换语言后部分界面仍显示中文 ([99c7ba8](https://github.com/tzzs/cablescope/commit/99c7ba83d8f723776d9e069b252ba3e08a9a0dc6))
+* 修复切换语言后部分界面仍显示中文 ([9dd582f](https://github.com/tzzs/cablescope/commit/9dd582ffc36083e45b902f155ae858bdbc272887))
+
 ## [0.4.0](https://github.com/tzzs/cablescope/compare/v0.3.0...v0.4.0) (2026-09-20)
 
 
