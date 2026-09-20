@@ -29,29 +29,34 @@ On most Macs, macOS only sees the *negotiated result* of a cable, never the cabl
 
 CableScope ships as **two separate products** — install either, or both. They share the same `CableKit` data layer but are distributed independently and do not conflict.
 
-**Menu bar app**
+**Menu bar app** — built from source:
+
+```bash
+brew install tzzs/tap/cablescope-app
+```
+
+Compiles `CableScope.app` on your machine. Needs an Xcode 15+ toolchain, but **no code signing**: a locally built app carries no quarantine attribute, so Gatekeeper's first-launch check never fires. `brew info` prints the one-line `ln -s` that puts it in `/Applications` for Finder and Launchpad.
+
+**Menu bar app** — prebuilt, notarized:
 
 ```bash
 brew install --cask tzzs/tap/cablescope
 ```
 
-Installs `CableScope.app` — shown as **CableScope** in Finder and Launchpad — into `/Applications`, from the notarized DMG attached to the [latest GitHub release](https://github.com/tzzs/cablescope/releases).
+Drops `CableScope.app` straight into `/Applications` in seconds, from the notarized DMG on the [latest release](https://github.com/tzzs/cablescope/releases) — no toolchain, no compile.
 
-> The cask is published only once a notarized build exists. Until then, use the CLI below, or download the DMG straight from the releases page and allow it under System Settings → Privacy & Security on first launch.
+> The cask is published only once a notarized build exists; until then use the formula above. A cask always applies a quarantine attribute and Homebrew offers no way to opt out, so an unnotarized cask would install an app macOS refuses to open — which is why it is withheld rather than shipped broken.
 
 **Command-line tool**
 
 ```bash
 brew install tzzs/tap/cablescope-cli
-```
-
-Builds from source on your machine and installs the `cablescope` command. Needs an Xcode 15+ toolchain at build time, but no code signing — so it is available regardless of the app's signing status.
-
-```bash
 cablescope pretty
 ```
 
-Both the cask and the formula in [tzzs/homebrew-tap](https://github.com/tzzs/homebrew-tap) are updated automatically on every release.
+Also builds from source, and likewise needs no signing.
+
+Every DMG is attached to its GitHub release and can be downloaded directly — allow it under System Settings → Privacy & Security on first launch while releases are unnotarized. Everything in [tzzs/homebrew-tap](https://github.com/tzzs/homebrew-tap) is updated automatically on every release.
 
 ## Quick Start
 

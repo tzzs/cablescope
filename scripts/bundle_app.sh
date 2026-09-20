@@ -5,15 +5,23 @@
 # - APP_VERSION        写入 Info.plist 的 CFBundleShortVersionString（缺省 0.1.0）
 # - CODESIGN_IDENTITY  Developer ID 签名身份（缺省空 = 不签名，产出未签名 bundle；
 #                      CI 无证书环境由此保持可用）。设置后使用 hardened runtime 签名。
+# - SWIFT_BUILD_FLAGS  追加给 swift build 的额外参数（按空格分词）。Homebrew 的
+#                      cablescope-app formula 用它传 --disable-sandbox：SwiftPM 自带的
+#                      构建沙盒与 Homebrew 的沙盒会互相干扰。
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 CONFIGURATION="${1:-release}"
 APP_VERSION="${APP_VERSION:-0.1.0}"
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-}"
-swift build -c "$CONFIGURATION" --product CableScopeApp
+SWIFT_BUILD_FLAGS="${SWIFT_BUILD_FLAGS:-}"
 
-BIN_PATH="$(swift build -c "$CONFIGURATION" --show-bin-path)"
+# SWIFT_BUILD_FLAGS 故意不加引号：需要按空格分词成多个参数，空值时展开为无参数。
+# shellcheck disable=SC2086
+swift build -c "$CONFIGURATION" --product CableScopeApp $SWIFT_BUILD_FLAGS
+
+# shellcheck disable=SC2086
+BIN_PATH="$(swift build -c "$CONFIGURATION" --show-bin-path $SWIFT_BUILD_FLAGS)"
 APP_DIR="build/CableScope.app"
 
 rm -rf "$APP_DIR"
