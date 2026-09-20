@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/tzzs/cablescope/compare/v0.4.1...v0.5.0) (2026-09-20)
+
+
+### Features
+
+* **build:** 一行安装脚本 + formula macOS 依赖语法修复 ([e073515](https://github.com/tzzs/cablescope/commit/e073515210cd109701f18e9e944346baed13cd7f))
+* **build:** 一行安装脚本 + Release 随附 DMG sha256 校验文件 ([85c9e36](https://github.com/tzzs/cablescope/commit/85c9e36ab0cbc5f12a792085edb83b21a4779ca6))
+
+
+### Bug Fixes
+
+* **build:** formula 的 macOS 版本依赖改用符号语法 ([04c9c86](https://github.com/tzzs/cablescope/commit/04c9c865528a7956d03887d02d91a1581ba76155))
+
 ## [0.4.1](https://github.com/tzzs/cablescope/compare/v0.4.0...v0.4.1) (2026-09-20)
 
 
