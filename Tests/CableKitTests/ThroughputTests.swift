@@ -83,9 +83,12 @@ final class ThroughputTests: XCTestCase {
         try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: workDir.path)
 
         do {
+            // locale 显式钉死为 zh-Hans：`measure` 默认 `.current`，CI runner 是英文系统，
+            // 不钉语言的话下面的中文断言只在开发机上绿——正是"断言随运行环境语言漂移"的坑。
             _ = try await ThroughputTester.measure(at: workDir,
                                                    secondsPerPhase: 0.3,
-                                                   chunkBytes: 256 * 1024)
+                                                   chunkBytes: 256 * 1024,
+                                                   locale: Locale(identifier: "zh-Hans"))
             XCTFail("只读目录应当抛 ThroughputError")
         } catch let error as ThroughputError {
             XCTAssertTrue(error.description.contains("只读") || error.description.contains("不可写"),
