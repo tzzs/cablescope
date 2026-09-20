@@ -16,16 +16,16 @@ public final class RegistryService: RegistryServiceProtocol {
 
     /// 常用类名清单（属性检查器的默认选择项；枚举结果可能为空，属正常现象）。
     public static let wellKnownClasses: [WellKnownClass] = [
-        WellKnownClass(className: "IOUSBHostDevice", label: "USB 设备"),
-        WellKnownClass(className: "IOUSBHostInterface", label: "USB 接口"),
-        WellKnownClass(className: "AppleSmartBattery", label: "电源 / 电池"),
-        WellKnownClass(className: "AppleHPMInterfaceType10", label: "USB-C 端口控制器"),
-        WellKnownClass(className: "AppleHPMInterfaceType11", label: "MagSafe 端口控制器"),
-        WellKnownClass(className: "IOPortFeaturePowerSource", label: "PD 电源档位"),
-        WellKnownClass(className: "IOPortTransportComponentCCUSBPDSOPp", label: "线缆 e-marker（SOP'）"),
-        WellKnownClass(className: "IODisplayConnect", label: "显示器连接"),
-        WellKnownClass(className: "IOPortTransportStateDisplayPort", label: "DisplayPort 传输链路"),
-        WellKnownClass(className: "IOThunderboltPort", label: "雷电端口"),
+        WellKnownClass(className: "IOUSBHostDevice", labelKey: "USB 设备"),
+        WellKnownClass(className: "IOUSBHostInterface", labelKey: "USB 接口"),
+        WellKnownClass(className: "AppleSmartBattery", labelKey: "电源 / 电池"),
+        WellKnownClass(className: "AppleHPMInterfaceType10", labelKey: "USB-C 端口控制器"),
+        WellKnownClass(className: "AppleHPMInterfaceType11", labelKey: "MagSafe 端口控制器"),
+        WellKnownClass(className: "IOPortFeaturePowerSource", labelKey: "PD 电源档位"),
+        WellKnownClass(className: "IOPortTransportComponentCCUSBPDSOPp", labelKey: "线缆 e-marker（SOP'）"),
+        WellKnownClass(className: "IODisplayConnect", labelKey: "显示器连接"),
+        WellKnownClass(className: "IOPortTransportStateDisplayPort", labelKey: "DisplayPort 传输链路"),
+        WellKnownClass(className: "IOThunderboltPort", labelKey: "雷电端口"),
     ]
 
     public init() {}
@@ -100,10 +100,19 @@ public final class RegistryService: RegistryServiceProtocol {
 /// 检查器默认类名选项。
 public struct WellKnownClass: Hashable, Sendable {
     public let className: String
-    public let label: String
+    /// 中文原句，同时充当 `Localizable.strings` 的 key；展示请走 `label(locale:)`。
+    ///
+    /// 保留裸字段而不是彻底私有化：`Hashable` 语义与去重都依赖它，且中文原句就是
+    /// 这套表的规范形式（见 KitLocalization 的注释）。
+    public let labelKey: String
 
-    public init(className: String, label: String) {
+    public init(className: String, labelKey: String) {
         self.className = className
-        self.label = label
+        self.labelKey = labelKey
+    }
+
+    /// 按调用方语言取展示名；查表落空退回中文原句。
+    public func label(locale: Locale) -> String {
+        KitLocalization.string(labelKey, locale: locale)
     }
 }

@@ -10,7 +10,7 @@ struct SessionDetailSectionView: View {
 
     var body: some View {
         if let session = viewModel.selectedSession {
-            SectionCard(title: "详情 · \(session.portLabel)", systemImage: "cable.connector") {
+            SectionCard(title: "详情 · \(session.portLabel(locale: locale))", systemImage: "cable.connector") {
                 VStack(alignment: .leading, spacing: 12) {
                     portStatusRow(of: session)
 
@@ -220,10 +220,10 @@ struct SessionDetailSectionView: View {
         return VStack(alignment: .leading, spacing: 4) {
             FlowLayout(spacing: 5) {
                 if let speed = eMarker.decodedSpeed {
-                    InfoChip(verbatim: speed.label, color: .purple)
+                    InfoChip(verbatim: speed.label(locale: locale), color: .purple)
                 }
                 if let rating = eMarker.decodedCurrentRating, rating != .reserved {
-                    InfoChip(verbatim: rating.label, color: .orange)
+                    InfoChip(verbatim: rating.label(locale: locale), color: .orange)
                 }
                 if let vendorID = eMarker.vendorID {
                     if vendorID == 0 {
@@ -353,7 +353,7 @@ struct SessionDetailSectionView: View {
                         InfoChip(text: "链路未知", color: .gray)
                     }
                     // 雷雳代际（M3，ThunderboltDeviceSnapshot.generation）：有值时跟在链路速率 chip 后。
-                    if let generation = device.generation {
+                    if let generation = device.generationLabel(locale: locale) {
                         InfoChip(verbatim: generation, color: .purple)
                     }
                 }

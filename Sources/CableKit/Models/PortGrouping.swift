@@ -24,11 +24,6 @@ public enum PortGrouping {
         String(format: "usb-0x%03x", portKey)
     }
 
-    /// 完整端口标签
-    public static func portLabel(forPortKey portKey: UInt32) -> String {
-        portKey == 0 ? "USB 端口（未知）" : String(format: "USB 端口 0x%03x", portKey)
-    }
-
     // MARK: 端口控制器节点（AppleHPM）标签
 
     /// 端口形态名："Port-USB-C@1" → "USB-C"；"Port-MagSafe 3@1" → "MagSafe 3"。
@@ -37,13 +32,6 @@ public enum PortGrouping {
         if let at = name.firstIndex(of: "@") { name = String(name[..<at]) }
         if name.hasPrefix("Port-") { name.removeFirst("Port-".count) }
         return name
-    }
-
-    /// 端口会话完整标签：形态 + location，如 "USB-C 端口 @1" / "MagSafe 3 端口"。
-    public static func portLabel(for port: USBCPortSnapshot) -> String {
-        let type = port.portType ?? portTypeName(fromPortID: port.portID)
-        guard let at = port.portID.firstIndex(of: "@") else { return "\(type) 端口" }
-        return "\(type) 端口 \(port.portID[at...])"
     }
 
     /// hub 层级深度（尽力而为）：locationID 低 20 bit 中非零 nibble 的数量。
@@ -107,7 +95,7 @@ public enum PortGrouping {
                 id: legacyKey.map(sessionID(forPortKey:)) ?? port.portID,
                 kind: .usb,
                 physicalPortID: port.portID,
-                portLabel: portLabel(for: port),
+                portType: port.portType ?? portTypeName(fromPortID: port.portID),
                 usbDevices: devices.sorted {
                     ($0.locationID, $0.registryID) < ($1.locationID, $1.registryID)
                 }
@@ -122,7 +110,6 @@ public enum PortGrouping {
                 kind: .usb,
                 portKey: key,
                 physicalPortID: physicalPortID,
-                portLabel: portLabel(forPortKey: key),
                 usbDevices: devices.sorted {
                     ($0.locationID, $0.registryID) < ($1.locationID, $1.registryID)
                 }
@@ -146,7 +133,6 @@ public enum PortGrouping {
                 id: port == 0 ? "tb-0" : "tb-\(port)",
                 kind: .thunderbolt,
                 receptaclePort: port,
-                portLabel: port == 0 ? "雷雳端口（未知）" : "雷雳端口 \(port)",
                 thunderboltDevices: devices.sorted { $0.name < $1.name }
             )
         }

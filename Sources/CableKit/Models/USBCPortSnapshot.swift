@@ -134,13 +134,15 @@ public enum CableSpeedClass: Int, Codable, Sendable {
     /// PD 3.2 为 EPR 线缆扩展的档位（内核头未列，best-effort）
     case usb4Gen4 = 4
 
-    public var label: String {
+    /// 展示名按调用方语言现算——"雷雳" 只在中文下出现，英文是 "Thunderbolt"。
+    /// 其余档位是协议名，中英文一致，查表落空自动退回 key 本身。
+    public func label(locale: Locale) -> String {
         switch self {
         case .usb2: return "USB 2.0"
-        case .usb32Gen1: return "USB 3.2 Gen1（5 Gbps）"
-        case .usb32Gen2: return "USB 3.2 Gen2（10 Gbps）"
-        case .usb4Gen3: return "USB4 / 雷雳 3（40 Gbps）"
-        case .usb4Gen4: return "USB4 Gen4（80 Gbps）"
+        case .usb32Gen1: return KitLocalization.string("USB 3.2 Gen1（5 Gbps）", locale: locale)
+        case .usb32Gen2: return KitLocalization.string("USB 3.2 Gen2（10 Gbps）", locale: locale)
+        case .usb4Gen3: return KitLocalization.string("USB4 / 雷雳 3（40 Gbps）", locale: locale)
+        case .usb4Gen4: return KitLocalization.string("USB4 Gen4（80 Gbps）", locale: locale)
         }
     }
 }
@@ -154,12 +156,12 @@ public enum CableCurrentRating: Int, Codable, Sendable {
     /// 保留值（EPR 线缆的 240W 能力用扩展字段表达，不在本位段）
     case reserved = 3
 
-    public var label: String {
+    public func label(locale: Locale) -> String {
         switch self {
-        case .usbDefault: return "默认 USB 电流"
-        case .threeAmp: return "3A（≤60W）"
-        case .fiveAmp: return "5A（≤100W）"
-        case .reserved: return "保留值"
+        case .usbDefault: return KitLocalization.string("默认 USB 电流", locale: locale)
+        case .threeAmp: return KitLocalization.string("3A（≤60W）", locale: locale)
+        case .fiveAmp: return KitLocalization.string("5A（≤100W）", locale: locale)
+        case .reserved: return KitLocalization.string("保留值", locale: locale)
         }
     }
 }

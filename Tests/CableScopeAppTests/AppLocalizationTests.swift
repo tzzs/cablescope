@@ -28,6 +28,27 @@ final class AppLocalizationTests: XCTestCase {
         XCTAssertNotEqual(translated, "已连接 %@")
     }
 
+    /// 这一批 key 是"补漏那一轮"加进去的：它们的调用点都走 SwiftUI 的
+    /// `Text`/`Label`（LocalizedStringKey），漏翻时只是静静显示中文，不报任何错。
+    /// `scripts/check_localization.py` 在源码层守住"表里有没有这条"，这里守的是
+    /// 另一半——译文表有没有真的被编译/拷贝进运行期的资源 bundle。
+    func testPreviouslyUntranslatedKeysResolve() {
+        let expected = [
+            "最近快照 %@": "Last snapshot %@",
+            "PD 档位（%@）": "PD Tiers (%@)",
+            "e-marker 未上报厂商": "e-marker did not report a vendor",
+            "对端 VID %@": "Partner VID %@",
+            "e-marker 厂商 %@": "e-marker vendor %@",
+            "类 %@ · registryID %llu · %lld 个属性": "Class %@ · registryID %llu · %lld properties",
+            "首次确认支持 5A": "5A support confirmed for the first time",
+            "显示器链路规格提升": "Display link spec upgraded",
+        ]
+        for (key, english) in expected {
+            XCTAssertEqual(AppLocalization.string(key, locale: self.english), english,
+                           "「\(key)」的英文查表失败")
+        }
+    }
+
     func testChineseLocaleFallsBackToSourceKey() {
         // zh-Hans 是源语言，没有独立 lproj：按设计安全回退为 key 本身（即中文原文）。
         let key = "线缆已断开"

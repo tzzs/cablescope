@@ -1,0 +1,10 @@
+# 确实不该进译文表的中文字面量，一行一条（格式符/插值请写成 %@ 等归一化形式）。
+# 加条目前先确认：它真的不会出现在用户界面上。
+
+# SessionDetailSectionView.icon(for:)：按产品名猜图标用的匹配词，不是展示文案。
+键盘
+硬盘
+坞
+
+# IORegistryValue 的 DecodingError debugDescription：开发者可见，不进 UI。
+不支持的 JSON 值类型（IORegistryValue）

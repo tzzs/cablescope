@@ -17,6 +17,26 @@ final class ThroughputTests: XCTestCase {
         try? FileManager.default.removeItem(at: workDir)
     }
 
+    // MARK: 错误文案的语言
+
+    /// 测速失败提示必须跟随调用方语言。此前这些文案是直接拼出来的中文字面量，
+    /// 英文界面下测速失败会弹出中文——`ThroughputSectionView` 里为此留过一条 TODO。
+    /// 用 `secondsPerPhase: 0` 触发参数校验，不碰任何真实 I/O，结果完全确定。
+    func testErrorMessagesFollowRequestedLocale() async {
+        for (locale, expectedPrefix) in [(Locale(identifier: "en"), "Seconds per phase must be greater than 0"),
+                                         (Locale(identifier: "zh-Hans"), "每阶段时长必须大于 0 秒")] {
+            do {
+                _ = try await ThroughputTester.measure(at: workDir, secondsPerPhase: 0, locale: locale)
+                XCTFail("secondsPerPhase = 0 应当抛错")
+            } catch let error as ThroughputError {
+                XCTAssertTrue(error.description.hasPrefix(expectedPrefix),
+                              "\(locale.identifier) 下的文案是：\(error.description)")
+            } catch {
+                XCTFail("抛出了非 ThroughputError：\(error)")
+            }
+        }
+    }
+
     // MARK: computeMBps 边界
 
     func testComputeMBpsBoundaries() throws {
@@ -63,9 +83,12 @@ final class ThroughputTests: XCTestCase {
         try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: workDir.path)
 
         do {
+            // locale 显式钉死为 zh-Hans：`measure` 默认 `.current`，CI runner 是英文系统，
+            // 不钉语言的话下面的中文断言只在开发机上绿——正是"断言随运行环境语言漂移"的坑。
             _ = try await ThroughputTester.measure(at: workDir,
                                                    secondsPerPhase: 0.3,
-                                                   chunkBytes: 256 * 1024)
+                                                   chunkBytes: 256 * 1024,
+                                                   locale: Locale(identifier: "zh-Hans"))
             XCTFail("只读目录应当抛 ThroughputError")
         } catch let error as ThroughputError {
             XCTAssertTrue(error.description.contains("只读") || error.description.contains("不可写"),

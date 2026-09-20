@@ -24,9 +24,12 @@
 "PD 合同" = "PD Contract";
 "PD 合同 " = "PD Contract ";
 "PD 合同 %lldW" = "PD Contract %lldW";
+"PD 档位（%@）" = "PD Tiers (%@)";
 "USB4/雷雳" = "USB4 / Thunderbolt";
 "W · 暂未充电" = "W · not charging yet";
 "W 充电中" = "W charging";
+"e-marker 厂商 %@" = "e-marker vendor %@";
+"e-marker 未上报厂商" = "e-marker did not report a vendor";
 "主显示器" = "Main Display";
 "以后再说" = "Not Now";
 "使用电池" = "On Battery";
@@ -39,6 +42,7 @@
 "刷新卷列表" = "Refresh Volume List";
 "前往下载页" = "Go to Download Page";
 "前往系统设置开启" = "Open System Settings";
+"功率" = "Power";
 "协商速率 ≠ 实际吞吐；测的是所选外接卷的真实读写速度" = "Negotiated speed ≠ actual throughput; this measures real read/write speed on the selected volume";
 "协商速率提升" = "Speed Upgraded";
 "厂商 ID 未上报" = "Vendor ID Not Reported";
@@ -51,6 +55,7 @@
 "基于 %lld 次协商观测" = "Based on %lld negotiation observations";
 "外接显示器" = "External Display";
 "外观" = "Appearance";
+"对端 VID %@" = "Partner VID %@";
 "已停止充电" = "Charging Stopped";
 "已启用传输" = "Enabled Transports";
 "已拷贝" = "Copied";
@@ -74,12 +79,15 @@
 "整机评级 · %lld 次观测" = "System rating · %lld observations";
 "无有效数据" = "No valid data";
 "无设备" = "No Device";
+"时间" = "Time";
 "显示器" = "Display";
+"显示器链路规格提升" = "Display link spec upgraded";
 "暂无充电数据" = "No Charging Data";
 "暂无电源数据" = "No Power Data";
 "暂无评级" = "No Rating Yet";
 "暂未读到该链路的显示器身份信息，稍后会自动补上" = "Display identity for this link hasn't been read yet; it will fill in automatically";
 "最近 5 分钟功率曲线" = "Power Over the Last 5 Minutes";
+"最近快照 %@" = "Last snapshot %@";
 "未在充电" = "Not Charging";
 "未接通电源" = "Not Connected";
 "未检测到外接/可移动卷" = "No external/removable volumes detected";
@@ -110,6 +118,7 @@
 "等待枚举结果…" = "Waiting for enumeration results…";
 "等待首次快照…" = "Waiting for First Snapshot…";
 "简体中文" = "简体中文";
+"类 %@ · registryID %llu · %lld 个属性" = "Class %@ · registryID %llu · %lld properties";
 "类名" = "Class Name";
 "系统未授权通知，以下开关不会实际生效" = "Notifications aren't authorized by the system — the switches below won't actually take effect";
 "系统输入 · " = "System input · ";
@@ -139,3 +148,5 @@
 "部分窗口标题栏文字可能需要重新打开窗口才会切换语言。" = "Some window title bar text may need the window reopened to switch language.";
 "链路未知" = "Link Unknown";
 "雷雳设备" = "Thunderbolt Devices";
+"首次确认支持 5A" = "5A support confirmed for the first time";
+"首次观测 %@ · 历史峰值，拔线不清零" = "First seen %@ · historical peak, never reset on unplug";

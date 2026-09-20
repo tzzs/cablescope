@@ -227,6 +227,16 @@ public struct DisplaySnapshot: Codable, Hashable, Sendable, Identifiable {
     public var id: UInt32 { displayID }
     public var resolutionLabel: String { "\(pixelWidth)×\(pixelHeight)" }
 
+    /// 展示名，按调用方语言现算。
+    ///
+    /// 内建屏不用 `name`：那个值来自 `NSScreen.localizedName`，跟随的是**系统**
+    /// Language & Region 而不是 App 内的语言开关——系统中文时它就是"内建视网膜显示器"，
+    /// 会把中文漏进英文界面。内建屏本来也没有 EDID 意义上的产品名，这里用自己的文案。
+    /// 外接屏的 `name` 是厂商写进 EDID 的产品名（"DELL U2723QE"），属专有名词，原样显示。
+    public func displayLabel(locale: Locale) -> String? {
+        isBuiltin ? KitLocalization.string("内建显示器", locale: locale) : name
+    }
+
     // 兼容旧 JSON（无 isBuiltin/vendorNumber/modelNumber/serialNumber 键）：
     // isBuiltin 缺失按 false 处理，其余缺失按未知（nil）处理。
     private enum CodingKeys: String, CodingKey {
@@ -259,7 +269,11 @@ public struct ThunderboltDeviceSnapshot: Codable, Hashable, Sendable, Identifiab
     public let deviceType: String?
     /// 所在物理端口的 receptacle 编号（来自 receptacle_N_tag；旧 JSON / 解析失败时为 nil）
     public let receptaclePort: Int?
-    /// 雷雳代际（M3）："雷雳 5" / "雷雳 4 / USB4" / "雷雳 3"；速度标签缺失或无法识别时为 nil
+    /// 雷雳代际（M3）："雷雳 5" / "雷雳 4 / USB4" / "雷雳 3"；速度标签缺失或无法识别时为 nil。
+    ///
+    /// 存的是中文原句，它同时就是 `Localizable.strings` 的 key——快照是要序列化进
+    /// JSON 的持久数据，存成某一种语言的成品文案会把语言写死在数据里。展示请走
+    /// `generationLabel(locale:)`，让渲染方决定语言。
     public let generation: String?
     /// 树内层级（M6）：receptacle 根设备为 0，下挂设备（级联链/坞站下游）逐层 +1；
     /// 旧 JSON / 旧解析数据为 nil（展示时按 0 处理）
@@ -277,6 +291,11 @@ public struct ThunderboltDeviceSnapshot: Codable, Hashable, Sendable, Identifiab
     }
 
     public var id: String { name + (vendorName ?? "") }
+
+    /// 雷雳代际的展示名，按调用方语言现算；`generation` 为 nil 时同样返回 nil。
+    public func generationLabel(locale: Locale) -> String? {
+        generation.map { KitLocalization.string($0, locale: locale) }
+    }
 
     // 兼容旧 JSON（无 receptaclePort/generation/depth 键）：缺失时视为 nil。
     private enum CodingKeys: String, CodingKey {

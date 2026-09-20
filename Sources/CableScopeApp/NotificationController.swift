@@ -44,7 +44,7 @@ final class NotificationController {
             guard AppPreferences.isNotificationEnabled(.plugUnplug),
                   let session = snapshot.sessions.first(where: { $0.id == sessionID }) else { return }
             let template = AppLocalization.string("已连接 %@", locale: locale)
-            deliver(title: String(format: template, session.shortPortLabel),
+            deliver(title: String(format: template, session.shortPortLabel(locale: locale)),
                     body: connectBody(session: session, port: port(session), locale: locale))
 
         case .sessionDisconnected:
@@ -64,14 +64,14 @@ final class NotificationController {
             guard AppPreferences.isNotificationEnabled(.speedUpgraded),
                   let session = snapshot.sessions.first(where: { $0.id == sessionID }) else { return }
             let template = AppLocalization.string("%@ 协商速率提升", locale: locale)
-            deliver(title: String(format: template, session.shortPortLabel),
+            deliver(title: String(format: template, session.shortPortLabel(locale: locale)),
                     body: "\(speed.generation) \(speed.label)")
 
         case .ratingUpgraded(let sessionID, let dimension):
             guard AppPreferences.isNotificationEnabled(.ratingUpgraded),
                   let session = snapshot.sessions.first(where: { $0.id == sessionID }) else { return }
             let template = AppLocalization.string("%@ 线缆评级提升", locale: locale)
-            deliver(title: String(format: template, session.shortPortLabel),
+            deliver(title: String(format: template, session.shortPortLabel(locale: locale)),
                     body: dimension.localizedDescription(locale: locale))
         }
     }

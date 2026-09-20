@@ -115,7 +115,7 @@ extension CableScopeCLI {
         guard !sessions.isEmpty else { return "  未检测到线缆 / 设备" }
         let portsByID = Dictionary(ports.map { ($0.portID, $0) }, uniquingKeysWith: { first, _ in first })
         return sessions.map { session in
-            var lines = ["  ▸ \(session.portLabel)  " + Term.dim("[\(session.id)]")]
+            var lines = ["  ▸ \(session.portLabel(locale: .current))  " + Term.dim("[\(session.id)]")]
 
             if let port = session.physicalPortID.flatMap({ portsByID[$0] }),
                let status = portStatusLine(port) {
@@ -143,7 +143,7 @@ extension CableScopeCLI {
                 if let vendor = device.vendorName { parts.append(vendor) }
                 if let link = device.linkSpeedLabel { parts.append(link) }
                 // 雷雳代际（M3）：存在时显示，如 "· 雷雳 4 / USB4"
-                if let generation = device.generation { parts.append(generation) }
+                if let generation = device.generationLabel(locale: .current) { parts.append(generation) }
                 let suffix = parts.isEmpty ? "" : "  " + parts.joined(separator: " · ")
                 lines.append("\(indent)• \(device.name)\(suffix)")
             }
@@ -167,7 +167,7 @@ extension CableScopeCLI {
                 parts.append(DiagnosticsEngine.eMarkerDescription(description))
             }
             if let rating = eMarker.decodedCurrentRating, rating != .reserved {
-                parts.append(rating.label)
+                parts.append(rating.label(locale: .current))
             }
         }
         if port.supportsThunderboltUSB4 { parts.append("USB4/雷雳可用") }

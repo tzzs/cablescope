@@ -13,6 +13,8 @@ struct RegistryInspectorView: View {
 
     // MARK: 状态
 
+    @Environment(\.locale) private var locale
+
     @State private var className = RegistryService.wellKnownClasses[0].className
     /// 输入框草稿：与 className 分离，避免每敲一个字符触发一次 IORegistry 枚举。
     @State private var classDraft = RegistryService.wellKnownClasses[0].className
@@ -46,7 +48,7 @@ struct RegistryInspectorView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Picker("类名", selection: $className) {
                     ForEach(RegistryService.wellKnownClasses, id: \.className) { item in
-                        Text("\(item.label) · \(item.className)").tag(item.className)
+                        Text("\(item.label(locale: locale)) · \(item.className)").tag(item.className)
                     }
                 }
                 .labelsHidden()

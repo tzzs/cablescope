@@ -27,7 +27,13 @@ final class RegistryServiceTests: XCTestCase {
         XCTAssertFalse(classes.isEmpty)
         XCTAssertEqual(Set(classes.map(\.className)).count, classes.count,
                        "默认类名清单不应有重复项")
-        XCTAssertTrue(classes.allSatisfy { !$0.className.isEmpty && !$0.label.isEmpty })
+        XCTAssertTrue(classes.allSatisfy { !$0.className.isEmpty && !$0.labelKey.isEmpty })
+        // 每条都必须有英文译文：labelKey 就是 .strings 的 key，查表落空会原样退回中文，
+        // 英文界面的类名下拉框因此会混进中文项——这里直接断言"英文 != 中文 key"。
+        for wellKnown in classes {
+            XCTAssertNotEqual(wellKnown.label(locale: Locale(identifier: "en")), wellKnown.labelKey,
+                              "\(wellKnown.className) 的英文译文缺失")
+        }
     }
 
     func testMaxEntriesIsPositiveAndBounded() {

@@ -224,7 +224,7 @@ struct MenuBarPanelView: View {
                 .foregroundStyle(.secondary)
             ForEach(sessions.prefix(3)) { session in
                 HStack {
-                    Text(session.shortPortLabel)
+                    Text(session.shortPortLabel(locale: locale))
                         .font(.caption)
                     Spacer()
                     if let speed = session.topUSBSpeed {

@@ -125,11 +125,11 @@ private final class ThroughputSectionModel: ObservableObject {
         lastError = nil
         Task {
             do {
-                lastResult = try await ThroughputTester.measure(at: candidate.url)
+                // locale 必须显式传：`measure` 默认 `.current`（系统语言），而这里要的是
+                // 用户在设置里选的语言，否则英文界面会收到中文的测速失败提示。
+                lastResult = try await ThroughputTester.measure(at: candidate.url,
+                                                               locale: AppPreferences.effectiveLocale())
             } catch let error as ThroughputError {
-                // ThroughputError.description 来自 CableKit，目前没有 locale 感知，
-                // 始终是中文——已知的小缺口，测速失败是低频路径，暂不为此单独
-                // 给 ThroughputTester 接入 KitLocalization。
                 lastError = error.description
             } catch {
                 let template = AppLocalization.string("测速失败：%@", locale: AppPreferences.effectiveLocale())

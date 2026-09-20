@@ -5,7 +5,7 @@ import XCTest
 /// USB 速率提升、首次 5A 确认、DP 链路提升，以及"无意义字段变化不误报"的回归。
 final class NotificationDiffTests: XCTestCase {
     private func session(id: String, portKey: UInt32, device: USBDeviceSnapshot?) -> CableSession {
-        CableSession(id: id, kind: .usb, portKey: portKey, portLabel: "USB 端口",
+        CableSession(id: id, kind: .usb, portKey: portKey,
                      usbDevices: device.map { [$0] } ?? [])
     }
 
