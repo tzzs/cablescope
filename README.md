@@ -29,6 +29,14 @@ On most Macs, macOS only sees the *negotiated result* of a cable, never the cabl
 
 CableScope ships as **two separate products** — install either, or both. They share the same `CableKit` data layer but are distributed independently and do not conflict.
 
+**Menu bar app** — one-line installer (recommended):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tzzs/cablescope/main/scripts/install.sh | bash
+```
+
+Downloads the prebuilt DMG from the [latest release](https://github.com/tzzs/cablescope/releases), verifies its sha256, and drops `CableScope.app` into `/Applications` — no toolchain, no Homebrew. Re-run the same command to upgrade. (curl doesn't set the quarantine attribute, so the build opens directly even while releases are still unsigned by a Developer ID.)
+
 **Menu bar app** — built from source:
 
 ```bash

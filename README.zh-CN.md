@@ -27,6 +27,14 @@ macOS 菜单栏工具：检测连接数据线（USB-C / 雷电）的**充电速�
 
 CableScope 提供**两个独立的产品**，可以只装其一，也可以都装。二者共用 `CableKit` 数据层，但分发渠道彼此独立，互不冲突。
 
+**菜单栏 App —— 一行安装脚本（推荐）**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tzzs/cablescope/main/scripts/install.sh | bash
+```
+
+从[最新 Release](https://github.com/tzzs/cablescope/releases) 下载预编译 DMG，校验 sha256，把 `CableScope.app` 放进 `/Applications`——无需工具链，也不需要 Homebrew；升级就再跑同一条命令。（curl 下载不会打上 quarantine 属性，所以在还没有 Developer ID 公证的阶段，装完也能直接打开。）
+
 **菜单栏 App —— 源码构建**
 
 ```bash
