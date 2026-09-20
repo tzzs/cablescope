@@ -127,7 +127,7 @@ public enum DiagnosticsEngine {
                 parts.append(eMarkerDescription(description, locale: locale))
             }
             if let rating = eMarker.decodedCurrentRating, rating != .reserved {
-                parts.append(rating.label)
+                parts.append(rating.label(locale: locale))
             }
         }
 

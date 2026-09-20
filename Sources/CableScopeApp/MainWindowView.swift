@@ -63,7 +63,11 @@ struct MainWindowView: View {
         }
     }
 
-    private var subtitleText: String {
+    /// 返回类型必须是 `LocalizedStringKey` 而不是 `String`：`navigationSubtitle` 同时有
+    /// `LocalizedStringKey` 和 `StringProtocol` 两个重载，传 `String` 变量命中的是后者
+    /// ——verbatim 显示，完全不查表。此前 "等待首次快照…" 明明有英文译文却永远显示
+    /// 中文，就是踩了这个重载。时间戳先格式化成 `String` 再插值，key 即 "最近快照 %@"。
+    private var subtitleText: LocalizedStringKey {
         if let timestamp = viewModel.snapshot?.timestamp {
             return "最近快照 \(timestamp.formatted(date: .omitted, time: .standard))"
         }

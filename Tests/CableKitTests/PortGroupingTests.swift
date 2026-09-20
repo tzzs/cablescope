@@ -1,6 +1,10 @@
 import XCTest
 @testable import CableKit
 
+/// 中文（源语言）展示名断言统一用它，显式传入而不是依赖运行环境的系统 locale
+/// ——CI runner 的系统语言是英文，不传就会拿到英文译文、断言集体失败。
+private let zh = Locale(identifier: "zh-Hans")
+
 /// 物理端口分组与线缆会话测试（纯函数 + JSON 兼容，无 IO 依赖）。
 final class PortGroupingTests: XCTestCase {
 
@@ -49,10 +53,10 @@ final class PortGroupingTests: XCTestCase {
 
         XCTAssertEqual(sessions.map(\.id), ["usb-0x141", "usb-0x142"], "按端口键排序")
         XCTAssertEqual(sessions[0].usbDevices.map(\.productName), ["Hub", "SSD"], "会话内按 locationID 排序，天然呈 hub 链路顺序")
-        XCTAssertEqual(sessions[0].portLabel, "USB 端口 0x141")
+        XCTAssertEqual(sessions[0].portLabel(locale: zh), "USB 端口 0x141")
         XCTAssertEqual(sessions[0].topUSBSpeed?.bitsPerSecond, 10_000_000_000, "会话速率取成员峰值")
         XCTAssertEqual(sessions[0].deviceCount, 2)
-        XCTAssertEqual(sessions[0].shortPortLabel, "USB·0x141")
+        XCTAssertEqual(sessions[0].shortPortLabel(locale: zh), "USB·0x141")
     }
 
     func testBuildSessionsPutsUnknownLocationBucketLast() {
@@ -62,8 +66,8 @@ final class PortGroupingTests: XCTestCase {
         let sessions = PortGrouping.buildSessions(usbDevices: [unknown, normal], thunderboltDevices: [])
 
         XCTAssertEqual(sessions.map(\.id), ["usb-0x141", "usb-0x000"])
-        XCTAssertEqual(sessions[1].portLabel, "USB 端口（未知）")
-        XCTAssertEqual(sessions[1].shortPortLabel, "USB·?")
+        XCTAssertEqual(sessions[1].portLabel(locale: zh), "USB 端口（未知）")
+        XCTAssertEqual(sessions[1].shortPortLabel(locale: zh), "USB·?")
     }
 
     // MARK: - 端口控制器会话（AppleHPM 活跃端口一等成卡）
@@ -111,8 +115,8 @@ final class PortGroupingTests: XCTestCase {
         let sessions = PortGrouping.buildSessions(usbDevices: [], thunderboltDevices: [], ports: [charger])
 
         XCTAssertEqual(sessions.map(\.id), ["Port-USB-C@2"])
-        XCTAssertEqual(sessions[0].portLabel, "USB-C 端口 @2")
-        XCTAssertEqual(sessions[0].shortPortLabel, "USB-C·@2")
+        XCTAssertEqual(sessions[0].portLabel(locale: zh), "USB-C 端口 @2")
+        XCTAssertEqual(sessions[0].shortPortLabel(locale: zh), "USB-C·@2")
         XCTAssertEqual(sessions[0].physicalPortID, "Port-USB-C@2")
         XCTAssertTrue(sessions[0].usbDevices.isEmpty, "充电线没有数据设备，会话允许为空")
     }
@@ -204,10 +208,42 @@ final class PortGroupingTests: XCTestCase {
     }
 
     func testPortLabelUsesPortTypeDescription() {
-        XCTAssertEqual(PortGrouping.portLabel(for: makePort(portID: "Port-USB-C@1")), "USB-C 端口 @1")
-        XCTAssertEqual(PortGrouping.portLabel(for: makePort(portID: "Port-MagSafe 3@1", portType: "MagSafe 3")),
-                       "MagSafe 3 端口 @1")
-        XCTAssertEqual(PortGrouping.portLabel(for: makePort(portID: "Port-USB-C", portType: nil)), "USB-C 端口")
+        func label(_ portID: String, portType: String? = "USB-C", locale: Locale = zh) -> String {
+            let sessions = PortGrouping.buildSessions(usbDevices: [], thunderboltDevices: [],
+                                                     ports: [makePort(portID: portID, portType: portType)])
+            return sessions[0].portLabel(locale: locale)
+        }
+        XCTAssertEqual(label("Port-USB-C@1"), "USB-C 端口 @1")
+        XCTAssertEqual(label("Port-MagSafe 3@1", portType: "MagSafe 3"), "MagSafe 3 端口 @1")
+        XCTAssertEqual(label("Port-USB-C", portType: nil), "USB-C 端口")
+    }
+
+    /// 展示名按调用方语言现算：同一个会话在 en 下必须给出英文。
+    /// 这一条是本地化回归的哨兵——`portLabel` 曾是快照里的预拼字符串，语言在聚合那一刻
+    /// 就写死了，英文界面里于是混着 "USB-C 端口 @2"。
+    func testPortLabelsFollowRequestedLocale() {
+        let en = Locale(identifier: "en")
+        let portSessions = PortGrouping.buildSessions(
+            usbDevices: [], thunderboltDevices: [], ports: [makePort(portID: "Port-USB-C@2")]
+        )
+        XCTAssertEqual(portSessions[0].portLabel(locale: en), "USB-C Port @2")
+
+        let usbSessions = PortGrouping.buildSessions(
+            usbDevices: [makeUSBDevice(registryID: 1, locationID: 0x14100000, name: "SSD", bps: nil),
+                         makeUSBDevice(registryID: 2, locationID: 0, name: "?", bps: nil)],
+            thunderboltDevices: []
+        )
+        XCTAssertEqual(usbSessions[0].portLabel(locale: en), "USB Port 0x141")
+        XCTAssertEqual(usbSessions[1].portLabel(locale: en), "USB Port (Unknown)")
+
+        let tbSessions = PortGrouping.buildSessions(
+            usbDevices: [], thunderboltDevices: [makeTBDevice(name: "Dock", receptaclePort: 1),
+                                                 makeTBDevice(name: "?", receptaclePort: nil)]
+        )
+        XCTAssertEqual(tbSessions[0].portLabel(locale: en), "Thunderbolt Port 1")
+        XCTAssertEqual(tbSessions[0].shortPortLabel(locale: en), "TB·1")
+        XCTAssertEqual(tbSessions[1].portLabel(locale: en), "Thunderbolt Port (Unknown)")
+        XCTAssertEqual(tbSessions[1].shortPortLabel(locale: en), "TB·?")
     }
 
     // MARK: - 雷雳会话聚合
@@ -227,10 +263,10 @@ final class PortGroupingTests: XCTestCase {
 
         XCTAssertEqual(sessions.map(\.id), ["tb-1", "tb-3", "tb-0"], "USB 会话在前，未知端口桶垫底")
         XCTAssertEqual(sessions[0].thunderboltDevices.map(\.name), ["Dock", "LG"])
-        XCTAssertEqual(sessions[0].portLabel, "雷雳端口 1")
-        XCTAssertEqual(sessions[0].shortPortLabel, "雷雳·1")
-        XCTAssertEqual(sessions[2].portLabel, "雷雳端口（未知）")
-        XCTAssertEqual(sessions[2].shortPortLabel, "雷雳·?")
+        XCTAssertEqual(sessions[0].portLabel(locale: zh), "雷雳端口 1")
+        XCTAssertEqual(sessions[0].shortPortLabel(locale: zh), "雷雳·1")
+        XCTAssertEqual(sessions[2].portLabel(locale: zh), "雷雳端口（未知）")
+        XCTAssertEqual(sessions[2].shortPortLabel(locale: zh), "雷雳·?")
     }
 
     func testUSBSessionsComeBeforeThunderboltSessions() {
@@ -373,7 +409,6 @@ final class PortGroupingTests: XCTestCase {
             id: "usb-0x141",
             kind: .usb,
             portKey: 0x141,
-            portLabel: "USB 端口 0x141",
             usbDevices: [device]
         )
         let snapshot = CableSnapshot(
@@ -388,6 +423,6 @@ final class PortGroupingTests: XCTestCase {
         let decoded = try CableSnapshot.fromJSON(snapshot.toJSON())
 
         XCTAssertEqual(decoded, snapshot, "含 sessions 的快照应无损往返")
-        XCTAssertEqual(decoded.sessions.first?.shortPortLabel, "USB·0x141")
+        XCTAssertEqual(decoded.sessions.first?.shortPortLabel(locale: zh), "USB·0x141")
     }
 }

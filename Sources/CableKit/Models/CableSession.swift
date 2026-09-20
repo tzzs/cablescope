@@ -24,8 +24,12 @@ public struct CableSession: Codable, Hashable, Sendable, Identifiable {
     public let receptaclePort: Int?
     /// 物理端口控制器名（"Port-USB-C@1"，与 USBCPortSnapshot.portID 配对；未知时为 nil）
     public let physicalPortID: String?
-    /// 完整展示名，如 "USB 端口 0x014" / "雷雳端口 2"
-    public let portLabel: String
+    /// 端口形态名（"USB-C" / "MagSafe 3"），**仅端口节点会话有值**。
+    ///
+    /// nil 不等于"形态未知"，而是"这个会话不是从端口节点建出来的"——设备桶自己报的
+    /// `physicalPortID` 配不上任何端口节点时就是这种情况，此时展示名按 `portKey`
+    /// 走十六进制形式（沿用改造前的行为，见 `portLabel(locale:)`）。
+    public let portType: String?
     public let usbDevices: [USBDeviceSnapshot]
     public let thunderboltDevices: [ThunderboltDeviceSnapshot]
 
@@ -34,7 +38,7 @@ public struct CableSession: Codable, Hashable, Sendable, Identifiable {
                 portKey: UInt32? = nil,
                 receptaclePort: Int? = nil,
                 physicalPortID: String? = nil,
-                portLabel: String,
+                portType: String? = nil,
                 usbDevices: [USBDeviceSnapshot] = [],
                 thunderboltDevices: [ThunderboltDeviceSnapshot] = []) {
         self.id = id
@@ -42,7 +46,7 @@ public struct CableSession: Codable, Hashable, Sendable, Identifiable {
         self.portKey = portKey
         self.receptaclePort = receptaclePort
         self.physicalPortID = physicalPortID
-        self.portLabel = portLabel
+        self.portType = portType
         self.usbDevices = usbDevices
         self.thunderboltDevices = thunderboltDevices
     }
@@ -55,8 +59,47 @@ public struct CableSession: Codable, Hashable, Sendable, Identifiable {
     /// 会话内的设备总数（USB + 雷雳）
     public var deviceCount: Int { usbDevices.count + thunderboltDevices.count }
 
-    /// 短标签，用于菜单栏等窄空间："USB-C·@1" / "USB·0x014" / "雷雳·2"
-    public var shortPortLabel: String {
+    // MARK: - 展示名（在渲染时按调用方语言生成，不进快照）
+    //
+    // 这两个展示名过去是 `portLabel: String` 存进快照的预拼字符串，语言在聚合那一刻
+    // 就被写死了——App 切换语言只换得掉自己那层文案，换不掉从 CableKit 带过来的这串，
+    // 于是英文界面里混着 "USB-C 端口 @2"。改成按 `Locale` 现算的方法后，语言由渲染方
+    // 决定；快照里只留结构化字段（kind / portKey / receptaclePort / physicalPortID /
+    // portType），谁都能再拼出自己语言的展示名。
+
+    /// 完整展示名，如 "USB-C 端口 @2" / "USB 端口 0x014" / "雷雳端口 2"。
+    ///
+    /// 分支依据是 `portType` 而不是 `physicalPortID`：设备自报的 `physicalPortID` 配不上
+    /// 端口节点时仍会留在会话里（`portType` 为 nil），那种会话改造前就是按 portKey 展示的，
+    /// 这里保持一致。
+    public func portLabel(locale: Locale) -> String {
+        switch kind {
+        case .usb:
+            if let type = portType {
+                guard let portID = physicalPortID, let at = portID.firstIndex(of: "@") else {
+                    return KitLocalization.string(template: "%@ 端口", locale: locale, args: type)
+                }
+                return KitLocalization.string(template: "%@ 端口 %@", locale: locale,
+                                              args: type, String(portID[at...]))
+            }
+            if let key = portKey, key != 0 {
+                return KitLocalization.string(template: "USB 端口 %@", locale: locale,
+                                              args: String(format: "0x%03x", key))
+            }
+            return KitLocalization.string("USB 端口（未知）", locale: locale)
+        case .thunderbolt:
+            if let port = receptaclePort, port != 0 {
+                return KitLocalization.string(template: "雷雳端口 %@", locale: locale, args: String(port))
+            }
+            return KitLocalization.string("雷雳端口（未知）", locale: locale)
+        }
+    }
+
+    /// 短标签，用于菜单栏等窄空间："USB-C·@1" / "USB·0x014" / "雷雳·2"。
+    ///
+    /// 与 `portLabel(locale:)` 的分支依据有意不同：短标签一直是"有 `physicalPortID` 就优先
+    /// 用形态名"，即使该端口配不上节点，窄空间里 "USB-C·@1" 也比 "USB·0x141" 好认。
+    public func shortPortLabel(locale: Locale) -> String {
         switch kind {
         case .usb:
             if let portID = physicalPortID {
@@ -67,8 +110,10 @@ public struct CableSession: Codable, Hashable, Sendable, Identifiable {
             if let key = portKey, key != 0 { return String(format: "USB·0x%03x", key) }
             return "USB·?"
         case .thunderbolt:
-            if let port = receptaclePort, port != 0 { return "雷雳·\(port)" }
-            return "雷雳·?"
+            if let port = receptaclePort, port != 0 {
+                return KitLocalization.string(template: "雷雳·%@", locale: locale, args: String(port))
+            }
+            return KitLocalization.string("雷雳·?", locale: locale)
         }
     }
 }

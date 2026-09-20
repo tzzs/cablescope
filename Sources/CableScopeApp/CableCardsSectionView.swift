@@ -87,7 +87,7 @@ struct CableCardView: View {
                         .fill(statusColor)
                         .frame(width: 8, height: 8)
                         .accessibilityHidden(true) // 状态语义由 chips 文本承载，纯颜色点对 VoiceOver 无意义
-                    Text(session.portLabel)
+                    Text(session.portLabel(locale: locale))
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                 }
@@ -187,7 +187,7 @@ struct CableCardView: View {
             )
         }
         if let rating = eMarker.decodedCurrentRating, rating != .reserved {
-            InfoChip(verbatim: rating.label, systemImage: "checkmark.seal.fill", color: .orange)
+            InfoChip(verbatim: rating.label(locale: locale), systemImage: "checkmark.seal.fill", color: .orange)
         }
         ForEach(trustNotes, id: \.self) { note in
             switch note {

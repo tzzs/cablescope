@@ -107,18 +107,22 @@ public enum ThroughputTester {
     ///   - chunkBytes: 单次读写块大小（默认 4 MiB）。
     ///   - flush: 写阶段每块后 `synchronizeFile` 强制落盘。开启时测真实介质吞吐；
     ///     关闭时写入大多停留在页缓存，数值虚高（仅适合对比缓存效应）。
+    ///   - locale: 错误文案语言。默认 `.current`（CLI 行为不变）；App 传入用户在设置里
+    ///     选的语言，否则"无法打开临时测速文件"这类提示会在英文界面里冒出中文。
     ///   - onPhaseChange: 阶段切换回调（后台线程触发，供 CLI/UI 打进度）。
     /// 阻塞 I/O 全程在 Task.detached 中执行，不占用协作线程池（对齐 CableKit 其他 Service）。
     public static func measure(at volumeURL: URL,
                                secondsPerPhase: TimeInterval = 5,
                                chunkBytes: Int = 4 * 1024 * 1024,
                                flush: Bool = true,
+                               locale: Locale = .current,
                                onPhaseChange: (@Sendable (Phase) -> Void)? = nil) async throws -> ThroughputResult {
         try await Task.detached(priority: .utility) {
             try Self.runMeasurement(at: volumeURL,
                                     secondsPerPhase: secondsPerPhase,
                                     chunkBytes: chunkBytes,
                                     flush: flush,
+                                    locale: locale,
                                     onPhaseChange: onPhaseChange)
         }.value
     }
@@ -129,12 +133,15 @@ public enum ThroughputTester {
                                        secondsPerPhase: TimeInterval,
                                        chunkBytes: Int,
                                        flush: Bool,
+                                       locale: Locale,
                                        onPhaseChange: (@Sendable (Phase) -> Void)?) throws -> ThroughputResult {
         guard secondsPerPhase > 0 else {
-            throw ThroughputError("每阶段时长必须大于 0 秒（当前 \(secondsPerPhase)）")
+            throw ThroughputError(KitLocalization.string(template: "每阶段时长必须大于 0 秒（当前 %@）",
+                                                        locale: locale, args: String(secondsPerPhase)))
         }
         guard chunkBytes > 0 else {
-            throw ThroughputError("读写块大小必须大于 0 字节（当前 \(chunkBytes)）")
+            throw ThroughputError(KitLocalization.string(template: "读写块大小必须大于 0 字节（当前 %@）",
+                                                        locale: locale, args: String(chunkBytes)))
         }
 
         // 空间预检：至少容纳 2 个块（写入文件 + 文件系统元数据余量）。
@@ -142,7 +149,9 @@ public enum ThroughputTester {
         if let capacity = try? volumeURL.resourceValues(forKeys: volumeCapacityKeys),
            let available = capacity.volumeAvailableCapacityForImportantUsage,
            available < Int64(chunkBytes) * 2 {
-            throw ThroughputError("空间不足：目标卷可用 \(available) 字节，测速至少需要 \(Int64(chunkBytes) * 2) 字节")
+            throw ThroughputError(KitLocalization.string(template: "空间不足：目标卷可用 %@ 字节，测速至少需要 %@ 字节",
+                                                        locale: locale,
+                                                        args: String(available), String(Int64(chunkBytes) * 2)))
         }
 
         let clock = ContinuousClock()
@@ -151,13 +160,15 @@ public enum ThroughputTester {
         // 临时测速文件建在卷根下，UUID 保证并发/重复运行不冲突
         let fileURL = volumeURL.appendingPathComponent(".cablescope-throughput-\(UUID().uuidString).tmp")
         guard FileManager.default.createFile(atPath: fileURL.path, contents: nil) else {
-            throw ThroughputError("无法在「\(volumeURL.path)」创建临时测速文件（卷可能为只读、路径不可写或不存在）")
+            throw ThroughputError(KitLocalization.string(template: "无法在「%@」创建临时测速文件（卷可能为只读、路径不可写或不存在）",
+                                                        locale: locale, args: volumeURL.path))
         }
         // O_RDWR 打开（forUpdating）：写阶段写入、读阶段用同一句柄回读——
         // forWritingTo 是 O_WRONLY 只写句柄，读阶段会直接 EBADF。
         guard let handle = try? FileHandle(forUpdating: fileURL) else {
             try? FileManager.default.removeItem(at: fileURL)
-            throw ThroughputError("无法打开临时测速文件用于读写：\(fileURL.path)")
+            throw ThroughputError(KitLocalization.string(template: "无法打开临时测速文件用于读写：%@",
+                                                        locale: locale, args: fileURL.path))
         }
         // finally 必删：无论正常结束、抛错还是取消，临时文件都不能残留在用户卷上
         defer {
@@ -183,7 +194,10 @@ public enum ThroughputTester {
             } catch {
                 // 卷写满（ENOSPC）是有界基准在小卷/接近满的卷上的正常终止方式：
                 // 已落盘的字节依然有效，按实际量计速，不让整个测速失败。
-                guard Self.isOutOfSpace(error) else { throw ThroughputError("写入失败：\(error)") }
+                guard Self.isOutOfSpace(error) else {
+                    throw ThroughputError(KitLocalization.string(template: "写入失败：%@",
+                                                                locale: locale, args: String(describing: error)))
+                }
                 break
             }
             bytesWritten += Int64(chunk.count)
@@ -207,7 +221,8 @@ public enum ThroughputTester {
                 }
             }
         } catch {
-            throw ThroughputError("读取失败：\(error)")
+            throw ThroughputError(KitLocalization.string(template: "读取失败：%@",
+                                                        locale: locale, args: String(describing: error)))
         }
         let readElapsed = durationSeconds(readStart.duration(to: clock.now))
 

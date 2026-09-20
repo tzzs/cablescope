@@ -78,7 +78,9 @@ extension USBDeviceSnapshot {
 }
 
 extension DisplaySnapshot {
-    var displayName: String { name ?? "显示器" }
+    /// 走 `displayLabel(locale:)` 而不是裸 `name`：内建屏的 `name` 来自系统、跟随
+    /// 系统语言，与 CLI 其余文案的语言可能对不上（详见该方法的注释）。
+    var displayName: String { displayLabel(locale: .current) ?? "显示器" }
 }
 
 extension PowerSnapshot {

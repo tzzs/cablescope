@@ -205,6 +205,7 @@ struct OverviewSectionView: View {
 
     // MARK: 显示器（整机级，v1 不按线归属）
 
+
     @ViewBuilder
     private var displayFooter: some View {
         let displays = viewModel.snapshot?.displays ?? []
@@ -221,7 +222,7 @@ struct OverviewSectionView: View {
                                 .foregroundStyle(.secondary)
                                 .frame(width: 18)
                             Group {
-                                if let name = display.name {
+                                if let name = display.displayLabel(locale: locale) {
                                     Text(name)
                                 } else {
                                     Text("显示器")

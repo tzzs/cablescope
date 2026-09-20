@@ -25,6 +25,11 @@ jobs:
       - name: Check layering (no direct system access outside CableKit)
         run: ./scripts/check_layering.sh
 
+      - name: Check localization (every Chinese string has an English translation)
+        # 漏翻不会让任何一步失败——查表落空一律安全回退成中文 key，英文界面因此会零星
+        # 混着中文而全程绿灯。这一步就是那个缺失的报错点。
+        run: ./scripts/check_localization.py
+
       - name: Build (debug)
         run: swift build
 
