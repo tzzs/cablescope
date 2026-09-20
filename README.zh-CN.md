@@ -27,29 +27,34 @@ macOS 菜单栏工具：检测连接数据线（USB-C / 雷电）的**充电速�
 
 CableScope 提供**两个独立的产品**，可以只装其一，也可以都装。二者共用 `CableKit` 数据层，但分发渠道彼此独立，互不冲突。
 
-**菜单栏 App**
+**菜单栏 App —— 源码构建**
+
+```bash
+brew install tzzs/tap/cablescope-app
+```
+
+在你的机器上编译出 `CableScope.app`。需要 Xcode 15+ 工具链，但**不需要任何代码签名**：本机构建的 app 不带 quarantine 属性，Gatekeeper 的首次启动检查不会被触发。`brew info` 会打印一行 `ln -s` 命令，软链到 `/Applications` 即可在访达与启动台中看到它。
+
+**菜单栏 App —— 预编译、已公证**
 
 ```bash
 brew install --cask tzzs/tap/cablescope
 ```
 
-从 [最新 GitHub Release](https://github.com/tzzs/cablescope/releases) 的已公证（notarized）DMG 安装 `CableScope.app` 到 `/Applications`，在访达与启动台中显示为 **CableScope**。
+从 [最新 Release](https://github.com/tzzs/cablescope/releases) 的已公证 DMG 秒装到 `/Applications`，无需工具链、无需编译。
 
-> cask 只有在存在已公证构建时才会发布。在那之前请改用下面的 CLI，或直接从 Release 页面下载 DMG，首次打开时在「系统设置 → 隐私与安全性」中放行。
+> cask 只有在存在已公证构建时才会发布，在那之前请用上面的 formula。cask 安装必定会打上 quarantine 属性且 Homebrew 不提供关闭开关 —— 未公证的 cask 装出来的 app macOS 会拒绝打开，因此宁可暂不发布，也不发一个装了打不开的版本。
 
 **命令行工具**
 
 ```bash
 brew install tzzs/tap/cablescope-cli
-```
-
-在你的机器上从源码编译，安装 `cablescope` 命令。编译期需要 Xcode 15+ 工具链，但**不需要任何代码签名** —— 因此不受 App 签名状态影响，随时可用。
-
-```bash
 cablescope pretty
 ```
 
-[tzzs/homebrew-tap](https://github.com/tzzs/homebrew-tap) 中的 cask 与 formula 都会在每次发版时自动更新，无需手动维护。
+同样从源码构建，同样不需要签名。
+
+每个版本的 DMG 都挂在对应的 GitHub Release 上，可直接下载 —— 在尚未公证期间，首次打开请在「系统设置 → 隐私与安全性」中放行。[tzzs/homebrew-tap](https://github.com/tzzs/homebrew-tap) 中的内容都会在每次发版时自动更新，无需手动维护。
 
 ## 快速开始
 

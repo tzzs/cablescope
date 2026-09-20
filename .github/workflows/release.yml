@@ -201,25 +201,30 @@ jobs:
             "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/tzzs/homebrew-tap.git" \
             /tmp/homebrew-tap
 
-          # --- formula（CLI）---
-          # 哈希取 GitHub 按 tag 自动生成的源码 tarball，与签名/公证无关。
-          # formula 不写 version stanza：Homebrew 从 tag URL 自行推导版本号。
-          #
-          # 模板是随源码一起检出的，补发旧 tag 时可能还不存在（formula 是后加的）。
-          if [[ -f Packaging/homebrew/cablescope-cli.rb ]]; then
-            TARBALL_URL="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${TAG}.tar.gz"
-            curl -fsSL "$TARBALL_URL" -o /tmp/cablescope-src.tar.gz
-            SRC_SHA256="$(shasum -a 256 /tmp/cablescope-src.tar.gz | awk '{print $1}')"
-
+          # --- formula（CLI 与 App）---
+          # 两个 formula 共用同一份源码 tarball 的哈希，与签名/公证无关（本机编译的
+          # 产物不带 quarantine，ad-hoc 签名即可）。都不写 version stanza：
+          # Homebrew 从 tag URL 自行推导版本号。
+          TARBALL_URL="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${TAG}.tar.gz"
+          SRC_SHA256=""
+          for NAME in cablescope-cli cablescope-app; do
+            # 模板是随源码一起检出的，补发旧 tag 时可能还不存在（formula 是后加的）。
+            if [[ ! -f "Packaging/homebrew/${NAME}.rb" ]]; then
+              echo "::notice::${TAG} 的源码中没有 ${NAME} 模板，跳过该 formula。"
+              continue
+            fi
+            # 第一个用到时才下载，且只下一次
+            if [[ -z "$SRC_SHA256" ]]; then
+              curl -fsSL "$TARBALL_URL" -o /tmp/cablescope-src.tar.gz
+              SRC_SHA256="$(shasum -a 256 /tmp/cablescope-src.tar.gz | awk '{print $1}')"
+            fi
             mkdir -p /tmp/homebrew-tap/Formula
-            FORMULA=/tmp/homebrew-tap/Formula/cablescope-cli.rb
-            cp Packaging/homebrew/cablescope-cli.rb "$FORMULA"
-            sed -i '' "s|^  url \".*\"|  url \"${TARBALL_URL}\"|" "$FORMULA"
-            sed -i '' "s|^  sha256 \".*\"|  sha256 \"${SRC_SHA256}\"|" "$FORMULA"
-            echo "formula 已更新到 ${TAG}（源码 sha256=${SRC_SHA256}）"
-          else
-            echo "::notice::${TAG} 的源码中没有 formula 模板，跳过 formula 同步。"
-          fi
+            DEST="/tmp/homebrew-tap/Formula/${NAME}.rb"
+            cp "Packaging/homebrew/${NAME}.rb" "$DEST"
+            sed -i '' "s|^  url \".*\"|  url \"${TARBALL_URL}\"|" "$DEST"
+            sed -i '' "s|^  sha256 \".*\"|  sha256 \"${SRC_SHA256}\"|" "$DEST"
+            echo "formula ${NAME} 已更新到 ${TAG}（源码 sha256=${SRC_SHA256}）"
+          done
 
           # --- cask（App）---
           if [[ "${NOTARIZED:-false}" == "true" ]]; then

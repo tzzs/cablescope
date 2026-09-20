@@ -144,16 +144,22 @@ Two independent GitHub Actions workflows cover the release path:
 
 ## Homebrew distribution
 
-CableScope ships as **two independent packages**, because the app and the CLI have different trust models — a cask distributes a pre-built binary (Gatekeeper applies quarantine, so it must be notarized), while a formula builds from source on the user's machine (no signing involved at all).
+CableScope ships **three Homebrew packages** — two for the app, one for the CLI — because the two install mechanisms have different trust models.
 
-| | `Casks/cablescope.rb` | `Formula/cablescope-cli.rb` |
-| --- | --- | --- |
-| Product | `CableScope.app` → `/Applications` | `cablescope` command → `bin` |
-| Source | notarized DMG from the GitHub Release | source tarball of the tag, built locally |
-| Needs Apple Developer secrets | **yes** | no |
-| Synced by `release.yml` | only when notarization succeeded | always |
+| | `Casks/cablescope.rb` | `Formula/cablescope-app.rb` | `Formula/cablescope-cli.rb` |
+| --- | --- | --- | --- |
+| Product | `CableScope.app` | `CableScope.app` | `cablescope` command |
+| Lands in | `/Applications` | the keg (user symlinks it) | `bin`, on `PATH` |
+| Source | notarized DMG from the Release | source tarball, built locally | source tarball, built locally |
+| Needs Apple Developer secrets | **yes** | no | no |
+| Needs an Xcode toolchain | no | **yes** | **yes** |
+| Synced by `release.yml` | only when notarization succeeded | always | always |
 
-Templates live in `Packaging/homebrew/`; `release.yml` copies them into `tzzs/homebrew-tap`, substituting the version/URL and hashes. **Three names are deliberately different and none of them should be "unified":** package token `cablescope-cli` (must not collide with the cask's `cablescope` token inside one tap — Homebrew only gives core-tap formulae the "formula wins" shortcut, third-party taps stay ambiguous), command name `cablescope` (short to type), SwiftPM target `CableScopeCLI` (a source-level identifier that should never appear in a user's install command).
+**Why the app has both a cask and a formula, and why that is not redundant:** Homebrew's cask subsystem *deliberately* applies `com.apple.quarantine` to what it installs and exposes no way to opt out (there is no `--no-quarantine` flag and no config key in current Homebrew), so an unnotarized cask installs an app macOS refuses to open. A formula builds on the user's machine, and a locally built bundle **carries no quarantine attribute at all**, so Gatekeeper's first-launch check never runs and `bundle_app.sh`'s ad-hoc signature is enough. Verified empirically: a freshly built `CableScope.app` has no `com.apple.quarantine` xattr and launches normally, even though `spctl -a` reports `rejected` — that assessment only governs quarantined files. The trade-off is the formula's, not the cask's: Homebrew only writes inside its own prefix, so a formula cannot put the app in `/Applications`; `caveats` prints the `ln -s` the user runs.
+
+`cablescope-app` drives `scripts/bundle_app.sh` rather than reimplementing the bundling. The script takes `APP_VERSION` and `SWIFT_BUILD_FLAGS` from the environment; the formula passes `--disable-sandbox` through the latter because SwiftPM's own build sandbox conflicts with Homebrew's.
+
+Templates live in `Packaging/homebrew/`; `release.yml` copies them into `tzzs/homebrew-tap`, substituting the version/URL and hashes. Both formulae share one source-tarball hash, downloaded at most once per run. **Three names are deliberately different and none of them should be "unified":** package token `cablescope-cli` (must not collide with the cask's `cablescope` token inside one tap — Homebrew only gives core-tap formulae the "formula wins" shortcut, third-party taps stay ambiguous), command name `cablescope` (short to type), SwiftPM target `CableScopeCLI` (a source-level identifier that should never appear in a user's install command).
 
 **The formula must install the executable and `CableScope_CableKit.bundle` into the same directory (`libexec`), never `bin` directly.** CableKit's resources (`usb-vendors.json`, the English `.strings`) live in that separate bundle, and when the binary is invoked through Homebrew's symlink in `bin`, `Bundle.main` does *not* resolve the symlink — it reports `bin/`. Of `CableKitResourceBundle.probe()`'s four candidates, only #2 (`Bundle(for:).resourceURL`, which goes through the dyld image path and *does* resolve) lands on `libexec/`. Verified empirically:
 
