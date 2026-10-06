@@ -65,7 +65,6 @@ public enum ThroughputTester {
         .volumeNameKey, .volumeIsRemovableKey, .volumeIsInternalKey, .volumeIsReadOnlyKey
     ]
     private static let volumeNameKeys: Set<URLResourceKey> = [.volumeNameKey]
-    private static let volumeCapacityKeys: Set<URLResourceKey> = [.volumeAvailableCapacityForImportantUsageKey]
 
     /// 列出可测速的候选卷：只保留挂在 /Volumes/ 下的可移动（U 盘/读卡器）或
     /// 外部（移动硬盘/雷雳盘/网络/镜像）卷。
@@ -146,8 +145,7 @@ public enum ThroughputTester {
 
         // 空间预检：至少容纳 2 个块（写入文件 + 文件系统元数据余量）。
         // 取不到容量信息（非卷路径等）时跳过该检查，交给写阶段自然报错。
-        if let capacity = try? volumeURL.resourceValues(forKeys: volumeCapacityKeys),
-           let available = capacity.volumeAvailableCapacityForImportantUsage,
+        if let available = availableCapacity(at: volumeURL),
            available < Int64(chunkBytes) * 2 {
             throw ThroughputError(KitLocalization.string(template: "空间不足：目标卷可用 %@ 字节，测速至少需要 %@ 字节",
                                                         locale: locale,
@@ -237,6 +235,31 @@ public enum ThroughputTester {
             bytesRead: bytesRead,
             elapsedSeconds: durationSeconds(totalStart.duration(to: clock.now))
         )
+    }
+
+    // MARK: - 容量预检（internal，查询可注入以覆盖不同文件系统的返回值）
+
+    /// 临时测速只使用实际空闲空间，不依赖包含可回收空间的 important-usage 估算。
+    /// 真机 exFAT 卷上该估算可能返回 0，即使普通容量查询和文件系统都报告仍有空间。
+    /// 普通查询缺失、抛错或返回无效负值时才回退；合法的 0 必须保留，避免放行满盘。
+    static func availableCapacity(
+        at volumeURL: URL,
+        volumeCapacity: (URL) throws -> Int64? = { url in
+            let values = try url.resourceValues(forKeys: [.volumeAvailableCapacityKey])
+            return values.volumeAvailableCapacity.map { Int64($0) }
+        },
+        fileSystemCapacity: (URL) throws -> Int64? = { url in
+            let attributes = try FileManager.default.attributesOfFileSystem(forPath: url.path)
+            return (attributes[.systemFreeSize] as? NSNumber)?.int64Value
+        }
+    ) -> Int64? {
+        if let available = try? volumeCapacity(volumeURL), available >= 0 {
+            return available
+        }
+        guard let available = try? fileSystemCapacity(volumeURL), available >= 0 else {
+            return nil
+        }
+        return available
     }
 
     // MARK: - 纯计算（internal 便于单测）
