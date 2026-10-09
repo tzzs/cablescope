@@ -13,6 +13,7 @@ struct MainWindowView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.locale) private var locale
 
     var body: some View {
         ScrollView {
@@ -69,8 +70,14 @@ struct MainWindowView: View {
     /// 中文，就是踩了这个重载。时间戳先格式化成 `String` 再插值，key 即 "最近快照 %@"。
     private var subtitleText: LocalizedStringKey {
         if let timestamp = viewModel.snapshot?.timestamp {
-            return "最近快照 \(timestamp.formatted(date: .omitted, time: .standard))"
+            return "最近快照 \(Self.timeLabel(timestamp, locale: locale))"
         }
         return "等待首次快照…"
+    }
+
+    /// 快照时间（internal 便于单测）。显式带 `locale`，理由同
+    /// `SessionDetailSectionView.dateLabel`：`formatted()` 默认跟随系统而不是 App 语言。
+    static func timeLabel(_ date: Date, locale: Locale) -> String {
+        date.formatted(.dateTime.hour().minute().second().locale(locale))
     }
 }

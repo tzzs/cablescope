@@ -21,7 +21,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MODULES = ["CableKit", "CableScopeApp", "CableScopeWidget"]
 PLACEHOLDER = "\x00"
-CJK = re.compile(r"[一-鿿]")
+# 汉字之外还要匹配全角/中文标点（U+3000–303F、U+FF00–FFEF）：只含标点、不含汉字的
+# 字面量（如 `.joined(separator: "；")`）同样会把中文标点漏进英文界面，此前正是因为
+# 只匹配汉字而漏检。
+CJK = re.compile(r"[一-鿿\u3000-\u303f\uff00-\uffef]")
 FORMAT_SPECIFIER = re.compile(r"%(?:lld|llu|ld|lu|d|u|@|[0-9.]*f)")
 STRINGS_ENTRY = re.compile(r'"((?:[^"\\]|\\.)*)"\s*=')
 
