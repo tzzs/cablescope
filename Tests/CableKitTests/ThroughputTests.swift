@@ -37,6 +37,71 @@ final class ThroughputTests: XCTestCase {
         }
     }
 
+    // MARK: 容量预检
+
+    func testAvailableCapacityUsesReportedFreeSpace() {
+        // 真机 exFAT 样本：important-usage 为 0，普通查询与 systemFreeSize
+        // 均为 127_997_444_096。预检应使用普通空闲容量，而不是该估算。
+        let available = ThroughputTester.availableCapacity(
+            at: workDir,
+            volumeCapacity: { url in
+                XCTAssertEqual(url, self.workDir)
+                return 127_997_444_096
+            },
+            fileSystemCapacity: { _ in
+                XCTFail("普通查询有值时不应再次查询文件系统")
+                return nil
+            })
+        XCTAssertEqual(available, 127_997_444_096)
+    }
+
+    func testAvailableCapacityPreservesZeroAndInsufficientSpace() {
+        for capacity: Int64 in [0, 1, 8_388_607, 8_388_608] {
+            let available = ThroughputTester.availableCapacity(
+                at: workDir,
+                volumeCapacity: { _ in capacity },
+                fileSystemCapacity: { _ in
+                    XCTFail("合法的零或低容量不能被回退值覆盖")
+                    return 127_997_444_096
+                })
+            XCTAssertEqual(available, capacity)
+        }
+    }
+
+    func testAvailableCapacityFallsBackWhenVolumeValueIsUnavailable() {
+        for capacity: Int64? in [nil, -1] {
+            let available = ThroughputTester.availableCapacity(
+                at: workDir,
+                volumeCapacity: { _ in capacity },
+                fileSystemCapacity: { url in
+                    XCTAssertEqual(url, self.workDir)
+                    return 127_997_444_096
+                })
+            XCTAssertEqual(available, 127_997_444_096)
+        }
+    }
+
+    func testAvailableCapacityFallsBackWhenVolumeQueryThrows() {
+        let available = ThroughputTester.availableCapacity(
+            at: workDir,
+            volumeCapacity: { _ in throw CocoaError(.fileReadUnknown) },
+            fileSystemCapacity: { _ in 0 })
+        XCTAssertEqual(available, 0, "文件系统报告满盘时仍应阻止测速")
+    }
+
+    func testAvailableCapacityRemainsUnknownWhenBothQueriesFail() {
+        for capacity: Int64? in [nil, -1] {
+            XCTAssertNil(ThroughputTester.availableCapacity(
+                at: workDir,
+                volumeCapacity: { _ in nil },
+                fileSystemCapacity: { _ in capacity }))
+        }
+        XCTAssertNil(ThroughputTester.availableCapacity(
+            at: workDir,
+            volumeCapacity: { _ in throw CocoaError(.fileReadUnknown) },
+            fileSystemCapacity: { _ in throw CocoaError(.fileReadUnknown) }))
+    }
+
     // MARK: computeMBps 边界
 
     func testComputeMBpsBoundaries() throws {
