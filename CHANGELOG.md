@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/tzzs/cablescope/compare/v0.5.0...v0.5.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* **kit:** 修复 exFAT 卷测速误报空间不足 ([#18](https://github.com/tzzs/cablescope/issues/18)) ([87a9862](https://github.com/tzzs/cablescope/commit/87a9862fadd318ced21b9246d38666f904e9f732))
+
 ## [0.5.0](https://github.com/tzzs/cablescope/compare/v0.4.1...v0.5.0) (2026-09-20)
 
 
