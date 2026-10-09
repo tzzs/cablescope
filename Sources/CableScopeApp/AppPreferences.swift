@@ -106,6 +106,8 @@ enum AppPreferences {
         var defaults: [String: Any] = [
             notificationsEnabledKey: true,
             openMainWindowOnLaunchKey: true,
+            // 自动检查更新默认关：PRIVACY.md 承诺"不点就不联网"，打开它是用户的显式选择。
+            UpdateChecker.autoCheckKey: false,
             languageKey: Language.system.rawValue,
             themeKey: Theme.system.rawValue,
         ]

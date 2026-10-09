@@ -33,6 +33,11 @@ struct CableScopeApp: App {
         Task { @MainActor [weak viewModel] in
             viewModel?.start()
         }
+
+        // 自动检查更新（opt-in，开关关闭时循环里不会发出任何网络请求）。
+        Task { @MainActor in
+            await UpdateChecker.runAutomaticChecks()
+        }
     }
 
     var body: some Scene {

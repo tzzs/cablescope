@@ -157,3 +157,8 @@
 "无法更改登录项：%@" = "Couldn't change the login item: %@";
 "仅打包后的 CableScope.app 支持登录时启动" = "Launch at login is only available in the bundled CableScope.app";
 "%@ 已断开" = "%@ disconnected";
+"通过 Homebrew 安装，请在终端运行：\n%@" = "Installed with Homebrew — run this in Terminal:\n%@";
+"拷贝命令" = "Copy Command";
+"更新" = "Updates";
+"自动检查更新" = "Check for Updates Automatically";
+"每天最多一次向 api.github.com 查询最新版本号，不发送任何设备信息。" = "Queries api.github.com for the latest version number at most once a day. No device information is sent.";

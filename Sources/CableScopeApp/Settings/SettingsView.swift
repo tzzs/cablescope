@@ -1,7 +1,7 @@
 import SwiftUI
 import UserNotifications
 
-/// 设置页：通用（启动 / 外观 / 语言）+ 通知两个 tab。
+/// 设置页：通用（启动 / 外观 / 语言 / 更新）+ 通知两个 tab。
 ///
 /// 此前通用 / 外观 / 语言各占一个 tab、每个 tab 只有一个控件，用户要点三次才能看完
 /// 本该一眼扫完的东西；合并成一个分组 Form，通知（行数多、还有系统授权状态）单独一个 tab。
@@ -40,6 +40,7 @@ private struct GeneralSettingsTab: View {
     @AppStorage(AppPreferences.openMainWindowOnLaunchKey) private var openMainWindowOnLaunch = true
     @AppStorage(AppPreferences.themeKey) private var theme: AppPreferences.Theme = .system
     @AppStorage(AppPreferences.languageKey) private var language: AppPreferences.Language = .system
+    @AppStorage(UpdateChecker.autoCheckKey) private var autoCheckForUpdates = false
 
     /// 登录项状态以系统为准（见 `LaunchAtLogin`），出现时 / App 重新激活时重新读取。
     @State private var launchState: LaunchAtLogin.State = LaunchAtLogin.state
@@ -101,9 +102,18 @@ private struct GeneralSettingsTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section {
+                Toggle("自动检查更新", isOn: $autoCheckForUpdates)
+            } header: {
+                Text("更新")
+            } footer: {
+                Text("每天最多一次向 api.github.com 查询最新版本号，不发送任何设备信息。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
-        .frame(width: settingsWidth, height: hasLaunchNote ? 450 : 410)
+        .frame(width: settingsWidth, height: hasLaunchNote ? 560 : 520)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             launchState = LaunchAtLogin.state
         }
