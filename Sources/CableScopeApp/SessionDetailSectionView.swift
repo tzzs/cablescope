@@ -175,14 +175,13 @@ struct SessionDetailSectionView: View {
                 .foregroundStyle(.tertiary)
             FlowLayout(spacing: 5) {
                 if let orientation = port.plugOrientation {
-                    if orientation == 1 {
-                        InfoChip(text: "正向插入", systemImage: "arrow.triangle.swap", color: .gray)
-                    } else {
-                        InfoChip(text: "反向插入", systemImage: "arrow.triangle.swap", color: .gray)
-                    }
+                    // 中性的 A/B 而不是"正向/反向插入"：USB-C 正反都能插，"反向"读起来像插错了。
+                    InfoChip(text: orientation == 1 ? "插头方向 A" : "插头方向 B",
+                             systemImage: "arrow.triangle.swap", color: .gray)
+                        .help("USB-C 正反都能插，这里只是端口上报的物理朝向，不影响充电或传输")
                 }
                 if let count = port.connectionCount {
-                    InfoChip(text: "累计连接 \(count) 次", color: .gray)
+                    InfoChip(verbatim: AppLocalization.format("累计连接 %lld 次", locale: locale, count), color: .gray)
                 }
             }
         }
@@ -381,7 +380,7 @@ struct SessionDetailSectionView: View {
                     Text("端口评级")
                         .font(.subheadline.weight(.medium))
                     Spacer(minLength: 8)
-                    Text("基于 \(rating.sampleCount) 次协商观测")
+                    Text(AppLocalization.format("基于 %lld 次协商观测", locale: locale, rating.sampleCount))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()

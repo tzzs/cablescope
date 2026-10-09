@@ -2,7 +2,7 @@
 
 ![Swift 5.10+](https://img.shields.io/badge/Swift-5.10%2B-orange) ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-lightgrey) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow) [![CI](https://github.com/tzzs/cablescope/actions/workflows/ci.yml/badge.svg)](https://github.com/tzzs/cablescope/actions/workflows/ci.yml)
 
-macOS 菜单栏工具：检测连接数据线（USB-C / 雷电）的**充电速度、传输速度、视频能力**与**线缆评级**。
+macOS 菜单栏工具：检测连接数据线（USB-C / 雷雳）的**充电速度、传输速度、视频能力**与**线缆评级**。
 
 > For the English version, see [README.md](README.md)。
 
@@ -13,7 +13,7 @@ macOS 菜单栏工具：检测连接数据线（USB-C / 雷电）的**充电速�
 | 维度 | 内容 |
 | --- | --- |
 | ⚡ 充电 | 瞬时功率（W）、电压/电流、PD 合同（与瞬时功率分开显示）、PD 档位表（直读，当前协商档标出）、充电瓶颈归因、电量、实时功率曲线（App） |
-| 🔌 传输 | USB 协商速率（USB 2.0 / 3.x / USB4 / 雷电）、设备列表 |
+| 🔌 传输 | USB 协商速率（USB 2.0 / 3.x / USB4 / 雷雳）、设备列表 |
 | 🖥 视频 | 显示器列表、分辨率/刷新率、DP 链路速率；外接显示器可精确归属到具体线缆卡片（DisplayPort 传输节点直读端口归属 + EDID 身份匹配） |
 | 🎛 端口控制器 | Apple Silicon 直读 USB-C 端口控制器（AppleHPM / AppleTC）：端口状态、插拔方向、支持的传输能力（CC / USB2 / USB3 / USB4 / DisplayPort）；Intel/老机型自动降级为推断模式 |
 | 🧬 e-marker | 直读线缆 e-marker 芯片（SOP' Discover Identity）：线缆速度档、3A / 5A 电流评级、厂商 ID + 产品类型 |
@@ -21,7 +21,7 @@ macOS 菜单栏工具：检测连接数据线（USB-C / 雷电）的**充电速�
 | 🧵 多线缆 | 设备按物理端口聚合为线缆会话（USB 根端口分组 + 雷雳 receptacle 编号）：主窗口每线一张卡片 + 可切换的详情区，菜单栏每线一行，CLI 输出按端口分组 |
 | 🧩 Widget | 桌面小组件（功率/电量、各端口头条）；跟随 App 的语言与主题设置 |
 | 🔔 通知 | 插拔系统通知（UNUserNotificationCenter）；未打包运行（无 bundle）时静默禁用 |
-| 🔬 IOKit 检查器 | 任意 IOKit 类的 IORegistry **全量原始属性**（USB 设备、电池、显示器连接、雷电端口…）：App 专属窗口 + CLI 子命令；快照 JSON 亦携带各设备 `rawProperties` |
+| 🔬 IOKit 检查器 | 任意 IOKit 类的 IORegistry **全量原始属性**（USB 设备、电池、显示器连接、雷雳端口…）：App 专属窗口 + CLI 子命令；快照 JSON 亦携带各设备 `rawProperties` |
 
 ## 安装
 
@@ -125,11 +125,11 @@ scripts/check_layering.sh # 分层规则检查（CableKit 之外禁止直接碰 
 - **USB**：IOKit `IOUSBHostDevice`（协商速率、LocationID、VID/PID）
 - **充电**：IORegistry `AppleSmartBattery`（瞬时功率 = `AdapterDetails.AdapterVoltage` × 顶层 `Amperage`；PD 合同 = `AdapterDetails` 合同值）+ IOKit.ps 备用电量
 - **显示器**：CoreGraphics（分辨率/刷新率）+ `NSScreen.localizedName`（macOS 26 移除了 CGDisplayProductName）
-- **雷电**：`system_profiler SPThunderboltDataType -json` 递归展平
+- **雷雳**：`system_profiler SPThunderboltDataType -json` 递归展平
 
 ## 开发状态
 
-- [x] CableKit 适配层（USB/电源/显示器/雷电 + 快照流 + 评级引擎）— 253/253 测试通过（含 CLI 与 App 测试 target）
+- [x] CableKit 适配层（USB/电源/显示器/雷雳 + 快照流 + 评级引擎）— 253/253 测试通过（含 CLI 与 App 测试 target）
 - [x] CLI 六个子命令（真机验证：PD 合同识别、e-marker 推断、评级持久化）
 - [x] macOS 菜单栏 App（整机概览、每线一卡 + 线缆详情、实时功率曲线、端口评级）
 - [x] IOKit 属性检查器（App 专属窗口 + CLI `properties` 子命令；快照携带全量 `rawProperties`）
@@ -146,7 +146,7 @@ scripts/check_layering.sh # 分层规则检查（CableKit 之外禁止直接碰 
 - 充电功率在多线时**无法归属到具体某根线**（macOS 只暴露当前活跃适配器；多根线同时插着时，除非恰好只有一个端口在协商合同，否则分不清是哪根线在收电）：这种情况下固定挂在整机概览；仅接一根线时充电状态自动提升到该线卡片。
 - 外接显示器**已可**归属到具体某根线：`IOPortTransportStateDisplayPort` 传输节点自己上报归属的 USB-C/MagSafe 端口（`DisplayPortTransportService` + `PortGrouping.displayPortLinks`），再按 EDID 身份匹配到具体的 `CGDirectDisplayID`（`PortGrouping.matchedDisplay`）取到分辨率/刷新率。EDID 匹配不唯一时（如坞站带两台同型号显示器）只展示链路自身已知的厂商/型号信息，不猜分辨率。
 - 端口名暂为技术格式（"USB 端口 0x014" / "雷雳端口 2"），左/右物理方位需要更深层的 registry 端口拓扑工作（v2）。
-- 内置显示器无 DP link rate 字段，`DisplaySnapshot.linkRateLabel`（system_profiler 尽力而为解析）需接外接 DP/雷电显示器才会生效；线缆卡片上的 DisplayPort 链路速率（`DisplayPortLinkSnapshot.linkRateDescription`）来自专门的传输节点，链路存在时恒可靠有值。
+- 内置显示器无 DP link rate 字段，`DisplaySnapshot.linkRateLabel`（system_profiler 尽力而为解析）需接外接 DP/雷雳显示器才会生效；线缆卡片上的 DisplayPort 链路速率（`DisplayPortLinkSnapshot.linkRateDescription`）来自专门的传输节点，链路存在时恒可靠有值。
 - `watch`/快照流为事件驱动唤醒（AppleSmartBattery 兴趣通知 + USB 匹配通知）+ 兜底轮询的内容变化检测。
 - 两处 `system_profiler` 读取（显示器信息、雷雳拓扑）带缓存，以保证常驻菜单栏的开销足够低（实测 `watch` 每 20 秒的 CPU 从 3.15s 降到 0.40s）。显示器变化会立即失效缓存（缓存 key 就是在线显示器 ID 集合），但新接入的**雷雳设备**最多需要 5 秒才会出现——雷雳没有同等便宜的变化探针。
 - `.app` 打包脚本适用于本地使用；App Store/公证分发建议后续迁移 Xcode 工程。

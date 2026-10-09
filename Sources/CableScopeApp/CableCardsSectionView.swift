@@ -96,7 +96,7 @@ struct CableCardView: View {
                     if let power {
                         if power.isCharging, let watts = power.watts, watts > 0 {
                             InfoChip(
-                                Text("⚡ ") + Text(watts, format: .number.precision(.fractionLength(1))) + Text("W 充电中"),
+                                Text("\(watts, format: .number.precision(.fractionLength(1)))W 充电中"),
                                 systemImage: "bolt.fill",
                                 color: .orange,
                                 isProminent: true
@@ -163,13 +163,16 @@ struct CableCardView: View {
         .onHover { isHovering = $0 }
     }
 
-    private var deviceSummary: LocalizedStringKey {
+    /// 设备数带复数（英文 "1 device" / "3 devices"），走 `AppLocalization.format` 按
+    /// 当前 `\.locale` 选复数分支，见该函数的注释。
+    private var deviceSummary: String {
         guard session.deviceCount > 0 else {
-            return port?.powerSource?.winning != nil ? "纯充电连接 · 无数据设备" : "端口无设备"
+            return AppLocalization.string(port?.powerSource?.winning != nil ? "纯充电连接 · 无数据设备" : "端口无设备",
+                                          locale: locale)
         }
         switch session.kind {
-        case .usb: return "\(session.usbDevices.count) 台 USB 设备"
-        case .thunderbolt: return "\(session.thunderboltDevices.count) 台雷雳设备"
+        case .usb: return AppLocalization.format("%lld 台 USB 设备", locale: locale, session.usbDevices.count)
+        case .thunderbolt: return AppLocalization.format("%lld 台雷雳设备", locale: locale, session.thunderboltDevices.count)
         }
     }
 

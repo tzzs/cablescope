@@ -115,7 +115,7 @@ enum SnapshotDiff {
         parts.append("⚡ " + (snapshot.power?.shortSummary ?? "暂无数据"))
         parts.append("USB ×\(snapshot.usbDevices.count)")
         parts.append("显示器 ×\(snapshot.displays.count)")
-        parts.append("雷电 ×\(snapshot.thunderboltDevices.count)")
+        parts.append("雷雳 ×\(snapshot.thunderboltDevices.count)")
         if !snapshot.ports.isEmpty {
             parts.append("端口 ×\(snapshot.ports.count)")
         }
@@ -232,8 +232,8 @@ enum SnapshotDiff {
         if oldIDs == newIDs { return }
         let added = new.filter { !oldIDs.contains($0.id) }.map(\.name)
         let removed = old.filter { !newIDs.contains($0.id) }.map(\.name)
-        if !added.isEmpty { out.append("雷电接入：" + added.joined(separator: "、")) }
-        if !removed.isEmpty { out.append("雷电断开：" + removed.joined(separator: "、")) }
+        if !added.isEmpty { out.append("雷雳接入：" + added.joined(separator: "、")) }
+        if !removed.isEmpty { out.append("雷雳断开：" + removed.joined(separator: "、")) }
     }
 
     private static func contractText(_ contract: PDContract) -> String {

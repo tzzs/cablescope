@@ -58,7 +58,7 @@
 "被动线缆" = "Passive cable";
 "读写块大小必须大于 0 字节（当前 %@）" = "Chunk size must be greater than 0 bytes (currently %@)";
 "读取失败：%@" = "Read failed: %@";
-"雷电端口" = "Thunderbolt Port";
+"雷雳端口" = "Thunderbolt Port";
 "雷雳 3" = "Thunderbolt 3";
 "雷雳 4 / USB4" = "Thunderbolt 4 / USB4";
 "雷雳 5" = "Thunderbolt 5";

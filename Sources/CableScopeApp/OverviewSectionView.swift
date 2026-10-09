@@ -54,14 +54,10 @@ struct OverviewSectionView: View {
             }
 
             if let voltageMV = power.adapterVoltageMV, let amperageMA = power.adapterAmperageMA {
-                // 固定文案片段和数值分开：数值走 FormatStyle 插值，不经过字符串目录查表
-                // （Swift 给 FormatStyle 插值生成的 key 格式没有把握，不敢手写对应译文，
-                // 之前直接整句插值导致这行文字永远显示中文，语言切换对它没有效果）。
-                (Text("系统输入 · ")
-                    + Text(Double(voltageMV) / 1000, format: .number.precision(.fractionLength(1)))
-                    + Text("V / ")
-                    + Text(Double(amperageMA) / 1000, format: .number.precision(.fractionLength(2)))
-                    + Text("A"))
+                // 整句一个 key：FormatStyle 插值在 LocalizedStringKey 里生成的就是 %@，key 即
+                // "系统输入 · %@V / %@A"。此前拆成 Text + Text 片段拼接，译文只能逐段对应、
+                // 语序锁死；更早的整句插值失效，是因为当时插的是预先格式化好的 String 变量。
+                Text("系统输入 · \(Double(voltageMV) / 1000, format: .number.precision(.fractionLength(1)))V / \(Double(amperageMA) / 1000, format: .number.precision(.fractionLength(2)))A")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
@@ -155,7 +151,7 @@ struct OverviewSectionView: View {
             }
             if let cycleCount = power.cycleCount {
                 kvRow(icon: "arrow.triangle.2.circlepath", title: "电池循环") {
-                    Text("\(cycleCount) 次")
+                    Text(AppLocalization.format("%lld 次", locale: locale, cycleCount))
                         .font(.callout.weight(.semibold))
                         .monospacedDigit()
                 }
@@ -293,7 +289,8 @@ struct OverviewSectionView: View {
                     .foregroundStyle(.orange)
                     .frame(width: 18)
                 FlowLayout(spacing: 5) {
-                    InfoChip(text: "整机评级 · \(rating.sampleCount) 次观测", color: .gray)
+                    InfoChip(verbatim: AppLocalization.format("整机评级 · %lld 次观测", locale: locale, rating.sampleCount),
+                             color: .gray)
                     InfoChip(
                         verbatim: rating.summary(locale: locale),
                         color: rating.is5ACable ? .orange : .blue,

@@ -54,12 +54,9 @@ struct ThroughputSectionView: View {
                         InfoChip(text: "读取 \(Self.speedText(result.readMBps, locale: locale))",
                                  systemImage: "square.and.arrow.down", color: .green)
                     }
-                    // 固定文案片段和数值分开：elapsedSeconds 走 FormatStyle 插值，
-                    // 不经过字符串目录查表（原因同 OverviewSectionView 的系统输入行）。
-                    (Text(result.volumeName) + Text(" · 写出 ") + Text(Self.mbText(result.bytesWritten))
-                        + Text(" · 读出 ") + Text(Self.mbText(result.bytesRead)) + Text(" · 共 ")
-                        + Text(result.elapsedSeconds, format: .number.precision(.fractionLength(1)))
-                        + Text(" 秒"))
+                    // 整句一个 key（原因同 OverviewSectionView 的系统输入行）；用词与上方
+                    // chips 统一为"写入/读取"，此前同一块里混用了"写出/读出"。
+                    Text("\(result.volumeName) · 已写入 \(Self.mbText(result.bytesWritten)) · 已读取 \(Self.mbText(result.bytesRead)) · 耗时 \(result.elapsedSeconds, format: .number.precision(.fractionLength(1))) 秒")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }

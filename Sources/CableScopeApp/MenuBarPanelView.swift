@@ -68,9 +68,7 @@ struct MenuBarPanelView: View {
                     Text("已接通电源")
                         .font(.title3.weight(.medium))
                     if let contract = viewModel.snapshot?.power?.pdContract {
-                        (Text("PD 合同 ")
-                            + Text(contract.watts, format: .number.precision(.fractionLength(0)))
-                            + Text("W · 暂未充电"))
+                        Text("PD 合同 \(contract.watts, format: .number.precision(.fractionLength(0)))W · 暂未充电")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
@@ -222,7 +220,7 @@ struct MenuBarPanelView: View {
                     if let speed = session.topUSBSpeed {
                         SpeedBadge(speed: speed)
                     } else if session.deviceCount > 0 {
-                        Text("\(session.deviceCount) 台设备")
+                        Text(AppLocalization.format("%lld 台设备", locale: locale, session.deviceCount))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {

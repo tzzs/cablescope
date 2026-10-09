@@ -14,6 +14,7 @@
 - 真正不该进译文表的中文（如 `name.contains("键盘")` 这种匹配用字面量）写进
   `scripts/localization_allowlist.txt`，一行一条，`#` 开头为注释。
 """
+import plistlib
 import re
 import sys
 from pathlib import Path
@@ -98,14 +99,20 @@ def load_allowlist():
 
 
 def load_translated_keys(module):
-    path = ROOT / "Sources" / module / "Resources" / "en.lproj" / "Localizable.strings"
+    """`.strings` 的 key 加上同目录 `.stringsdict`（复数规则）的顶层 key。"""
+    lproj = ROOT / "Sources" / module / "Resources" / "en.lproj"
+    path = lproj / "Localizable.strings"
     if not path.exists():
         return None
-    return {
+    keys = {
         normalize_key(m.group(1))
         for line in path.read_text(encoding="utf-8").splitlines()
         if line.startswith('"') and (m := STRINGS_ENTRY.match(line))
     }
+    plurals = lproj / "Localizable.stringsdict"
+    if plurals.exists():
+        keys |= {normalize_key(key) for key in plistlib.loads(plurals.read_bytes())}
+    return keys
 
 
 def scan_module(module, allowlist):
