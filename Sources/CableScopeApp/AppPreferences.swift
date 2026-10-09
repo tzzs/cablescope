@@ -17,6 +17,27 @@ enum AppPreferences {
         UserDefaults.standard.bool(forKey: showDockIconKey)
     }
 
+    // MARK: 启动时打开主窗口
+
+    static let openMainWindowOnLaunchKey = "openMainWindowOnLaunch"
+    static let hasLaunchedBeforeKey = "hasLaunchedBefore"
+
+    /// 启动时是否拉起主窗口。首次启动无条件打开（新用户得先看到这个 App 在干什么，
+    /// 菜单栏小图标很容易被忽略）；之后按用户偏好。偏好默认开，保持此前"每次启动都
+    /// 打开主窗口"的行为不变——开了"登录时启动"、不想每次开机弹窗的用户自己关掉即可。
+    static func shouldOpenMainWindowOnLaunch(isFirstLaunch: Bool, preference: Bool) -> Bool {
+        isFirstLaunch || preference
+    }
+
+    /// 读出本次启动的决定，并把"已启动过"记下来。每次进程启动只应调用一次
+    /// （`CableScopeApp.init`），第二次调用时首次启动标记已被消费。
+    static func consumeLaunchDecision(_ defaults: UserDefaults = .standard) -> Bool {
+        let isFirstLaunch = !defaults.bool(forKey: hasLaunchedBeforeKey)
+        defaults.set(true, forKey: hasLaunchedBeforeKey)
+        return shouldOpenMainWindowOnLaunch(isFirstLaunch: isFirstLaunch,
+                                            preference: defaults.bool(forKey: openMainWindowOnLaunchKey))
+    }
+
     // MARK: 语言
 
     enum Language: String, CaseIterable, Identifiable {
@@ -84,6 +105,7 @@ enum AppPreferences {
     static var registrationDefaults: [String: Any] {
         var defaults: [String: Any] = [
             notificationsEnabledKey: true,
+            openMainWindowOnLaunchKey: true,
             languageKey: Language.system.rawValue,
             themeKey: Theme.system.rawValue,
         ]

@@ -150,3 +150,10 @@
 "雷雳设备" = "Thunderbolt Devices";
 "首次确认支持 5A" = "5A support confirmed for the first time";
 "首次观测 %@ · 历史峰值，拔线不清零" = "First seen %@ · historical peak, never reset on unplug";
+"启动" = "Startup";
+"登录时启动" = "Launch at Login";
+"启动时打开主窗口" = "Open Main Window at Launch";
+"需要在系统设置的「登录项」中允许 CableScope" = "Allow CableScope under Login Items in System Settings";
+"打开登录项设置" = "Open Login Items Settings";
+"无法更改登录项：%@" = "Couldn't change the login item: %@";
+"仅打包后的 CableScope.app 支持登录时启动" = "Launch at login is only available in the bundled CableScope.app";

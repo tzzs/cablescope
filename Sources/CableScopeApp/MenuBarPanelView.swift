@@ -23,7 +23,7 @@ struct MenuBarLabelView: View {
     }
 }
 
-/// 菜单栏弹出面板（.window 样式）：功率大字、电量、线缆列表（多线每线一行）、打开主窗口、检查更新、退出。
+/// 菜单栏弹出面板（.window 样式）：功率大字、电量、线缆列表（多线每线一行）、打开主窗口、检查更新、设置、退出。
 struct MenuBarPanelView: View {
     @ObservedObject var viewModel: MonitorViewModel
     @Environment(\.openWindow) private var openWindow
@@ -34,10 +34,6 @@ struct MenuBarPanelView: View {
     // 检查更新：请求进行中防重复点击；结果显示为按钮下方的一行小字，几秒后自动清除
     @State private var isCheckingForUpdate = false
     @State private var updateStatusMessage: String?
-
-    // "在 Dock 显示图标"：默认关闭（纯菜单栏工具形态）。开启时切到 .regular 策略，
-    // Dock 出现图标 + 可从 Cmd-Tab / App Switcher 切换；关闭时切回 .accessory。
-    @AppStorage(AppPreferences.showDockIconKey) private var showDockIcon = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -111,8 +107,8 @@ struct MenuBarPanelView: View {
 
             // 菜单项本身贴着排（spacing 0）——每行的高度和呼吸感全靠 MenuRowButton 自己的
             // .padding(.vertical) 撑出来，贴近原生 NSMenu 里相邻菜单项紧挨在一起、行高本身
-            // 就是间距的样子，而不是额外在行与行之间再加一段空隙。"在 Dock 显示图标"也统一
-            // 用 MenuRowButton（选中时行尾 checkmark），不用开关控件，和其余纯文字菜单项同款。
+            // 就是间距的样子，而不是额外在行与行之间再加一段空隙。"在 Dock 显示图标"这类
+            // 低频偏好只放设置页，面板只留高频动作，不再和设置页重复一份。
             VStack(alignment: .leading, spacing: 0) {
                 Divider()
                     .padding(.bottom, 6)
@@ -135,10 +131,6 @@ struct MenuBarPanelView: View {
                     dismiss()
                     openSettings()
                     NSApplication.shared.activate(ignoringOtherApps: true)
-                }
-                MenuRowButton(title: "在 Dock 显示图标", isChecked: showDockIcon) {
-                    showDockIcon.toggle()
-                    NSApplication.shared.setActivationPolicy(showDockIcon ? .regular : .accessory)
                 }
                 MenuRowButton(title: "退出") {
                     NSApplication.shared.terminate(nil)
