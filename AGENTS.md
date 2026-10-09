@@ -93,10 +93,11 @@ No App Group is needed: on the external (Developer ID) channel neither target is
 
 ## Localization: classic `.strings` only, never `.xcstrings`
 
-All three modules ship their English table as a hand-maintained `Resources/en.lproj/Localizable.strings`, with the Chinese source string as the key:
+The App, CableKit and the widget each ship their English table as a hand-maintained `Resources/en.lproj/Localizable.strings`, with the Chinese source string as the key:
 
 - `Sources/CableKit/Resources/en.lproj/Localizable.strings` (looked up by `KitLocalization`, explicit `locale:` parameter)
 - `Sources/CableScopeApp/Resources/en.lproj/Localizable.strings` (SwiftUI `Text`/`LocalizedStringKey` via `Bundle.main` after `bundle_app.sh` flattens it, plus `AppLocalization` for AppKit-layer code)
+- **`CableScopeCLI` has no table of its own**: its strings live in CableKit's table and go through `L(...)` (`Sources/CableScopeCLI/Localization.swift`, a thin wrapper over the public `KitLocalization`). A separate CLI resource bundle would have to be added to the Homebrew formula's `libexec` layout, and forgetting it would silently fall back to Chinese. Language: `CABLESCOPE_LANG` → `LC_ALL` → `LC_MESSAGES` → system; `LANG` is deliberately ignored because terminals auto-fill it with `en_US.UTF-8`. Keys use format specifiers (`L("USB 断开：%@", name)`), never `\(...)` interpolation. CLI tests pin `CLILanguage.locale` to zh-Hans in `setUp`, because CI runs on an English system.
 - `Sources/CableScopeWidget/Resources/en.lproj/Localizable.strings` (the widget's own chrome; it is a separate bundle, so the App's table does not cover it. Headline text comes from CableKit instead — both are driven by the locale `SharedAppPreferences` resolves)
 
 **Do not reintroduce `.xcstrings`.** The classic SwiftPM build engine (what CI and the release workflow use) does not compile String Catalogs — it copies the raw JSON, so `en.lproj` never exists, every English lookup silently falls back to the Chinese key, and `bundle_app.sh`'s lproj-flattening step skips silently without failing the build. This bit CableKit (5401f72) and then the App layer (whose entire English UI was affected in release builds until it was migrated too). `AppLocalizationTests` / `DiagnosticsTests` assert real English output so a regression fails CI instead of shipping.

@@ -1,9 +1,24 @@
+import Foundation
 import CableKit
 import XCTest
 @testable import CableScopeCLI
 
 /// watch 子命令的快照差异计算测试。
 final class SnapshotDiffTests: XCTestCase {
+    /// 断言里写的是中文输出：钉死 CLI 语言，否则在英文系统（CI runner）上跟随系统切成英文。
+    private var savedLocale = CLILanguage.locale
+
+    override func setUp() {
+        super.setUp()
+        savedLocale = CLILanguage.locale
+        CLILanguage.locale = Locale(identifier: "zh-Hans")
+    }
+
+    override func tearDown() {
+        CLILanguage.locale = savedLocale
+        super.tearDown()
+    }
+
     private func makeUSB(location: UInt32, name: String, bps: Int?) -> USBDeviceSnapshot {
         USBDeviceSnapshot(registryID: UInt64(location), locationID: location, productName: name,
                           vendorName: nil, vendorID: nil, productID: nil, serialNumber: nil,

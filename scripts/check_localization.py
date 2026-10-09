@@ -20,7 +20,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-MODULES = ["CableKit", "CableScopeApp", "CableScopeWidget"]
+MODULES = ["CableKit", "CableScopeApp", "CableScopeWidget", "CableScopeCLI"]
+# 模块 → 它查的那张译文表所在模块。CLI 没有自己的资源 bundle，文案走 CableKit 的表
+# （见 Sources/CableScopeCLI/Localization.swift 的注释）。
+TABLE_MODULE = {"CableScopeCLI": "CableKit"}
 PLACEHOLDER = "\x00"
 # 汉字之外还要匹配全角/中文标点（U+3000–303F、U+FF00–FFEF）：只含标点、不含汉字的
 # 字面量（如 `.joined(separator: "；")`）同样会把中文标点漏进英文界面，此前正是因为
@@ -116,9 +119,10 @@ def load_translated_keys(module):
 
 
 def scan_module(module, allowlist):
-    keys = load_translated_keys(module)
+    table = TABLE_MODULE.get(module, module)
+    keys = load_translated_keys(table)
     if keys is None:
-        return [(f"Sources/{module}", "缺少 Resources/en.lproj/Localizable.strings")]
+        return [(f"Sources/{table}", "缺少 Resources/en.lproj/Localizable.strings")]
     missing = []
     for path in sorted((ROOT / "Sources" / module).rglob("*.swift")):
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
