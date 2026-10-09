@@ -72,7 +72,6 @@
 "当前未在充电 · 暂无功率变化" = "Not charging · no power change";
 "当前版本：%@" = "Current version: %@";
 "打开 CableScope" = "Open CableScope";
-"拔出了 1 根线缆" = "Unplugged 1 cable";
 "拷贝全部" = "Copy All";
 "搜索条目与属性键值" = "Search entries and property values";
 "整机概览" = "System Overview";
@@ -157,3 +156,4 @@
 "打开登录项设置" = "Open Login Items Settings";
 "无法更改登录项：%@" = "Couldn't change the login item: %@";
 "仅打包后的 CableScope.app 支持登录时启动" = "Launch at login is only available in the bundled CableScope.app";
+"%@ 已断开" = "%@ disconnected";

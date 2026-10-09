@@ -7,7 +7,7 @@
    App 语言偏好驱动。 */
 
 "充电功率" = "Charging Power";
-"当前充电功率、PD 协商档与各端口线缆头条，约每 15 分钟刷新。" = "Current charging power, the negotiated PD tier and a per-port cable headline. Refreshes about every 15 minutes.";
+"当前充电功率、PD 协商档与各端口线缆头条；插拔或充电状态变化时随 App 即时刷新。" = "Current charging power, the negotiated PD tier and a per-port cable headline. Refreshes as soon as CableScope sees a plug, unplug or charging change.";
 "充电中" = "Charging";
 "已暂停" = "Paused";
 "已接通电源" = "Plugged in";
@@ -17,4 +17,3 @@
 /* Text("协商档 \(Int(...))W") 的插值 key：Int 插值生成 %lld，占位符必须原样保留 */
 "协商档 %lldW" = "Negotiated %lldW";
 "老机型或无 USB-C 控制器读数" = "Older Mac, or no USB-C controller readings";
-"现场读取" = "Live read";
