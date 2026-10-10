@@ -113,7 +113,7 @@ private struct GeneralSettingsTab: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: settingsWidth, height: hasLaunchNote ? 560 : 520)
+        .frame(width: settingsWidth, height: hasLaunchNote ? 580 : 545)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             launchState = LaunchAtLogin.state
         }

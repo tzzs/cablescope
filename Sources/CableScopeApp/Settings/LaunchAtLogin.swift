@@ -24,8 +24,10 @@ enum LaunchAtLogin {
         switch SMAppService.mainApp.status {
         case .enabled: return .enabled
         case .requiresApproval: return .requiresApproval
-        case .notRegistered: return .disabled
-        case .notFound: return .unavailable
+        // .notFound 只说明"系统还没登记过这个 App"（从 build 目录直接运行、未放进
+        // /Applications 时就是这个状态），不代表不能注册——让用户尝试，真失败时由
+        // setEnabled 抛出的错误如实显示。只有没有 bundle ID 才是确定无法注册。
+        case .notRegistered, .notFound: return .disabled
         @unknown default: return .disabled
         }
     }
