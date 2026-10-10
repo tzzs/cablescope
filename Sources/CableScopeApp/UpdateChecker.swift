@@ -6,6 +6,17 @@ enum UpdateChecker {
     /// GitHub 仓库地址。
     static let repositoryURL = "https://github.com/tzzs/cablescope"
 
+    /// 是否允许 App 自己检查更新。商店版（Xcode `AppStore` 配置定义 `APP_STORE`）为 false：
+    /// App Store 审核指南 2.4.5(vii) 要求更新只能经由 Mac App Store 分发，自带的更新入口
+    /// 会被拒审。条件编译只写在这一处，调用点按这个常量隐藏入口，两种构建都能编译与测试。
+    static let isSelfUpdateAllowed: Bool = {
+        #if APP_STORE
+        return false
+        #else
+        return true
+        #endif
+    }()
+
     // MARK: - 查询最新 Release
 
     /// 拉取仓库最新 Release 的 tag（tag_name）。
@@ -121,6 +132,7 @@ enum UpdateChecker {
     /// 用户中途关掉立即生效；整个循环只在开关打开时才会发任何网络请求。
     @MainActor
     static func runAutomaticChecks() async {
+        guard isSelfUpdateAllowed else { return }
         while !Task.isCancelled {
             await performAutomaticCheckIfDue()
             try? await Task.sleep(nanoseconds: 6 * 60 * 60 * 1_000_000_000)

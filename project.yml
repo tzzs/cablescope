@@ -51,6 +51,9 @@ targets:
       configs:
         AppStore:
           CODE_SIGN_ENTITLEMENTS: Packaging/entitlements/mas.entitlements
+          # 商店版编译条件：App Store 审核指南 2.4.5(vii) 要求更新只能经由 Mac App Store，
+          # 自带的检查更新入口必须去掉（见 UpdateChecker.isSelfUpdateAllowed）。
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE"
   CableScopeWidget:
     type: app-extension
     platform: macOS

@@ -116,14 +116,16 @@ struct MenuBarPanelView: View {
                 MenuRowButton(title: "IOKit 属性检查器") {
                     openMainWindow(id: "registry")
                 }
-                MenuRowButton(title: "检查更新", isInProgress: isCheckingForUpdate) {
-                    Task { await checkForUpdates() }
-                }
-                if let updateStatusMessage {
-                    Text(updateStatusMessage)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 2)
+                if UpdateChecker.isSelfUpdateAllowed {
+                    MenuRowButton(title: "检查更新", isInProgress: isCheckingForUpdate) {
+                        Task { await checkForUpdates() }
+                    }
+                    if let updateStatusMessage {
+                        Text(updateStatusMessage)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 2)
+                    }
                 }
                 MenuRowButton(title: "设置") {
                     dismiss()
