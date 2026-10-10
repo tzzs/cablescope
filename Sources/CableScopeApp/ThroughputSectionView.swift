@@ -1,3 +1,4 @@
+import Combine
 import CableKit
 import SwiftUI
 
@@ -69,7 +70,18 @@ struct ThroughputSectionView: View {
             }
         }
         .task { model.reloadCandidates() }
+        // 插拔 U 盘/移动硬盘时自动刷新候选卷（NSWorkspace 卷挂载通知，不涉及系统直读，
+        // 不违反分层规则）；手动"刷新卷列表"按钮保留，作为通知漏发时的兜底。
+        .onReceive(Self.volumeChanges) { _ in
+            guard !model.isRunning else { return }
+            model.reloadCandidates()
+        }
     }
+
+    private static let volumeChanges = Publishers.Merge(
+        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didMountNotification),
+        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didUnmountNotification)
+    )
 
     /// 速率展示文案（internal 便于单测）。
     ///
