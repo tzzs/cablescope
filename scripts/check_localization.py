@@ -118,6 +118,25 @@ def load_translated_keys(module):
     return keys
 
 
+def unused_keys(table, allowlist):
+    """译文表里有、但对应模块源码中已没有任何字面量引用的 key（死条目）。
+
+    死条目不影响运行，但会误导维护者：改文案时以为英文"早就有了"，实际已无人引用
+    （此前 Widget 表里的「现场读取」就是这样留下的）。只看字面量出现与否，与缺译检查
+    用同一套归一化。"""
+    modules = [m for m in MODULES if TABLE_MODULE.get(m, m) == table]
+    literals = set()
+    for module in modules:
+        for path in (ROOT / "Sources" / module).rglob("*.swift"):
+            for line in path.read_text(encoding="utf-8").splitlines():
+                stripped = line.lstrip()
+                if stripped.startswith("//") or stripped.startswith("*"):
+                    continue
+                literals.update(normalize_literal(lit) for lit in string_literals(line))
+    keys = load_translated_keys(table) or set()
+    return sorted(k for k in keys if k not in literals and k not in allowlist)
+
+
 def scan_module(module, allowlist):
     table = TABLE_MODULE.get(module, module)
     keys = load_translated_keys(table)
@@ -152,8 +171,17 @@ def main():
         for where, text in missing:
             print(f"  {where}\n    {text}")
         print()
+    for table in sorted({TABLE_MODULE.get(m, m) for m in MODULES}):
+        dead = unused_keys(table, allowlist)
+        if not dead:
+            continue
+        failed = True
+        print(f"{table}：以下译文条目在源码中已无引用（死条目），请删除")
+        for key in dead:
+            print(f"    {key.replace(PLACEHOLDER, '%@')}")
+        print()
     if failed:
-        print("补齐译文条目，或把确实不该翻译的字面量加进 scripts/localization_allowlist.txt。")
+        print("补齐译文条目、删除死条目，或把确实不该翻译的字面量加进 scripts/localization_allowlist.txt。")
         return 1
     print("本地化检查通过：所有中文文案都有英文译文。")
     return 0

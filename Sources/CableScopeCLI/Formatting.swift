@@ -80,7 +80,9 @@ extension USBDeviceSnapshot {
 extension DisplaySnapshot {
     /// 走 `displayLabel(locale:)` 而不是裸 `name`：内建屏的 `name` 来自系统、跟随
     /// 系统语言，与 CLI 其余文案的语言可能对不上（详见该方法的注释）。
-    var displayName: String { displayLabel(locale: CLILanguage.locale) ?? L("显示器") }
+    /// 只有外接屏没上报名称时才是 nil（内建屏恒有标签），兜底用"外接显示器"——不能与
+    /// 分区标题共用"显示器"这个 key，后者的英文是复数 "Displays"。
+    var displayName: String { displayLabel(locale: CLILanguage.locale) ?? L("外接显示器") }
 }
 
 extension PowerSnapshot {

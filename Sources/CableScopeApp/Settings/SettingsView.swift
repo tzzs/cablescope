@@ -62,6 +62,11 @@ private struct GeneralSettingsTab: View {
         )
     }
 
+    /// 按截图实测：基础 455pt，「更新」分组约 90pt（商店版没有），登录项说明行约 35pt。
+    private var generalHeight: CGFloat {
+        455 + (UpdateChecker.isSelfUpdateAllowed ? 90 : 0) + (hasLaunchNote ? 35 : 0)
+    }
+
     private var hasLaunchNote: Bool {
         launchState == .requiresApproval || launchState == .unavailable || launchError != nil
     }
@@ -87,7 +92,7 @@ private struct GeneralSettingsTab: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
             }
-            Section {
+            Section("语言") {
                 Picker("语言", selection: $language) {
                     Text("跟随系统").tag(AppPreferences.Language.system)
                     Text("简体中文").tag(AppPreferences.Language.zhHans)
@@ -95,25 +100,21 @@ private struct GeneralSettingsTab: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-            } header: {
-                Text("语言")
-            } footer: {
-                Text("部分窗口标题栏文字可能需要重新打开窗口才会切换语言。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
-            Section {
-                Toggle("自动检查更新", isOn: $autoCheckForUpdates)
-            } header: {
-                Text("更新")
-            } footer: {
-                Text("每天最多一次向 api.github.com 查询最新版本号，不发送任何设备信息。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            if UpdateChecker.isSelfUpdateAllowed {
+                Section {
+                    Toggle("自动检查更新", isOn: $autoCheckForUpdates)
+                } header: {
+                    Text("更新")
+                } footer: {
+                    Text("每天最多一次向 api.github.com 查询最新版本号，不发送任何设备信息。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .formStyle(.grouped)
-        .frame(width: settingsWidth, height: hasLaunchNote ? 580 : 545)
+        .frame(width: settingsWidth, height: generalHeight)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             launchState = LaunchAtLogin.state
         }
