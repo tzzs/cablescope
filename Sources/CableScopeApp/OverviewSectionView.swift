@@ -65,20 +65,8 @@ struct OverviewSectionView: View {
 
             chargingDiagnosticRow
 
-            if viewModel.hasNonZeroPower {
-                PowerChart(segments: viewModel.powerSegments)
-                    .frame(height: 60)
-                    .padding(.top, 6)
-                    .accessibilityLabel("最近 5 分钟功率曲线")
-                Text("最近 5 分钟功率曲线")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            } else if viewModel.isExternalConnected {
-                Text("当前未在充电 · 暂无功率变化")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 6)
-            }
+            PowerHistorySection(history: viewModel.powerHistory,
+                                isExternalConnected: viewModel.isExternalConnected)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -302,10 +290,34 @@ struct OverviewSectionView: View {
     }
 }
 
+/// 曲线区：唯一观察 `PowerHistory`（每秒变化）的视图，1Hz 重绘只发生在这一小块，
+/// 不会带着整个概览卡与线缆卡片一起重新求值。
+struct PowerHistorySection: View {
+    @ObservedObject var history: PowerHistory
+    let isExternalConnected: Bool
+
+    var body: some View {
+        if history.hasNonZeroPower {
+            PowerChart(segments: history.segments)
+                .frame(height: 60)
+                .padding(.top, 6)
+                .accessibilityLabel("最近 5 分钟功率曲线")
+            Text("最近 5 分钟功率曲线")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        } else if isExternalConnected {
+            Text("当前未在充电 · 暂无功率变化")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.top, 6)
+        }
+    }
+}
+
 /// 最近 5 分钟功率极简折线（无坐标轴的 sparkline 风格，带渐变面积）。
 /// NaN 断点已在 ViewModel 分段，段与段之间不连线。
 struct PowerChart: View {
-    let segments: [[MonitorViewModel.PowerPoint]]
+    let segments: [[PowerHistory.Point]]
 
     var body: some View {
         Chart {

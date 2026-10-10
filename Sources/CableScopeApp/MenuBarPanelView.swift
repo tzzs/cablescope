@@ -1,9 +1,9 @@
 import SwiftUI
 
 /// 菜单栏状态项 label：仅一个固定图标（不随充电状态切换、不显示功率文字）。
-/// 独立 View + @ObservedObject，保证 VM 变化时状态项实时刷新。
+/// 刻意**不观察** `MonitorViewModel`：图标是固定的，用不到任何状态；此前挂着
+/// `@ObservedObject`，每秒的功率采样都会让状态项 label 白白重新求值一次。
 struct MenuBarLabelView: View {
-    @ObservedObject var viewModel: MonitorViewModel
     /// 启动时自动呈现主窗口（accessory 策略下 SwiftUI 不自动展示 WindowGroup）
     var opensMainOnLaunch: Bool = false
 

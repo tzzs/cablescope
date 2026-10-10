@@ -45,7 +45,7 @@ struct CableScopeApp: App {
             MenuBarPanelView(viewModel: viewModel)
                 .appEnvironment(language: language, theme: theme)
         } label: {
-            MenuBarLabelView(viewModel: viewModel, opensMainOnLaunch: opensMainOnLaunch)
+            MenuBarLabelView(opensMainOnLaunch: opensMainOnLaunch)
         }
         .menuBarExtraStyle(.window)
 
