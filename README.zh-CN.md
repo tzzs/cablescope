@@ -6,7 +6,9 @@ macOS 菜单栏工具：检测连接数据线（USB-C / 雷雳）的**充电速�
 
 > For the English version, see [README.md](README.md)。
 
-核心思路：多数 Mac 上系统只看到"协商结果"，看不到线缆本身。在 Apple Silicon 上，CableScope 直读 USB-C 端口控制器（AppleHPM）——包括线缆的 e-marker 芯片——并展示实时协商信息；拿不到 e-marker 数据时，通过**历史协商峰值**推断线缆规格下限（如 PD 协商到 20V×5A ⇒ 必为 5A e-marker 线）。
+## 工作原理
+
+多数 Mac 上系统只看到"协商结果"，看不到线缆本身。在 Apple Silicon 上，CableScope 直读 USB-C 端口控制器（AppleHPM）——包括线缆的 e-marker 芯片——并展示实时协商信息；拿不到 e-marker 数据时，通过**历史协商峰值**推断线缆规格下限（如 PD 协商到 20V×5A ⇒ 必为 5A e-marker 线）。
 
 ## 功能
 
@@ -19,8 +21,10 @@ macOS 菜单栏工具：检测连接数据线（USB-C / 雷雳）的**充电速�
 | 🧬 e-marker | 直读线缆 e-marker 芯片（SOP' Discover Identity）：线缆速度档、3A / 5A 电流评级、厂商 ID + 产品类型 |
 | 🏷 评级 | 基于历史协商峰值的线缆能力卡，持久化到本地（按端口分桶，拔线不清零） |
 | 🧵 多线缆 | 设备按物理端口聚合为线缆会话（USB 根端口分组 + 雷雳 receptacle 编号）：主窗口每线一张卡片 + 可切换的详情区，菜单栏每线一行，CLI 输出按端口分组 |
-| 🧩 Widget | 桌面小组件（功率/电量、各端口头条）；跟随 App 的语言与主题设置 |
-| 🔔 通知 | 插拔系统通知（UNUserNotificationCenter）；未打包运行（无 bundle）时静默禁用 |
+| 🧩 Widget | 桌面小组件（功率/电量、各端口头条）；跟随 App 的语言与主题设置，App 检测到插拔或充电状态变化时立即刷新 |
+| 🔔 通知 | 五类事件、各自独立开关：插拔（注明端口）、开始充电（附 PD 合同）/ 停止充电、协商速率提升、评级提升；按端口限流防止线头松动刷屏，通知中心按端口分组；未打包运行（无 bundle）时静默禁用 |
+| ⚙️ 设置 | 登录时启动、启动时打开主窗口、Dock 图标、浅色/深色主题、App 内语言（简体中文 / English，独立于系统）、可选的每日自动检查更新（识别 Homebrew 安装） |
+| 🌐 多语言 | App、Widget、CLI 均支持简体中文与英文；CLI 跟随系统语言，可用 `CABLESCOPE_LANG=en` / `zh` 覆盖 |
 | 🔬 IOKit 检查器 | 任意 IOKit 类的 IORegistry **全量原始属性**（USB 设备、电池、显示器连接、雷雳端口…）：App 专属窗口 + CLI 子命令；快照 JSON 亦携带各设备 `rawProperties` |
 
 ## 安装
@@ -100,6 +104,8 @@ swift run CableScopeApp
 | `properties [类名]` | 按类名枚举 IORegistry 条目，输出**全量** IOKit 属性（ioreg 风格文本；`--json` 结构化输出） |
 | `throughput` | 可选的 U 盘实测吞吐基准（写入临时测试文件读写测速；`--volume <路径\|卷名>` 选卷，`--seconds N` 调整每阶段时长，默认 5 秒） |
 
+输出语言跟随系统；设置 `CABLESCOPE_LANG=en` 或 `CABLESCOPE_LANG=zh` 可覆盖（也认 `LC_ALL` / `LC_MESSAGES`；刻意不读 `LANG`，因为终端常会自动把它设成 `en_US.UTF-8`）。
+
 ## 工程结构
 
 ```
@@ -112,12 +118,13 @@ Sources/
 ├── CableScopeCLI/     # 命令行工具
 └── CableScopeApp/     # SwiftUI 菜单栏 App（MenuBarExtra + 主窗口 + Swift Charts 功率曲线）
 Tests/
-├── CableKitTests/       # 176 个测试：数据契约、按端口分桶评级引擎 + 旧格式迁移、端口分组、解析器（真机样例回归）、诊断、厂商库、评级存储、IORegistry 检查器、profiler 缓存 + 真机冒烟
-├── CableScopeCLITests/  # 43 个测试：参数解析（含 throughput）、格式化、watch 快照差异计算
-└── CableScopeAppTests/  # 34 个测试：更新检查版本号比较、通知偏好开关逻辑、英文本地化、视图层文案格式化、MonitorViewModel 对真实 CableMonitor 的冒烟测试
-Docs/                  # 数据获取指南 / 优化路线图
+├── CableKitTests/       # 184 个测试：数据契约、按端口分桶评级引擎 + 旧格式迁移、端口分组、解析器（真机样例回归）、诊断、厂商库、评级存储、IORegistry 检查器、profiler 缓存 + 真机冒烟
+├── CableScopeCLITests/  # 51 个测试：参数解析（含 throughput）、格式化、watch 快照差异计算、英文输出与语言解析
+└── CableScopeAppTests/  # 54 个测试：更新检查（版本号、安装渠道、每日检查）、启动弹窗决策、通知限流、功率历史、通知偏好开关逻辑、英文本地化（含复数）、视图层文案格式化、MonitorViewModel 对真实 CableMonitor 的冒烟测试
+Docs/                  # 数据获取指南 / 优化路线图 / 术语表
 scripts/bundle_app.sh     # .app 打包脚本
 scripts/check_layering.sh # 分层规则检查（CableKit 之外禁止直接碰 IOKit/CoreGraphics/system_profiler）
+scripts/check_localization.py # 本地化检查（含 CLI 在内的每条中文文案都必须有英文译文）
 ```
 
 ## 数据来源（详见 [Docs/03-数据获取指南.md](Docs/03-数据获取指南.md)）
@@ -129,12 +136,14 @@ scripts/check_layering.sh # 分层规则检查（CableKit 之外禁止直接碰 
 
 ## 开发状态
 
-- [x] CableKit 适配层（USB/电源/显示器/雷雳 + 快照流 + 评级引擎）— 253/253 测试通过（含 CLI 与 App 测试 target）
+- [x] CableKit 适配层（USB/电源/显示器/雷雳 + 快照流 + 评级引擎）— 289/289 测试通过（含 CLI 与 App 测试 target）
 - [x] CLI 六个子命令（真机验证：PD 合同识别、e-marker 推断、评级持久化）
 - [x] macOS 菜单栏 App（整机概览、每线一卡 + 线缆详情、实时功率曲线、端口评级）
 - [x] IOKit 属性检查器（App 专属窗口 + CLI `properties` 子命令；快照携带全量 `rawProperties`）
 - [x] 多线缆布局（按物理端口聚合线缆会话：USB 根端口分组 + 雷雳 receptacle 编号，旧 ratings.json 自动迁移）
-- [x] 插拔系统通知（UNUserNotificationCenter）
+- [x] 系统通知（UNUserNotificationCenter）：五类事件分别开关，按端口限流与分组
+- [x] 设置页：登录时启动、启动行为、主题、App 内语言、可选的自动检查更新
+- [x] App、Widget、CLI 全量中英双语
 - [x] USB 实测吞吐（CLI `throughput` 子命令 + App「吞吐实测」区：挂载卷读写测速）
 - [x] IOKit 通知替代轮询（AppleSmartBattery 兴趣通知 + USB 匹配通知 + 轮询兜底的混合模式）
 - [x] App 图标（经典 Assets.car appiconset + Icon Composer Liquid Glass 分层，Xcode 与 SwiftPM/DMG 两路均已接入）
@@ -155,8 +164,8 @@ scripts/check_layering.sh # 分层规则检查（CableKit 之外禁止直接碰 
 
 欢迎贡献！本地构建（`swift build` / `swift test`）、代码结构一分钟导览、PR 指引（含 `usb-vendors.json` 厂商条目格式与真机 fixture 测试要求）与措辞红线，见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-提交 issue 时请附：机型与芯片（Apple Silicon / Intel）、macOS 版本，以及相关 IOKit 类的 IORegistry 输出（如 `swift run CableScopeCLI properties <类名> --json`）。
+提交 issue 时请附：机型与芯片（Apple Silicon / Intel）、macOS 版本，以及相关 IOKit 类的 IORegistry 输出（如 `cablescope properties <类名> --json`；源码目录下用 `swift run CableScopeCLI properties <类名> --json`）。
 
 ## 许可证
 
-[MIT](LICENSE)。CableScope 的全部数据均在本机采集与存储（无遥测、无网络请求），详见 [PRIVACY.md](PRIVACY.md)。
+[MIT](LICENSE)。CableScope 的全部数据均在本机采集与存储（无遥测）。唯一的网络请求是检查更新——手动触发，或在你开启后每天最多一次——详见 [PRIVACY.md](PRIVACY.md)。
