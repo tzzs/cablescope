@@ -22,6 +22,13 @@ enum AppLocalization {
         return languageBundle.localizedString(forKey: key, value: nil, table: "Localizable")
     }
 
+    /// 查表 + 按**同一个** locale 填参数。复数（`.stringsdict`）的 one/other 分支由
+    /// 格式化时的 locale 决定：`String(format:)` / `localizedStringWithFormat` 用的是系统
+    /// locale，中文系统下英文译文永远落进 other（"1 devices"）——中文只有 other 一个类别。
+    static func format(_ key: String, locale: Locale, _ arguments: CVarArg...) -> String {
+        String(format: string(key, locale: locale), locale: locale, arguments: arguments)
+    }
+
     /// 先找嵌套的 `CableScope_CableScopeApp.bundle`，全部落空才退回 `Bundle.main`。
     ///
     /// **顺序不能反过来**（改前的写法是"`Bundle.main.localizations` 非空就直接用

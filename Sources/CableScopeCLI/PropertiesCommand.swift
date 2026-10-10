@@ -3,7 +3,7 @@ import Foundation
 
 // MARK: - properties 子命令：按 IOKit 类名枚举 IORegistry 条目，输出全量属性
 //
-// 用法：swift run CableScopeCLI properties [ClassName] [--json]
+// 用法：cablescope properties [ClassName] [--json]
 // 默认类名 IOUSBHostDevice；--json 输出结构化结果（便于管道/脚本消费）。
 
 extension CableScopeCLI {
@@ -14,7 +14,7 @@ extension CableScopeCLI {
         do {
             entries = try await RegistryService().listEntries(matchingClass: className)
         } catch {
-            throw RuntimeError("IORegistry 枚举失败：\(error)")
+            throw RuntimeError(L("IORegistry 枚举失败：%@", String(describing: error)))
         }
 
         if json {
@@ -24,18 +24,18 @@ extension CableScopeCLI {
             do {
                 data = try encoder.encode(entries)
             } catch {
-                throw RuntimeError("JSON 编码失败：\(error)")
+                throw RuntimeError(L("JSON 编码失败：%@", String(describing: error)))
             }
             print(String(data: data, encoding: .utf8) ?? "[]")
             return
         }
 
         if entries.isEmpty {
-            print(Term.dim("未找到类「\(className)」的 IORegistry 条目。"))
+            print(Term.dim(L("未找到类「%@」的 IORegistry 条目。", className)))
             return
         }
 
-        var lines: [String] = [Term.dim("类「\(className)」共 \(entries.count) 条条目（枚举上限 \(RegistryService.maxEntries)）")]
+        var lines: [String] = [Term.dim(L("类「%@」共 %lld 条条目（枚举上限 %lld）", className, entries.count, RegistryService.maxEntries))]
         for entry in entries {
             lines.append("")
             lines.append(Term.bold("\(entry.displayTitle)  [\(entry.className) · registryID \(entry.registryID)]"))

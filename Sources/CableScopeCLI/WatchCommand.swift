@@ -11,7 +11,7 @@ extension CableScopeCLI {
         let intervalText = interval == interval.rounded()
             ? String(format: "%.0f", interval)
             : String(format: "%.1f", interval)
-        print("👀 CableScope watch · 事件流 + 兜底轮询 \(intervalText)s · Ctrl-C 退出")
+        print("👀 " + L("CableScope watch · 事件流 + 兜底轮询 %@s · Ctrl-C 退出", intervalText))
         fflush(stdout)
 
         // Ctrl-C / SIGTERM → 取消监听 Task，走优雅退出
@@ -48,11 +48,11 @@ extension CableScopeCLI {
                 if let previous = last {
                     let changes = SnapshotDiff.changes(from: previous, to: snapshot)
                     if !changes.isEmpty {
-                        print("[\(Fmt.clock(snapshot.timestamp))]  " + changes.joined(separator: "；"))
+                        print("[\(Fmt.clock(snapshot.timestamp))]  " + changes.joined(separator: L("；")))
                         fflush(stdout)
                     }
                 } else {
-                    print("📍 基线快照  " + SnapshotDiff.baselineSummary(snapshot))
+                    print("📍 " + L("基线快照  %@", SnapshotDiff.baselineSummary(snapshot)))
                     fflush(stdout)
                 }
                 last = snapshot
@@ -61,7 +61,7 @@ extension CableScopeCLI {
         box.task = task
         await task.value
 
-        print("\n👋 监听已退出")
+        print("\n👋 " + L("监听已退出"))
     }
 }
 
@@ -112,12 +112,12 @@ enum SnapshotDiff {
 
     static func baselineSummary(_ snapshot: CableSnapshot) -> String {
         var parts: [String] = []
-        parts.append("⚡ " + (snapshot.power?.shortSummary ?? "暂无数据"))
+        parts.append("⚡ " + (snapshot.power?.shortSummary ?? L("暂无数据")))
         parts.append("USB ×\(snapshot.usbDevices.count)")
-        parts.append("显示器 ×\(snapshot.displays.count)")
-        parts.append("雷电 ×\(snapshot.thunderboltDevices.count)")
+        parts.append(L("显示器 ×%lld", snapshot.displays.count))
+        parts.append(L("雷雳 ×%lld", snapshot.thunderboltDevices.count))
         if !snapshot.ports.isEmpty {
-            parts.append("端口 ×\(snapshot.ports.count)")
+            parts.append(L("端口 ×%lld", snapshot.ports.count))
         }
         return parts.joined(separator: " · ")
     }
@@ -131,9 +131,9 @@ enum SnapshotDiff {
             let before = oldWinning[port.portID] ?? nil
             if before != after {
                 if let before {
-                    out.append("PD 档位 \(before.label) → \(after.label)")
+                    out.append(L("PD 档位 %@ → %@", before.label, after.label))
                 } else {
-                    out.append("PD 协商开始：\(after.label)")
+                    out.append(L("PD 协商开始：%@", after.label))
                 }
             }
         }
@@ -142,32 +142,32 @@ enum SnapshotDiff {
     private static func diffPower(old: PowerSnapshot?, new: PowerSnapshot?, into out: inout [String]) {
         switch (old, new) {
         case (nil, let newPower?):
-            out.append("电源信息可用：" + newPower.shortSummary)
+            out.append(L("电源信息可用：%@", newPower.shortSummary))
         case (let oldPower?, nil):
-            out.append("电源信息不可用（原：\(oldPower.shortSummary)）")
+            out.append(L("电源信息不可用（原：%@）", oldPower.shortSummary))
         case (let oldPower?, let newPower?):
             if oldPower.isCharging != newPower.isCharging {
-                out.append(newPower.isCharging ? "开始充电" : "已停止充电")
+                out.append(L(newPower.isCharging ? "开始充电" : "已停止充电"))
             }
             // 功率变化超过 1 W 才报告
             switch (oldPower.watts, newPower.watts) {
             case (nil, let watts?):
-                out.append("功率开始上报 \(Fmt.watts(watts))")
+                out.append(L("功率开始上报 %@", Fmt.watts(watts)))
             case (.some, nil):
-                out.append("功率不再上报")
+                out.append(L("功率不再上报"))
             case (let before?, let after?) where abs(after - before) > 1.0:
-                out.append(String(format: "功率 %.1f W → %.1f W", before, after))
+                out.append(L("功率 %@ → %@", Fmt.watts(before), Fmt.watts(after)))
             default:
                 break
             }
             if let before = oldPower.pdContract, let after = newPower.pdContract, before != after {
-                out.append("PD 合同 \(contractText(before)) → \(contractText(after))")
+                out.append(L("PD 合同 %@ → %@", contractText(before), contractText(after)))
             }
             if let before = oldPower.batteryPercent, let after = newPower.batteryPercent {
                 let beforeInt = Int(before.rounded())
                 let afterInt = Int(after.rounded())
                 if beforeInt != afterInt {
-                    out.append("电量 \(beforeInt)% → \(afterInt)%")
+                    out.append(L("电量 %lld%% → %lld%%", beforeInt, afterInt))
                 }
             }
         default:
@@ -181,20 +181,20 @@ enum SnapshotDiff {
         let newByLocation = Dictionary(new.map { ($0.locationID, $0) }, uniquingKeysWith: { first, _ in first })
 
         for (_, device) in newByLocation where oldByLocation[device.locationID] == nil {
-            out.append("USB 接入：\(device.displayName) · \(device.speedDescription)")
+            out.append(L("USB 接入：%@ · %@", device.displayName, device.speedDescription))
         }
         for (_, device) in oldByLocation where newByLocation[device.locationID] == nil {
-            out.append("USB 断开：\(device.displayName)")
+            out.append(L("USB 断开：%@", device.displayName))
         }
         for (_, newDevice) in newByLocation {
             guard let oldDevice = oldByLocation[newDevice.locationID] else { continue }
             if oldDevice.productName != newDevice.productName {
-                out.append("USB 设备变更：\(oldDevice.displayName) → \(newDevice.displayName)")
+                out.append(L("USB 设备变更：%@ → %@", oldDevice.displayName, newDevice.displayName))
             }
             if let before = oldDevice.speed?.bitsPerSecond, let after = newDevice.speed?.bitsPerSecond, before != after {
-                out.append("USB 速率 \(USBSpeed(bitsPerSecond: before).label) → \(USBSpeed(bitsPerSecond: after).label)")
+                out.append(L("USB 速率 %@ → %@", USBSpeed(bitsPerSecond: before).label, USBSpeed(bitsPerSecond: after).label))
             } else if oldDevice.speed == nil, let after = newDevice.speed?.bitsPerSecond {
-                out.append("USB 速率未知 → \(USBSpeed(bitsPerSecond: after).label)")
+                out.append(L("USB 速率未知 → %@", USBSpeed(bitsPerSecond: after).label))
             }
         }
     }
@@ -204,24 +204,24 @@ enum SnapshotDiff {
         let newByID = Dictionary(new.map { ($0.displayID, $0) }, uniquingKeysWith: { first, _ in first })
 
         for (_, display) in newByID where oldByID[display.displayID] == nil {
-            out.append("显示器接入：\(display.displayName) \(display.resolutionLabel)")
+            out.append(L("显示器接入：%@ %@", display.displayName, display.resolutionLabel))
         }
         for (_, display) in oldByID where newByID[display.displayID] == nil {
-            out.append("显示器断开：\(display.displayName) \(display.resolutionLabel)")
+            out.append(L("显示器断开：%@ %@", display.displayName, display.resolutionLabel))
         }
         for (_, newDisplay) in newByID {
             guard let oldDisplay = oldByID[newDisplay.displayID] else { continue }
             if oldDisplay.pixelWidth != newDisplay.pixelWidth || oldDisplay.pixelHeight != newDisplay.pixelHeight {
-                out.append("分辨率 \(oldDisplay.resolutionLabel) → \(newDisplay.resolutionLabel)")
+                out.append(L("分辨率 %@ → %@", oldDisplay.resolutionLabel, newDisplay.resolutionLabel))
             }
             if let before = oldDisplay.refreshRateHz, let after = newDisplay.refreshRateHz, before != after {
-                out.append(String(format: "刷新率 %.0f Hz → %.0f Hz", before, after))
+                out.append(L("刷新率 %@ Hz → %@ Hz", String(format: "%.0f", before), String(format: "%.0f", after)))
             }
             if oldDisplay.linkRateLabel != newDisplay.linkRateLabel {
-                out.append("DP 链路 \(oldDisplay.linkRateLabel ?? "未知") → \(newDisplay.linkRateLabel ?? "未知")")
+                out.append(L("DP 链路 %@ → %@", oldDisplay.linkRateLabel ?? L("未知"), newDisplay.linkRateLabel ?? L("未知")))
             }
             if oldDisplay.isMain != newDisplay.isMain {
-                out.append(newDisplay.isMain ? "主显示器切换" : "主显示器身份变化")
+                out.append(L(newDisplay.isMain ? "主显示器切换" : "主显示器身份变化"))
             }
         }
     }
@@ -232,8 +232,8 @@ enum SnapshotDiff {
         if oldIDs == newIDs { return }
         let added = new.filter { !oldIDs.contains($0.id) }.map(\.name)
         let removed = old.filter { !newIDs.contains($0.id) }.map(\.name)
-        if !added.isEmpty { out.append("雷电接入：" + added.joined(separator: "、")) }
-        if !removed.isEmpty { out.append("雷电断开：" + removed.joined(separator: "、")) }
+        if !added.isEmpty { out.append(L("雷雳接入：%@", added.joined(separator: L("、")))) }
+        if !removed.isEmpty { out.append(L("雷雳断开：%@", removed.joined(separator: L("、")))) }
     }
 
     private static func contractText(_ contract: PDContract) -> String {

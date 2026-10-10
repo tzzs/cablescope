@@ -1,16 +1,17 @@
 import SwiftUI
 import UserNotifications
 
-/// 设置页：通用（Dock 图标）/ 外观（主题）/ 语言 / 通知（总开关 + 细分开关）四个 tab。
+/// 设置页：通用（启动 / 外观 / 语言 / 更新）+ 通知两个 tab。
 ///
-/// 每个 tab 的内容量差别很大（"通用"只有一个开关，"通知"有六行），按 HIG 对 macOS
-/// 设置窗口的要求——"窗口应随当前 pane 的内容量调整尺寸，用户不用自己拉大窗口看更多
-/// 内容"——**不）**给整个 TabView 套一个统一的大 frame，而是每个 tab 自己声明贴合内容的
-/// 尺寸，配合 CableScopeApp.swift 里 `Settings` scene 的 `.windowResizability(.contentSize)`，
-/// 切 tab 时窗口跟着重新收放，不会有大片空白。
+/// 此前通用 / 外观 / 语言各占一个 tab、每个 tab 只有一个控件，用户要点三次才能看完
+/// 本该一眼扫完的东西；合并成一个分组 Form，通知（行数多、还有系统授权状态）单独一个 tab。
+///
+/// 尺寸按 HIG 对 macOS 设置窗口的要求——"窗口应随当前 pane 的内容量调整尺寸"——
+/// 不给整个 TabView 套统一 frame，而是每个 tab 自己声明贴合内容的尺寸，配合
+/// CableScopeApp.swift 里 `Settings` scene 的 `.windowResizability(.contentSize)`。
 struct SettingsView: View {
     // 记住上次停留的 tab（HIG："设置窗口应恢复最近查看的 pane"）；用 UserDefaults 持久化，
-    // 比 HIG 最低要求（仅本次会话内记住）更进一步，跨次启动也保留。
+    // 跨次启动也保留。旧版本存过 "appearance"/"language"，解不出时 @AppStorage 自动回落到 .general。
     @AppStorage("settingsSelectedTab") private var selectedTab: SettingsTab = .general
 
     var body: some View {
@@ -18,12 +19,6 @@ struct SettingsView: View {
             GeneralSettingsTab()
                 .tabItem { Label("通用", systemImage: "gearshape") }
                 .tag(SettingsTab.general)
-            AppearanceSettingsTab()
-                .tabItem { Label("外观", systemImage: "paintbrush") }
-                .tag(SettingsTab.appearance)
-            LanguageSettingsTab()
-                .tabItem { Label("语言", systemImage: "globe") }
-                .tag(SettingsTab.language)
             NotificationSettingsTab()
                 .tabItem { Label("通知", systemImage: "bell") }
                 .tag(SettingsTab.notifications)
@@ -32,71 +27,120 @@ struct SettingsView: View {
 }
 
 private enum SettingsTab: String {
-    case general, appearance, language, notifications
+    case general, notifications
 }
 
 /// 统一宽度：原生设置窗口切 tab 时通常只有高度随内容变化，宽度保持稳定，
 /// 避免每次切换 tab 窗口左右也跟着抖动。
-private let settingsWidth: CGFloat = 360
+private let settingsWidth: CGFloat = 400
 
 private struct GeneralSettingsTab: View {
-    // 同一个 UserDefaults key，与 MenuBarPanelView 里的"在 Dock 显示图标"行天然同步——
-    // 一个是随手切换的快捷入口，一个是正式收纳位，不是重复逻辑。
+    @Environment(\.locale) private var locale
     @AppStorage(AppPreferences.showDockIconKey) private var showDockIcon = false
+    @AppStorage(AppPreferences.openMainWindowOnLaunchKey) private var openMainWindowOnLaunch = true
+    @AppStorage(AppPreferences.themeKey) private var theme: AppPreferences.Theme = .system
+    @AppStorage(AppPreferences.languageKey) private var language: AppPreferences.Language = .system
+    @AppStorage(UpdateChecker.autoCheckKey) private var autoCheckForUpdates = false
+
+    /// 登录项状态以系统为准（见 `LaunchAtLogin`），出现时 / App 重新激活时重新读取。
+    @State private var launchState: LaunchAtLogin.State = LaunchAtLogin.state
+    @State private var launchError: String?
+
+    private var launchAtLoginBinding: Binding<Bool> {
+        Binding(
+            get: { launchState == .enabled || launchState == .requiresApproval },
+            set: { newValue in
+                do {
+                    try LaunchAtLogin.setEnabled(newValue)
+                    launchError = nil
+                } catch {
+                    let template = AppLocalization.string("无法更改登录项：%@", locale: locale)
+                    launchError = String(format: template, error.localizedDescription)
+                }
+                launchState = LaunchAtLogin.state
+            }
+        )
+    }
+
+    /// 按截图实测：基础 455pt，「更新」分组约 90pt（商店版没有），登录项说明行约 35pt。
+    private var generalHeight: CGFloat {
+        455 + (UpdateChecker.isSelfUpdateAllowed ? 90 : 0) + (hasLaunchNote ? 35 : 0)
+    }
+
+    private var hasLaunchNote: Bool {
+        launchState == .requiresApproval || launchState == .unavailable || launchError != nil
+    }
 
     var body: some View {
         Form {
-            Section {
+            Section("启动") {
+                Toggle("登录时启动", isOn: launchAtLoginBinding)
+                    .disabled(launchState == .unavailable)
+                launchNote
+                Toggle("启动时打开主窗口", isOn: $openMainWindowOnLaunch)
                 Toggle("在 Dock 显示图标", isOn: $showDockIcon)
                     .onChange(of: showDockIcon) { _, newValue in
                         NSApplication.shared.setActivationPolicy(newValue ? .regular : .accessory)
                     }
             }
-        }
-        .formStyle(.grouped)
-        .frame(width: settingsWidth, height: 100)
-    }
-}
-
-private struct AppearanceSettingsTab: View {
-    @AppStorage(AppPreferences.themeKey) private var theme: AppPreferences.Theme = .system
-
-    var body: some View {
-        Form {
-            Section {
+            Section("外观") {
                 Picker("外观", selection: $theme) {
                     Text("跟随系统").tag(AppPreferences.Theme.system)
                     Text("浅色").tag(AppPreferences.Theme.light)
                     Text("深色").tag(AppPreferences.Theme.dark)
                 }
                 .pickerStyle(.segmented)
+                .labelsHidden()
             }
-        }
-        .formStyle(.grouped)
-        .frame(width: settingsWidth, height: 100)
-    }
-}
-
-private struct LanguageSettingsTab: View {
-    @AppStorage(AppPreferences.languageKey) private var language: AppPreferences.Language = .system
-
-    var body: some View {
-        Form {
-            Section {
+            Section("语言") {
                 Picker("语言", selection: $language) {
                     Text("跟随系统").tag(AppPreferences.Language.system)
                     Text("简体中文").tag(AppPreferences.Language.zhHans)
                     Text("English").tag(AppPreferences.Language.english)
                 }
                 .pickerStyle(.segmented)
-            } footer: {
-                Text("部分窗口标题栏文字可能需要重新打开窗口才会切换语言。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .labelsHidden()
+            }
+            if UpdateChecker.isSelfUpdateAllowed {
+                Section {
+                    Toggle("自动检查更新", isOn: $autoCheckForUpdates)
+                } header: {
+                    Text("更新")
+                } footer: {
+                    Text("每天最多一次向 api.github.com 查询最新版本号，不发送任何设备信息。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .formStyle(.grouped)
-        .frame(width: settingsWidth, height: 130)
+        .frame(width: settingsWidth, height: generalHeight)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            launchState = LaunchAtLogin.state
+        }
+    }
+
+    /// 登录项的附加说明：需要用户去系统设置放行 / 裸可执行不支持 / 注册失败。
+    @ViewBuilder
+    private var launchNote: some View {
+        if let launchError {
+            Text(launchError)
+                .font(.caption)
+                .foregroundStyle(.red)
+        } else if launchState == .requiresApproval {
+            HStack {
+                Text("需要在系统设置的「登录项」中允许 CableScope")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                Spacer(minLength: 8)
+                Button("打开登录项设置") { LaunchAtLogin.openSystemSettings() }
+                    .controlSize(.small)
+            }
+        } else if launchState == .unavailable {
+            Text("仅打包后的 CableScope.app 支持登录时启动")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 

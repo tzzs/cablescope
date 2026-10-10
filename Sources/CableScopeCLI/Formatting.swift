@@ -47,7 +47,7 @@ enum Fmt {
 // MARK: - 展示辅助（只读扩展，不改动 CableKit）
 
 extension USBDeviceSnapshot {
-    var displayName: String { productName ?? vendorName ?? "未知设备" }
+    var displayName: String { productName ?? vendorName ?? L("未知设备") }
 
     /// VID 解析出的厂商名：优先用系统上报的 vendorName，缺失时查内置 VID 目录（M3）。
     var resolvedVendorName: String? {
@@ -72,7 +72,7 @@ extension USBDeviceSnapshot {
 
     /// 如 "10000 Mbps → USB 3.x Gen2 10 Gbps"
     var speedDescription: String {
-        guard let speed else { return "速率未知" }
+        guard let speed else { return L("速率未知") }
         return "\(Fmt.rawMbps(speed.bitsPerSecond)) → \(speed.generation) \(speed.label)"
     }
 }
@@ -80,19 +80,21 @@ extension USBDeviceSnapshot {
 extension DisplaySnapshot {
     /// 走 `displayLabel(locale:)` 而不是裸 `name`：内建屏的 `name` 来自系统、跟随
     /// 系统语言，与 CLI 其余文案的语言可能对不上（详见该方法的注释）。
-    var displayName: String { displayLabel(locale: .current) ?? "显示器" }
+    /// 只有外接屏没上报名称时才是 nil（内建屏恒有标签），兜底用"外接显示器"——不能与
+    /// 分区标题共用"显示器"这个 key，后者的英文是复数 "Displays"。
+    var displayName: String { displayLabel(locale: CLILanguage.locale) ?? L("外接显示器") }
 }
 
 extension PowerSnapshot {
     /// 一行摘要，如 "65.4 W · 充电中"；保温暂停时为 "已接通电源 · 未在充电"（瞬时功率为负，不展示）。
     var shortSummary: String {
         if isCharging, let watts {
-            return "\(Fmt.watts(watts)) · 充电中"
+            return L("%@ · 充电中", Fmt.watts(watts))
         }
         if externalConnected {
-            return "已接通电源 · 未在充电"
+            return L("已接通电源 · 未在充电")
         }
-        return "未接通电源"
+        return L("未接通电源")
     }
 }
 

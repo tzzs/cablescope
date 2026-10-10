@@ -14,14 +14,21 @@
 - 真正不该进译文表的中文（如 `name.contains("键盘")` 这种匹配用字面量）写进
   `scripts/localization_allowlist.txt`，一行一条，`#` 开头为注释。
 """
+import plistlib
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-MODULES = ["CableKit", "CableScopeApp", "CableScopeWidget"]
+MODULES = ["CableKit", "CableScopeApp", "CableScopeWidget", "CableScopeCLI"]
+# 模块 → 它查的那张译文表所在模块。CLI 没有自己的资源 bundle，文案走 CableKit 的表
+# （见 Sources/CableScopeCLI/Localization.swift 的注释）。
+TABLE_MODULE = {"CableScopeCLI": "CableKit"}
 PLACEHOLDER = "\x00"
-CJK = re.compile(r"[一-鿿]")
+# 汉字之外还要匹配全角/中文标点（U+3000–303F、U+FF00–FFEF）：只含标点、不含汉字的
+# 字面量（如 `.joined(separator: "；")`）同样会把中文标点漏进英文界面，此前正是因为
+# 只匹配汉字而漏检。
+CJK = re.compile(r"[一-鿿\u3000-\u303f\uff00-\uffef]")
 FORMAT_SPECIFIER = re.compile(r"%(?:lld|llu|ld|lu|d|u|@|[0-9.]*f)")
 STRINGS_ENTRY = re.compile(r'"((?:[^"\\]|\\.)*)"\s*=')
 
@@ -95,20 +102,46 @@ def load_allowlist():
 
 
 def load_translated_keys(module):
-    path = ROOT / "Sources" / module / "Resources" / "en.lproj" / "Localizable.strings"
+    """`.strings` 的 key 加上同目录 `.stringsdict`（复数规则）的顶层 key。"""
+    lproj = ROOT / "Sources" / module / "Resources" / "en.lproj"
+    path = lproj / "Localizable.strings"
     if not path.exists():
         return None
-    return {
+    keys = {
         normalize_key(m.group(1))
         for line in path.read_text(encoding="utf-8").splitlines()
         if line.startswith('"') and (m := STRINGS_ENTRY.match(line))
     }
+    plurals = lproj / "Localizable.stringsdict"
+    if plurals.exists():
+        keys |= {normalize_key(key) for key in plistlib.loads(plurals.read_bytes())}
+    return keys
+
+
+def unused_keys(table, allowlist):
+    """译文表里有、但对应模块源码中已没有任何字面量引用的 key（死条目）。
+
+    死条目不影响运行，但会误导维护者：改文案时以为英文"早就有了"，实际已无人引用
+    （此前 Widget 表里的「现场读取」就是这样留下的）。只看字面量出现与否，与缺译检查
+    用同一套归一化。"""
+    modules = [m for m in MODULES if TABLE_MODULE.get(m, m) == table]
+    literals = set()
+    for module in modules:
+        for path in (ROOT / "Sources" / module).rglob("*.swift"):
+            for line in path.read_text(encoding="utf-8").splitlines():
+                stripped = line.lstrip()
+                if stripped.startswith("//") or stripped.startswith("*"):
+                    continue
+                literals.update(normalize_literal(lit) for lit in string_literals(line))
+    keys = load_translated_keys(table) or set()
+    return sorted(k for k in keys if k not in literals and k not in allowlist)
 
 
 def scan_module(module, allowlist):
-    keys = load_translated_keys(module)
+    table = TABLE_MODULE.get(module, module)
+    keys = load_translated_keys(table)
     if keys is None:
-        return [(f"Sources/{module}", "缺少 Resources/en.lproj/Localizable.strings")]
+        return [(f"Sources/{table}", "缺少 Resources/en.lproj/Localizable.strings")]
     missing = []
     for path in sorted((ROOT / "Sources" / module).rglob("*.swift")):
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
@@ -138,8 +171,17 @@ def main():
         for where, text in missing:
             print(f"  {where}\n    {text}")
         print()
+    for table in sorted({TABLE_MODULE.get(m, m) for m in MODULES}):
+        dead = unused_keys(table, allowlist)
+        if not dead:
+            continue
+        failed = True
+        print(f"{table}：以下译文条目在源码中已无引用（死条目），请删除")
+        for key in dead:
+            print(f"    {key.replace(PLACEHOLDER, '%@')}")
+        print()
     if failed:
-        print("补齐译文条目，或把确实不该翻译的字面量加进 scripts/localization_allowlist.txt。")
+        print("补齐译文条目、删除死条目，或把确实不该翻译的字面量加进 scripts/localization_allowlist.txt。")
         return 1
     print("本地化检查通过：所有中文文案都有英文译文。")
     return 0

@@ -260,7 +260,7 @@ public struct DisplaySnapshot: Codable, Hashable, Sendable, Identifiable {
     }
 }
 
-/// 雷电设备快照
+/// 雷雳设备快照
 public struct ThunderboltDeviceSnapshot: Codable, Hashable, Sendable, Identifiable {
     public let name: String
     public let vendorName: String?

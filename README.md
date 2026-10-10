@@ -21,8 +21,10 @@ On most Macs, macOS only sees the *negotiated result* of a cable, never the cabl
 | 🧬 E-marker | Direct read of the cable's e-marker chip (SOP' Discover Identity): cable speed class, 3A / 5A current rating, vendor ID + product type |
 | 🏷 Rating | Cable capability card derived from historical negotiation peaks, persisted locally (per-port buckets, peaks survive unplugging) |
 | 🧵 Multi-cable | Devices aggregated into per-port cable sessions (USB root-port grouping + Thunderbolt receptacles): one card per cable in the main window with a selectable per-cable detail, one line per cable in the menu bar, port-grouped CLI output |
-| 🧩 Widget | Desktop widget (power/battery, per-port headlines); follows the app's language and theme settings |
-| 🔔 Notifications | Plug/unplug system notifications (UNUserNotificationCenter); silently disabled when running unbundled |
+| 🧩 Widget | Desktop widget (power/battery, per-port headlines); follows the app's language and theme settings, and refreshes as soon as the app sees a plug/unplug or charging change |
+| 🔔 Notifications | Five event types, each with its own switch: plug/unplug (names the port), charging started (with the PD contract) / stopped, negotiated speed upgraded, rating upgraded. Throttled per port so a loose connector doesn't spam, grouped per port in Notification Center; silently disabled when running unbundled |
+| ⚙️ Settings | Launch at login, open the main window at launch, Dock icon, light/dark theme, in-app language (简体中文 / English, independent of the system), optional daily update check that recognizes Homebrew installs |
+| 🌐 Languages | App, widget and CLI in Simplified Chinese and English. The CLI follows the system language; override with `CABLESCOPE_LANG=en` / `zh` |
 | 🔬 IOKit inspector | Full raw IORegistry properties for any class (USB devices, battery, display connects, Thunderbolt ports, …) — App window + CLI subcommand; snapshots and JSON output carry `rawProperties` for each device |
 
 ## Installation
@@ -102,6 +104,8 @@ swift run CableScopeApp
 | `properties [Class]` | Enumerate IORegistry entries of an IOKit class and print **all** raw properties (ioreg-style text; `--json` for structured output) |
 | `throughput` | Optional read/write throughput benchmark on a mounted USB volume (writes a temporary test file; `--volume <path\|name>` picks the volume, `--seconds N` adjusts per-phase duration, default 5s) |
 
+Output language follows the system; set `CABLESCOPE_LANG=en` or `CABLESCOPE_LANG=zh` to override (`LC_ALL` / `LC_MESSAGES` are honored too; `LANG` is deliberately ignored because terminals often set it to `en_US.UTF-8` on their own).
+
 ## Project Layout
 
 ```
@@ -114,12 +118,13 @@ Sources/
 ├── CableScopeCLI/     # Command-line tool
 └── CableScopeApp/     # SwiftUI menu bar app (MenuBarExtra + main window + Swift Charts power chart)
 Tests/
-├── CableKitTests/       # 176 tests: data contracts, per-port rating engine + migration, grouping, parsers (real-device samples), diagnostics, vendor directory, rating store, registry inspector, profiler caching + live smoke tests
-├── CableScopeCLITests/  # 43 tests: argument parsing (incl. throughput), formatting, watch snapshot diffing
-└── CableScopeAppTests/  # 34 tests: update-checker version comparison, notification-preference gating, English localization, view-layer formatting, MonitorViewModel smoke test against a real CableMonitor
-Docs/                  # Data-source guide (IOKit) & optimization roadmap
+├── CableKitTests/       # 184 tests: data contracts, per-port rating engine + migration, grouping, parsers (real-device samples), diagnostics, vendor directory, rating store, registry inspector, profiler caching + live smoke tests
+├── CableScopeCLITests/  # 51 tests: argument parsing (incl. throughput), formatting, watch snapshot diffing, English output + language resolution
+└── CableScopeAppTests/  # 54 tests: update checker (versions, install channel, daily check), launch decision, notification throttling, power history, notification-preference gating, English localization incl. plurals, view-layer formatting, MonitorViewModel smoke test against a real CableMonitor
+Docs/                  # Data-source guide (IOKit), optimization roadmap & glossary
 scripts/bundle_app.sh     # .app bundling script
 scripts/check_layering.sh # enforces the layering rule (no IOKit/CoreGraphics/system_profiler outside CableKit)
+scripts/check_localization.py # every Chinese UI string (incl. CLI) must have an English entry
 ```
 
 ## Data Sources (see [Docs/03-数据获取指南.md](Docs/03-数据获取指南.md) for details)
@@ -131,12 +136,14 @@ scripts/check_layering.sh # enforces the layering rule (no IOKit/CoreGraphics/sy
 
 ## Status
 
-- [x] CableKit adapter layer (USB/power/displays/Thunderbolt + snapshot stream + rating engine) — 253/253 tests passing (including the CLI and App test targets)
+- [x] CableKit adapter layer (USB/power/displays/Thunderbolt + snapshot stream + rating engine) — 289/289 tests passing (including the CLI and App test targets)
 - [x] All six CLI subcommands (validated on real hardware: PD contract detection, e-marker inference, rating persistence)
 - [x] macOS menu bar app (system overview, one card per cable with per-cable detail, live power chart, per-port rating)
 - [x] IOKit property inspector (App window + CLI `properties` subcommand; snapshots carry full `rawProperties`)
 - [x] Multi-cable layout (per-port cable sessions, USB root-port grouping + Thunderbolt receptacle numbers, legacy ratings.json migration)
-- [x] Plug/unplug system notifications (UNUserNotificationCenter)
+- [x] System notifications (UNUserNotificationCenter): five event types with per-type switches, per-port throttling and grouping
+- [x] Settings: launch at login, launch behavior, theme, in-app language, optional automatic update check
+- [x] Full Chinese/English localization of the app, widget and CLI
 - [x] Real-world USB throughput measurement (CLI `throughput` subcommand + App "Throughput" section: read/write benchmark on a mounted volume)
 - [x] IOKit notifications to replace polling (AppleSmartBattery interest + USB matching notifications with polling fallback)
 - [x] App icon (classic Assets.car appiconset + Icon Composer Liquid Glass layers, both Xcode and SwiftPM/DMG paths)
@@ -147,7 +154,7 @@ scripts/check_layering.sh # enforces the layering rule (no IOKit/CoreGraphics/sy
 - E-marker direct read requires Apple Silicon (AppleHPM); on Intel/older Macs — and for cables without an e-marker — the rating is a "lower-bound inference from negotiation peaks", labeled as such in both the UI and the CLI. Branded specs still cannot be read.
 - Charging power **cannot be attributed to a specific cable** in the multi-cable case (macOS only exposes the active adapter, so with several cables plugged in there's no way to tell which one is receiving power unless exactly one port has a negotiated contract): it stays in the system overview then. With exactly one cable connected, charging status is promoted onto that cable's card.
 - External displays **are** attributed to a specific cable: an `IOPortTransportStateDisplayPort` transport node reports its own owning USB-C/MagSafe port directly (`DisplayPortTransportService` + `PortGrouping.displayPortLinks`), and is matched to its `CGDirectDisplayID` by EDID identity (`PortGrouping.matchedDisplay`) to pull in resolution/refresh rate. When that EDID match isn't unique (e.g. a dock driving two identical monitors), only the link's own vendor/model info is shown — no guessed resolution.
-- Physical port labels are technical ("USB 端口 0x014" / "雷雳端口 2"); friendly left/right positions would require registry port-topology work (v2).
+- Physical port labels are technical ("USB Port 0x014" / "Thunderbolt Port 2"); friendly left/right positions would require registry port-topology work (v2).
 - The built-in display has no DP link rate field, and `DisplaySnapshot.linkRateLabel` (parsed best-effort from `system_profiler`) only becomes meaningful when an external DP/Thunderbolt display is connected. The per-cable card's DisplayPort link rate (`DisplayPortLinkSnapshot.linkRateDescription`) comes from the dedicated transport node instead and is reliably populated whenever the link exists.
 - `watch`/the snapshot stream use event-driven wake-ups (AppleSmartBattery interest + USB matching notifications) with fallback polling for content-change detection.
 - The two `system_profiler`-backed reads (display metadata, Thunderbolt topology) are cached so the always-on menu bar app stays cheap (measured: 3.15s → 0.40s of CPU per 20s of `watch`). Display changes invalidate the cache immediately (the online display-ID set is the cache key), but a newly attached **Thunderbolt** device can take up to 5s to appear, since there is no equally cheap change probe for it.
@@ -157,8 +164,8 @@ scripts/check_layering.sh # enforces the layering rule (no IOKit/CoreGraphics/sy
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup (`swift build` / `swift test`), a one-minute tour of the code structure, PR guidelines (including the `usb-vendors.json` vendor-entry format and the fixture-test requirement), and the project's wording rules.
 
-When filing an issue, please include your Mac model and chip, macOS version, and the IORegistry output of the relevant classes (e.g. `swift run CableScopeCLI properties <Class> --json`).
+When filing an issue, please include your Mac model and chip, macOS version, and the IORegistry output of the relevant classes (e.g. `cablescope properties <Class> --json`, or `swift run CableScopeCLI properties <Class> --json` from a source checkout).
 
 ## License
 
-[MIT](LICENSE) — free to use, modify, and redistribute. CableScope collects and stores all data locally on your machine (no telemetry, no network requests) — see [PRIVACY.md](PRIVACY.md).
+[MIT](LICENSE) — free to use, modify, and redistribute. CableScope collects and stores all data locally on your machine (no telemetry). The only network request is the update check — on demand, or at most daily if you opt in — see [PRIVACY.md](PRIVACY.md).

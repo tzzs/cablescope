@@ -1,9 +1,9 @@
 import SwiftUI
 
 /// 菜单栏状态项 label：仅一个固定图标（不随充电状态切换、不显示功率文字）。
-/// 独立 View + @ObservedObject，保证 VM 变化时状态项实时刷新。
+/// 刻意**不观察** `MonitorViewModel`：图标是固定的，用不到任何状态；此前挂着
+/// `@ObservedObject`，每秒的功率采样都会让状态项 label 白白重新求值一次。
 struct MenuBarLabelView: View {
-    @ObservedObject var viewModel: MonitorViewModel
     /// 启动时自动呈现主窗口（accessory 策略下 SwiftUI 不自动展示 WindowGroup）
     var opensMainOnLaunch: Bool = false
 
@@ -23,7 +23,7 @@ struct MenuBarLabelView: View {
     }
 }
 
-/// 菜单栏弹出面板（.window 样式）：功率大字、电量、线缆列表（多线每线一行）、打开主窗口、检查更新、退出。
+/// 菜单栏弹出面板（.window 样式）：功率大字、电量、线缆列表（多线每线一行）、打开主窗口、检查更新、设置、退出。
 struct MenuBarPanelView: View {
     @ObservedObject var viewModel: MonitorViewModel
     @Environment(\.openWindow) private var openWindow
@@ -34,10 +34,6 @@ struct MenuBarPanelView: View {
     // 检查更新：请求进行中防重复点击；结果显示为按钮下方的一行小字，几秒后自动清除
     @State private var isCheckingForUpdate = false
     @State private var updateStatusMessage: String?
-
-    // "在 Dock 显示图标"：默认关闭（纯菜单栏工具形态）。开启时切到 .regular 策略，
-    // Dock 出现图标 + 可从 Cmd-Tab / App Switcher 切换；关闭时切回 .accessory。
-    @AppStorage(AppPreferences.showDockIconKey) private var showDockIcon = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -72,9 +68,7 @@ struct MenuBarPanelView: View {
                     Text("已接通电源")
                         .font(.title3.weight(.medium))
                     if let contract = viewModel.snapshot?.power?.pdContract {
-                        (Text("PD 合同 ")
-                            + Text(contract.watts, format: .number.precision(.fractionLength(0)))
-                            + Text("W · 暂未充电"))
+                        Text("PD 合同 \(contract.watts, format: .number.precision(.fractionLength(0)))W · 暂未充电")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
@@ -111,8 +105,8 @@ struct MenuBarPanelView: View {
 
             // 菜单项本身贴着排（spacing 0）——每行的高度和呼吸感全靠 MenuRowButton 自己的
             // .padding(.vertical) 撑出来，贴近原生 NSMenu 里相邻菜单项紧挨在一起、行高本身
-            // 就是间距的样子，而不是额外在行与行之间再加一段空隙。"在 Dock 显示图标"也统一
-            // 用 MenuRowButton（选中时行尾 checkmark），不用开关控件，和其余纯文字菜单项同款。
+            // 就是间距的样子，而不是额外在行与行之间再加一段空隙。"在 Dock 显示图标"这类
+            // 低频偏好只放设置页，面板只留高频动作，不再和设置页重复一份。
             VStack(alignment: .leading, spacing: 0) {
                 Divider()
                     .padding(.bottom, 6)
@@ -122,23 +116,21 @@ struct MenuBarPanelView: View {
                 MenuRowButton(title: "IOKit 属性检查器") {
                     openMainWindow(id: "registry")
                 }
-                MenuRowButton(title: "检查更新", isInProgress: isCheckingForUpdate) {
-                    Task { await checkForUpdates() }
-                }
-                if let updateStatusMessage {
-                    Text(updateStatusMessage)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 2)
+                if UpdateChecker.isSelfUpdateAllowed {
+                    MenuRowButton(title: "检查更新", isInProgress: isCheckingForUpdate) {
+                        Task { await checkForUpdates() }
+                    }
+                    if let updateStatusMessage {
+                        Text(updateStatusMessage)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 2)
+                    }
                 }
                 MenuRowButton(title: "设置") {
                     dismiss()
                     openSettings()
                     NSApplication.shared.activate(ignoringOtherApps: true)
-                }
-                MenuRowButton(title: "在 Dock 显示图标", isChecked: showDockIcon) {
-                    showDockIcon.toggle()
-                    NSApplication.shared.setActivationPolicy(showDockIcon ? .regular : .accessory)
                 }
                 MenuRowButton(title: "退出") {
                     NSApplication.shared.terminate(nil)
@@ -230,7 +222,7 @@ struct MenuBarPanelView: View {
                     if let speed = session.topUSBSpeed {
                         SpeedBadge(speed: speed)
                     } else if session.deviceCount > 0 {
-                        Text("\(session.deviceCount) 台设备")
+                        Text(AppLocalization.format("%lld 台设备", locale: locale, session.deviceCount))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {

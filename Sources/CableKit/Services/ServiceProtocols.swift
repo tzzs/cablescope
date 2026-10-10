@@ -18,7 +18,7 @@ public protocol DisplayServiceProtocol: Sendable {
 }
 
 public protocol ThunderboltServiceProtocol: Sendable {
-    /// 雷电设备列表（SPThunderboltDataType / IOThunderboltPort）
+    /// 雷雳设备列表（SPThunderboltDataType / IOThunderboltPort）
     func listThunderboltDevices() async throws -> [ThunderboltDeviceSnapshot]
 }
 
