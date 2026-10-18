@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/tzzs/cablescope/compare/v0.6.0...v0.6.1) (2026-10-18)
+
+
+### Bug Fixes
+
+* **ci:** release-please 守卫前补 checkout，脚本与历史在浅克隆下不可用 ([afe65b4](https://github.com/tzzs/cablescope/commit/afe65b4308d2e91019b6d2fdcd38c56b987ec52e))
+
 ## [0.6.0](https://github.com/tzzs/cablescope/compare/v0.5.1...v0.6.0) (2026-10-18)
 
 
