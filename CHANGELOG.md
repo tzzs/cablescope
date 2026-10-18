@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/tzzs/cablescope/compare/v0.6.1...v0.6.2) (2026-10-18)
+
+
+### Bug Fixes
+
+* **app:** MAS 商店版隐藏吞吐实测区块，沙盒下测速必然失败 ([668f0ff](https://github.com/tzzs/cablescope/commit/668f0ff4a82cf2c4defe3c370c9f59bdd028b3d9))
+
 ## [0.6.1](https://github.com/tzzs/cablescope/compare/v0.6.0...v0.6.1) (2026-10-18)
 
 
