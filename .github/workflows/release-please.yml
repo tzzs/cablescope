@@ -40,6 +40,20 @@ jobs:
       # 「There are untagged, merged release PRs outstanding - aborting」，
       # 连新的 release PR 都不再生成。所以 release-please-config.json 里
       # 不要再打开 skip-github-release。
+      # 本仓库用 merge commit 合 PR，release-please 会拿「被合并 PR 的标题」当作提交
+      # 主题去解析 Conventional Commits。标题不符合格式时它把那批提交整条丢弃
+      # （日志 "commit could not be parsed" → "Considering: 0 commits"），然后什么都不做、
+      # job 照样报 success —— release PR 永远不会生成（v0.6.0 实际踩过：PR #20）。
+      # 检查逻辑与恢复路径见 scripts/check_conventional_commits.sh 头部注释。
+      - name: Guard conventional commit format
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ./scripts/check_conventional_commits.sh \
+            "${{ github.event.before }}" \
+            "${{ github.sha }}" \
+            "${{ github.repository }}"
+
       - name: Release please
         uses: googleapis/release-please-action@v5
         with:
