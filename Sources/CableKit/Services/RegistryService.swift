@@ -25,7 +25,7 @@ public final class RegistryService: RegistryServiceProtocol {
         WellKnownClass(className: "IOPortTransportComponentCCUSBPDSOPp", labelKey: "线缆 e-marker（SOP'）"),
         WellKnownClass(className: "IODisplayConnect", labelKey: "显示器连接"),
         WellKnownClass(className: "IOPortTransportStateDisplayPort", labelKey: "DisplayPort 传输链路"),
-        WellKnownClass(className: "IOThunderboltPort", labelKey: "雷电端口"),
+        WellKnownClass(className: "IOThunderboltPort", labelKey: "雷雳端口"),
     ]
 
     public init() {}

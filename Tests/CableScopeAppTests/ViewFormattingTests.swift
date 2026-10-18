@@ -69,4 +69,19 @@ final class ViewFormattingTests: XCTestCase {
         XCTAssertEqual(SessionDetailSectionView.hexLabel(0x1), "0x0001")
         XCTAssertEqual(SessionDetailSectionView.hexLabel(0xABCD), "0xABCD")
     }
+
+    // MARK: - 日期跟随 App 语言而非系统语言
+
+    func testDateLabelsFollowRequestedLocaleNotSystem() {
+        // 断言的是"语言"而不是具体日期：任何时区下都落在 9 月 9–10 日，月份名恒为 Sep。
+        let date = Date(timeIntervalSince1970: 1_789_000_000) // 2026-09-10 UTC
+        let en = SessionDetailSectionView.dateLabel(date, locale: Locale(identifier: "en_US"))
+        XCTAssertTrue(en.contains("Sep"), en)
+        XCTAssertFalse(en.contains("年"), en)
+        let zh = SessionDetailSectionView.dateLabel(date, locale: Locale(identifier: "zh-Hans"))
+        XCTAssertTrue(zh.contains("年"), zh)
+
+        let time = MainWindowView.timeLabel(date, locale: Locale(identifier: "en_US"))
+        XCTAssertTrue(time.contains("AM") || time.contains("PM"), time)
+    }
 }

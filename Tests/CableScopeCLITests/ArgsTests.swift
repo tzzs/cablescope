@@ -1,7 +1,22 @@
+import Foundation
 import XCTest
 @testable import CableScopeCLI
 
 final class ArgsTests: XCTestCase {
+    /// 断言里写的是中文输出：钉死 CLI 语言，否则在英文系统（CI runner）上跟随系统切成英文。
+    private var savedLocale = CLILanguage.locale
+
+    override func setUp() {
+        super.setUp()
+        savedLocale = CLILanguage.locale
+        CLILanguage.locale = Locale(identifier: "zh-Hans")
+    }
+
+    override func tearDown() {
+        CLILanguage.locale = savedLocale
+        super.tearDown()
+    }
+
     func assertUsageError(_ arguments: [String], contains expected: String, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertThrowsError(try Args.parse(arguments), file: file, line: line) { error in
             guard let usage = error as? UsageError else {

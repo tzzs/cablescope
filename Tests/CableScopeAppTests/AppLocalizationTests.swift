@@ -59,4 +59,25 @@ final class AppLocalizationTests: XCTestCase {
         let key = "这条文案不存在于任何译文表中"
         XCTAssertEqual(AppLocalization.string(key, locale: english), key)
     }
+
+    /// 复数走 `en.lproj/Localizable.stringsdict`：此前 `.strings` 里只能写成 "%lld device(s)"、
+    /// "%lld times"，于是界面上出现 "1 times"、"Battery Cycles 47 times"。`.stringsdict`
+    /// 是 plist，两种 SwiftPM 构建引擎都原样拷贝（不像 `.xcstrings` 需要编译），这里断言
+    /// 它真的进了运行期资源包，且 one/other 两个分支都能选中。
+    func testPluralRulesResolveFromStringsdict() {
+        func plural(_ key: String, _ n: Int) -> String {
+            AppLocalization.format(key, locale: english, n)
+        }
+        XCTAssertEqual(plural("%lld 台设备", 1), "1 device")
+        XCTAssertEqual(plural("%lld 台设备", 3), "3 devices")
+        XCTAssertEqual(plural("%lld 次", 1), "1 cycle")
+        XCTAssertEqual(plural("%lld 次", 47), "47 cycles")
+        XCTAssertEqual(plural("累计连接 %lld 次", 1), "Connected once")
+        XCTAssertEqual(plural("累计连接 %lld 次", 12), "Connected 12 times")
+        XCTAssertEqual(plural("整机评级 · %lld 次观测", 2), "System rating · 2 observations")
+        // 复数分支必须跟随请求的语言，而不是系统语言（中文系统下曾一律落进 other）。
+        XCTAssertEqual(String(format: AppLocalization.string("%lld 台设备", locale: english),
+                              locale: Locale(identifier: "zh-Hans"), 1), "1 devices",
+                       "对照组：按中文 locale 格式化就会选错分支，这正是 format(_:locale:) 存在的理由")
+    }
 }

@@ -6,6 +6,8 @@ struct CableScopeApp: App {
     @StateObject private var viewModel: MonitorViewModel
     @AppStorage(AppPreferences.languageKey) private var language: AppPreferences.Language = .system
     @AppStorage(AppPreferences.themeKey) private var theme: AppPreferences.Theme = .system
+    /// 本次启动是否拉起主窗口（首次启动必开，之后按偏好），见 `AppPreferences.consumeLaunchDecision`。
+    private let opensMainOnLaunch: Bool
 
     init() {
         // 新增偏好键必须先注册默认值，不能依赖 UserDefaults.bool(forKey:) 对未设置 key
@@ -19,6 +21,8 @@ struct CableScopeApp: App {
         // setActivationPolicy 切到 .regular 加出 Dock 图标（同 Bartender/iStat Menus 的做法）。
         NSApplication.shared.setActivationPolicy(AppPreferences.showDockIcon ? .regular : .accessory)
 
+        opensMainOnLaunch = AppPreferences.consumeLaunchDecision()
+
         // 插拔通知：前台也弹横幅（无 bundle 的 SPM 运行会自动跳过）。
         NotificationController.activate()
 
@@ -29,6 +33,11 @@ struct CableScopeApp: App {
         Task { @MainActor [weak viewModel] in
             viewModel?.start()
         }
+
+        // 自动检查更新（opt-in，开关关闭时循环里不会发出任何网络请求）。
+        Task { @MainActor in
+            await UpdateChecker.runAutomaticChecks()
+        }
     }
 
     var body: some Scene {
@@ -36,7 +45,7 @@ struct CableScopeApp: App {
             MenuBarPanelView(viewModel: viewModel)
                 .appEnvironment(language: language, theme: theme)
         } label: {
-            MenuBarLabelView(viewModel: viewModel, opensMainOnLaunch: true)
+            MenuBarLabelView(opensMainOnLaunch: opensMainOnLaunch)
         }
         .menuBarExtraStyle(.window)
 
@@ -51,7 +60,7 @@ struct CableScopeApp: App {
         }
         .windowResizability(.contentMinSize)
 
-        // 偏好设置：语言/主题/通知/Dock 图标。accessory 策略下没有标准菜单栏，
+        // 偏好设置：启动（登录项/主窗口/Dock 图标）、外观、语言、通知。accessory 策略下没有标准菜单栏，
         // Cmd+, 不会自动生效，入口在 MenuBarPanelView 的菜单行列表里显式调用 openSettings()。
         // .contentSize：窗口尺寸锁定为每个 tab 各自的内容尺寸（HIG 原话"设置窗口应随当前
         // pane 的内容量调整大小，用户不用自己拉大窗口"），副作用是缩放按钮自动变灰——

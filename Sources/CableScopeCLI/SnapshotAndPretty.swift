@@ -10,7 +10,7 @@ extension CableScopeCLI {
         do {
             data = try snapshot.toJSON(pretty: pretty)
         } catch {
-            throw RuntimeError("JSON 编码失败：\(error)")
+            throw RuntimeError(L("JSON 编码失败：%@", String(describing: error)))
         }
         print(String(data: data, encoding: .utf8) ?? "{}")
     }
@@ -28,49 +28,50 @@ extension CableScopeCLI {
         var lines: [String] = []
         let rule = String(repeating: "─", count: 32)
 
-        lines.append("CableScope · 线缆透视")
+        lines.append(L("CableScope · 线缆透视"))
         lines.append(rule)
         lines.append("")
-        lines.append("⚡ 电源")
+        lines.append("⚡ " + L("电源"))
         lines.append(powerSection(snapshot.power, ports: snapshot.ports))
         lines.append("")
-        lines.append("🔌 线缆端口 (\(snapshot.sessions.count))")
+        lines.append("🔌 " + L("线缆端口 (%lld)", snapshot.sessions.count))
         lines.append(sessionsSection(snapshot.sessions, ports: snapshot.ports,
                                      displayPortLinks: snapshot.displayPortLinks, displays: snapshot.displays))
         lines.append("")
-        lines.append("🖥 显示器")
+        lines.append("🖥 " + L("显示器"))
         lines.append(displaySection(snapshot.displays))
         lines.append("")
         lines.append(rule)
-        lines.append(Term.dim("\(Fmt.timeString(snapshot.timestamp, format: "yyyy-MM-dd HH:mm:ss")) · 线缆规格基于协商结果推断，仅供参考"))
+        lines.append(Term.dim(L("%@ · 线缆规格基于协商结果推断，仅供参考",
+                                Fmt.timeString(snapshot.timestamp, format: "yyyy-MM-dd HH:mm:ss"))))
         return lines.joined(separator: "\n")
     }
 
     private static func powerSection(_ power: PowerSnapshot?, ports: [USBCPortSnapshot]) -> String {
-        guard let power else { return "  暂无数据" }
+        guard let power else { return "  " + L("暂无数据") }
 
         var lines: [String] = []
         // 标题数字的取舍：充电中显示瞬时功率；已接通但未充电（保温/优化充电暂停，
         // 电池侧电流为负）时瞬时功率无意义，显示 PD 合同能力；未接通时不显示数字。
         let headline: String
         if power.isCharging {
-            headline = "充电中" + wattsSuffix(power.watts)
+            headline = L("充电中") + wattsSuffix(power.watts)
         } else if power.externalConnected {
-            headline = "已接通电源（未在充电）" + wattsSuffix(power.pdContract?.watts)
+            headline = L("已接通电源（未在充电）") + wattsSuffix(power.pdContract?.watts)
         } else {
-            headline = "未接通电源（使用电池）"
+            headline = L("未接通电源（使用电池）")
         }
         lines.append("  " + Term.bold(headline))
 
         if let voltage = power.adapterVoltageMV, let amperage = power.adapterAmperageMA {
-            lines.append("  电压/电流  \(Fmt.volts(voltage)) / \(Fmt.amps(amperage))")
+            lines.append("  " + L("电压/电流  %@ / %@", Fmt.volts(voltage), Fmt.amps(amperage)))
         } else if let contract = power.pdContract {
-            lines.append("  电压/电流  \(Fmt.volts(contract.voltageMV)) / \(Fmt.amps(contract.currentMA))")
+            lines.append("  " + L("电压/电流  %@ / %@", Fmt.volts(contract.voltageMV), Fmt.amps(contract.currentMA)))
         }
 
         if let contract = power.pdContract {
-            var pd = "PD 合同  \(Fmt.volts(contract.voltageMV)) × \(Fmt.amps(contract.currentMA))"
-            if contract.implies5ACable { pd += "（5A e-marker 线）" }
+            var pd = L("PD 合同  %@ × %@", Fmt.volts(contract.voltageMV), Fmt.amps(contract.currentMA))
+            if contract.implies5ACable { pd += L("（5A e-marker 线）") }
             lines.append("  " + pd)
         }
 
@@ -80,17 +81,17 @@ extension CableScopeCLI {
             let options = pdo.options.enumerated().map { index, phase in
                 index == winningIndex ? Term.bold("*\(phase.label)") : phase.label
             }
-            lines.append("  PD 档位  " + options.joined(separator: " · "))
+            lines.append("  " + L("PD 档位  %@", options.joined(separator: " · ")))
         }
 
         if let percent = power.batteryPercent {
-            lines.append("  电量  \(Int(percent.rounded()))%")
+            lines.append("  " + L("电量  %lld%%", Int(percent.rounded())))
         }
         if let cycleCount = power.cycleCount {
-            lines.append("  电池循环  \(cycleCount) 次")
+            lines.append("  " + L("电池循环  %lld 次", cycleCount))
         }
         if let adapter = power.adapterDescription, !adapter.isEmpty {
-            lines.append("  适配器  \(adapter)")
+            lines.append("  " + L("适配器  %@", adapter))
         }
         return lines.joined(separator: "\n")
     }
@@ -112,10 +113,10 @@ extension CableScopeCLI {
     private static func sessionsSection(_ sessions: [CableSession], ports: [USBCPortSnapshot],
                                         displayPortLinks: [DisplayPortLinkSnapshot] = [],
                                         displays: [DisplaySnapshot] = []) -> String {
-        guard !sessions.isEmpty else { return "  未检测到线缆 / 设备" }
+        guard !sessions.isEmpty else { return "  " + L("未检测到线缆 / 设备") }
         let portsByID = Dictionary(ports.map { ($0.portID, $0) }, uniquingKeysWith: { first, _ in first })
         return sessions.map { session in
-            var lines = ["  ▸ \(session.portLabel(locale: .current))  " + Term.dim("[\(session.id)]")]
+            var lines = ["  ▸ \(session.portLabel(locale: CLILanguage.locale))  " + Term.dim("[\(session.id)]")]
 
             if let port = session.physicalPortID.flatMap({ portsByID[$0] }),
                let status = portStatusLine(port) {
@@ -143,12 +144,12 @@ extension CableScopeCLI {
                 if let vendor = device.vendorName { parts.append(vendor) }
                 if let link = device.linkSpeedLabel { parts.append(link) }
                 // 雷雳代际（M3）：存在时显示，如 "· 雷雳 4 / USB4"
-                if let generation = device.generationLabel(locale: .current) { parts.append(generation) }
+                if let generation = device.generationLabel(locale: CLILanguage.locale) { parts.append(generation) }
                 let suffix = parts.isEmpty ? "" : "  " + parts.joined(separator: " · ")
                 lines.append("\(indent)• \(device.name)\(suffix)")
             }
             if session.deviceCount == 0 {
-                lines.append("    （无设备）")
+                lines.append("    " + L("（无设备）"))
             }
             return lines.joined(separator: "\n")
         }
@@ -160,19 +161,19 @@ extension CableScopeCLI {
         var parts: [String] = []
         if let portType = port.portType { parts.append(portType) }
         if let orientation = port.plugOrientation {
-            parts.append(orientation == 1 ? "正向" : "反向")
+            parts.append(L(orientation == 1 ? "插头方向 A" : "插头方向 B"))
         }
         if let eMarker = port.eMarker {
             if let description = eMarker.productTypeDescription {
-                parts.append(DiagnosticsEngine.eMarkerDescription(description))
+                parts.append(DiagnosticsEngine.eMarkerDescription(description, locale: CLILanguage.locale))
             }
             if let rating = eMarker.decodedCurrentRating, rating != .reserved {
-                parts.append(rating.label(locale: .current))
+                parts.append(rating.label(locale: CLILanguage.locale))
             }
         }
-        if port.supportsThunderboltUSB4 { parts.append("USB4/雷雳可用") }
+        if port.supportsThunderboltUSB4 { parts.append(L("USB4/雷雳可用")) }
         guard !parts.isEmpty else { return nil }
-        return Term.dim("端口：") + parts.joined(separator: " · ")
+        return Term.dim(L("端口：")) + parts.joined(separator: " · ")
     }
 
     /// 一条 DisplayPort 链路的展示行：优先用匹配到的 CGDirectDisplayID 给出分辨率/刷新率，
@@ -183,30 +184,30 @@ extension CableScopeCLI {
         case let (vendor?, product?): name = "\(vendor) \(product)"
         case (nil, let product?): name = product
         case (let vendor?, nil): name = vendor
-        default: name = "外接显示器"
+        default: name = L("外接显示器")
         }
         var parts: [String] = []
         if let display {
             parts.append(display.resolutionLabel)
             if let hz = display.refreshRateHz { parts.append(String(format: "%.0f Hz", hz)) }
         } else {
-            parts.append("分辨率未知")
+            parts.append(L("分辨率未知"))
         }
         if let linkRate = link.linkRateDescription { parts.append(linkRate) }
         return "\(name)  " + parts.joined(separator: " · ")
     }
 
     private static func displaySection(_ displays: [DisplaySnapshot]) -> String {
-        if displays.isEmpty { return "  未检测到显示器" }
+        if displays.isEmpty { return "  " + L("未检测到显示器") }
         return displays.map { display in
             var parts = [display.resolutionLabel]
             if let hz = display.refreshRateHz {
                 parts.append(String(format: "%.0f Hz", hz))
             }
             if let link = display.linkRateLabel {
-                parts.append("链路 \(link)")
+                parts.append(L("链路 %@", link))
             }
-            if display.isMain { parts.append("主显示器") }
+            if display.isMain { parts.append(L("主显示器")) }
             return "  • \(display.displayName)  " + parts.joined(separator: " · ")
         }
         .joined(separator: "\n")

@@ -42,7 +42,9 @@ enum CableKitResourceBundle {
 /// `Bundle(for:)` 的锚点类，用法等价于 `VendorDirectory.BundleAnchor`。
 private final class BundleAnchor {}
 
-enum KitLocalization {
+/// `public`：CLI 没有自己的资源 bundle（Homebrew formula 只把可执行文件和
+/// `CableScope_CableKit.bundle` 装进 libexec），它的文案与 CableKit 共用这张译文表。
+public enum KitLocalization {
     /// 按指定语言取本地化字符串。
     ///
     /// **不用 `String(localized:bundle:locale:)`**：实测（见 `LocalizationProbeTests`
@@ -57,9 +59,14 @@ enum KitLocalization {
     /// bundle 定位失败、目标语言没有对应 `.lproj`（例如源语言 zh-Hans 本身就没有
     /// 单独的 lproj，key 即中文原文）、或该 key 未收录时，安全退化为返回 `key` 本身，
     /// 绝不崩溃。
-    static func string(_ key: String, locale: Locale) -> String {
+    public static func string(_ key: String, locale: Locale) -> String {
         guard let languageBundle = languageBundle(for: locale) else { return key }
         return languageBundle.localizedString(forKey: key, value: nil, table: "Localizable")
+    }
+
+    /// 查表 + 用**同一个** locale 填参数（`%@`/`%lld` 等格式符，与 `String(format:)` 相同）。
+    public static func format(_ key: String, locale: Locale, _ arguments: CVarArg...) -> String {
+        String(format: string(key, locale: locale), locale: locale, arguments: arguments)
     }
 
     /// 模板 + `%@` 占位符替换：数字先格式化成字符串，再套进已翻译的模板。

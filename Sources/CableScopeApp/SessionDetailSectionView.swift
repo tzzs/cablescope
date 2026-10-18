@@ -175,14 +175,13 @@ struct SessionDetailSectionView: View {
                 .foregroundStyle(.tertiary)
             FlowLayout(spacing: 5) {
                 if let orientation = port.plugOrientation {
-                    if orientation == 1 {
-                        InfoChip(text: "正向插入", systemImage: "arrow.triangle.swap", color: .gray)
-                    } else {
-                        InfoChip(text: "反向插入", systemImage: "arrow.triangle.swap", color: .gray)
-                    }
+                    // 中性的 A/B 而不是"正向/反向插入"：USB-C 正反都能插，"反向"读起来像插错了。
+                    InfoChip(text: orientation == 1 ? "插头方向 A" : "插头方向 B",
+                             systemImage: "arrow.triangle.swap", color: .gray)
+                        .help("USB-C 正反都能插，这里只是端口上报的物理朝向，不影响充电或传输")
                 }
                 if let count = port.connectionCount {
-                    InfoChip(text: "累计连接 \(count) 次", color: .gray)
+                    InfoChip(verbatim: AppLocalization.format("累计连接 %lld 次", locale: locale, count), color: .gray)
                 }
             }
         }
@@ -215,8 +214,10 @@ struct SessionDetailSectionView: View {
     }
 
     /// e-marker 明细 chips：速度档 / 电流评级 / VID（未上报时如实说明）+ 可信度提示行。
+    /// 可信度提示每条单独一行，而不是拼成一句：拼接用的分隔符本身也是文案（此前用全角
+    /// "；"，英文界面里就漏出了中文标点），逐行展示既不用分隔符，也更好扫读。
     private func eMarkerChips(_ eMarker: EMarkerSnapshot) -> some View {
-        let trustLine = EMarkerTrust.assess(eMarker).map { $0.summary(locale: locale) }.joined(separator: "；")
+        let trustNotes = EMarkerTrust.assess(eMarker).map { $0.summary(locale: locale) }
         return VStack(alignment: .leading, spacing: 4) {
             FlowLayout(spacing: 5) {
                 if let speed = eMarker.decodedSpeed {
@@ -233,8 +234,8 @@ struct SessionDetailSectionView: View {
                     }
                 }
             }
-            if !trustLine.isEmpty {
-                Label(trustLine, systemImage: "info.circle")
+            ForEach(trustNotes, id: \.self) { note in
+                Label(note, systemImage: "info.circle")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
@@ -248,6 +249,12 @@ struct SessionDetailSectionView: View {
         let hex = hexLabel(vendorID)
         guard let name = VendorDirectory.shared.name(forVendorID: vendorID) else { return hex }
         return "\(name) (\(hex))"
+    }
+
+    /// "首次观测"日期（internal 便于单测）。必须显式带上 `locale`：`Date.formatted()`
+    /// 默认用系统 locale，中文系统下 App 切到英文会显示 "First seen 2026年9月10日"。
+    static func dateLabel(_ date: Date, locale: Locale) -> String {
+        date.formatted(.dateTime.year().month(.abbreviated).day().locale(locale))
     }
 
     /// VID 的十六进制展示形式，如 "0x05AC"（十六进制数字本身不涉及语言，不用翻译；
@@ -373,7 +380,7 @@ struct SessionDetailSectionView: View {
                     Text("端口评级")
                         .font(.subheadline.weight(.medium))
                     Spacer(minLength: 8)
-                    Text("基于 \(rating.sampleCount) 次协商观测")
+                    Text(AppLocalization.format("基于 %lld 次协商观测", locale: locale, rating.sampleCount))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
@@ -386,7 +393,7 @@ struct SessionDetailSectionView: View {
                     )
                 }
                 if let firstSeen = rating.firstSeen {
-                    Text("首次观测 \(firstSeen.formatted(date: .abbreviated, time: .omitted)) · 历史峰值，拔线不清零")
+                    Text("首次观测 \(Self.dateLabel(firstSeen, locale: locale)) · 历史峰值，拔线不清零")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }

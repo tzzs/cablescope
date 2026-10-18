@@ -6,30 +6,21 @@ import Foundation
 /// 职责：
 /// - 消费 `CableMonitor.snapshotStream()`，驱动全部 @Published 状态；
 /// - 持有评级引擎，每次新快照 record + save（持久化到 app-ratings.json）；
-/// - 以 1Hz 采样维护最近 5 分钟的功率历史（环形缓冲 300 点）。
+/// - 以 1Hz 采样维护最近 5 分钟的功率历史（`PowerHistory`，独立观察对象，见其注释）。
 @MainActor
 final class MonitorViewModel: ObservableObject {
-    /// 功率曲线采样点。watts 为 NaN 表示当时无功率数据（折线在此断开）。
-    struct PowerPoint: Identifiable, Equatable {
-        let date: Date
-        let watts: Double
-
-        var id: Date { date }
-        var isFinite: Bool { watts.isFinite }
-    }
-
-    static let historyCapacity = 300 // 1Hz × 5 分钟
-    static let sampleIntervalNanos: UInt64 = 1_000_000_000
 
     // MARK: Published 状态
 
     @Published private(set) var snapshot: CableSnapshot?
     @Published private(set) var rating: CableRating?
-    @Published private(set) var powerHistory: [PowerPoint] = []
-    @Published private(set) var hasPowerData = false
     @Published private(set) var isRefreshing = false
     /// 当前选中的线缆会话（CableSession.id）；nil = 回退默认（第一根）。
     @Published private(set) var selectedSessionID: String?
+
+    /// 不是 `@Published`：它自己每秒发 `objectWillChange`，挂成 VM 的 Published 属性会把
+    /// 这个频率重新传染给所有观察 VM 的视图。
+    let powerHistory = PowerHistory()
 
     // MARK: 依赖
 
@@ -81,7 +72,9 @@ final class MonitorViewModel: ObservableObject {
             while !Task.isCancelled {
                 guard let self else { break }
                 self.appendPowerSample()
-                try? await Task.sleep(nanoseconds: Self.sampleIntervalNanos)
+                // tolerance 让系统把这次唤醒与其他定时器合并（24/7 常驻，省电）；
+                // 采样时刻抖动 ±250ms 对 5 分钟曲线没有可见影响。
+                try? await Task.sleep(for: .seconds(1), tolerance: .milliseconds(250))
             }
         }
     }
@@ -202,29 +195,6 @@ final class MonitorViewModel: ObservableObject {
             ?? sources.max { $0.options.count < $1.options.count }
     }
 
-    /// 近 5 分钟是否出现过非零功率。未充电时采样全为 0，画出来是无意义的平线。
-    var hasNonZeroPower: Bool {
-        powerHistory.contains { $0.isFinite && $0.watts > 0.01 }
-    }
-
-    /// 功率曲线分段：NaN（无数据）断开后的连续段，段与段之间不连线。
-    var powerSegments: [[PowerPoint]] {
-        var segments: [[PowerPoint]] = []
-        var current: [PowerPoint] = []
-        for point in powerHistory {
-            if point.isFinite {
-                current.append(point)
-            } else if !current.isEmpty {
-                segments.append(current)
-                current = []
-            }
-        }
-        if !current.isEmpty {
-            segments.append(current)
-        }
-        return segments
-    }
-
     // MARK: - 内部
 
     private func ingest(_ snapshot: CableSnapshot) {
@@ -260,12 +230,6 @@ final class MonitorViewModel: ObservableObject {
             watts = power.watts ?? .nan // 充电中但电压/电流读数缺失
         }
 
-        powerHistory.append(PowerPoint(date: Date(), watts: watts))
-        if powerHistory.count > Self.historyCapacity {
-            powerHistory.removeFirst(powerHistory.count - Self.historyCapacity)
-        }
-        if watts.isFinite {
-            hasPowerData = true
-        }
+        powerHistory.append(watts: watts)
     }
 }

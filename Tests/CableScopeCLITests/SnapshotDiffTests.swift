@@ -1,9 +1,24 @@
+import Foundation
 import CableKit
 import XCTest
 @testable import CableScopeCLI
 
 /// watch 子命令的快照差异计算测试。
 final class SnapshotDiffTests: XCTestCase {
+    /// 断言里写的是中文输出：钉死 CLI 语言，否则在英文系统（CI runner）上跟随系统切成英文。
+    private var savedLocale = CLILanguage.locale
+
+    override func setUp() {
+        super.setUp()
+        savedLocale = CLILanguage.locale
+        CLILanguage.locale = Locale(identifier: "zh-Hans")
+    }
+
+    override func tearDown() {
+        CLILanguage.locale = savedLocale
+        super.tearDown()
+    }
+
     private func makeUSB(location: UInt32, name: String, bps: Int?) -> USBDeviceSnapshot {
         USBDeviceSnapshot(registryID: UInt64(location), locationID: location, productName: name,
                           vendorName: nil, vendorID: nil, productID: nil, serialNumber: nil,
@@ -141,7 +156,7 @@ final class SnapshotDiffTests: XCTestCase {
         XCTAssertTrue(disconnect.contains { $0.contains("显示器断开") })
     }
 
-    // MARK: 雷电
+    // MARK: 雷雳
 
     func testThunderboltAddAndRemove() {
         let dock = ThunderboltDeviceSnapshot(name: "Dock", vendorName: nil, linkSpeedLabel: nil, deviceType: nil)
@@ -149,11 +164,11 @@ final class SnapshotDiffTests: XCTestCase {
 
         let add = SnapshotDiff.changes(from: makeSnapshot(thunderbolt: [dock]),
                                        to: makeSnapshot(thunderbolt: [dock, ssd]))
-        XCTAssertTrue(add.contains { $0.contains("雷电接入") && $0.contains("SSD") })
+        XCTAssertTrue(add.contains { $0.contains("雷雳接入") && $0.contains("SSD") })
 
         let remove = SnapshotDiff.changes(from: makeSnapshot(thunderbolt: [dock, ssd]),
                                           to: makeSnapshot(thunderbolt: [dock]))
-        XCTAssertTrue(remove.contains { $0.contains("雷电断开") && $0.contains("SSD") })
+        XCTAssertTrue(remove.contains { $0.contains("雷雳断开") && $0.contains("SSD") })
     }
 
     // MARK: 基线摘要
@@ -165,7 +180,7 @@ final class SnapshotDiffTests: XCTestCase {
         XCTAssertTrue(summary.contains("充电中"))
         XCTAssertTrue(summary.contains("USB ×1"))
         XCTAssertTrue(summary.contains("显示器 ×1"))
-        XCTAssertTrue(summary.contains("雷电 ×0"))
+        XCTAssertTrue(summary.contains("雷雳 ×0"))
         // 无电源数据时优雅降级
         let bare = SnapshotDiff.baselineSummary(makeSnapshot())
         XCTAssertTrue(bare.contains("暂无数据"))

@@ -1,8 +1,23 @@
+import Foundation
 import CableKit
 import XCTest
 @testable import CableScopeCLI
 
 final class FormattingTests: XCTestCase {
+    /// 断言里写的是中文输出：钉死 CLI 语言，否则在英文系统（CI runner）上跟随系统切成英文。
+    private var savedLocale = CLILanguage.locale
+
+    override func setUp() {
+        super.setUp()
+        savedLocale = CLILanguage.locale
+        CLILanguage.locale = Locale(identifier: "zh-Hans")
+    }
+
+    override func tearDown() {
+        CLILanguage.locale = savedLocale
+        super.tearDown()
+    }
+
     // MARK: Fmt
 
     func testFmtWattsVoltsAmps() {

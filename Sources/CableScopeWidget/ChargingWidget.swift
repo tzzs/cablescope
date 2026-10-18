@@ -151,7 +151,7 @@ struct CableScopeChargingWidget: Widget {
             ChargingWidgetEntryView(entry: entry)
         }
         .configurationDisplayName("充电功率")
-        .description("当前充电功率、PD 协商档与各端口线缆头条，约每 15 分钟刷新。")
+        .description("当前充电功率、PD 协商档与各端口线缆头条；插拔或充电状态变化时随 App 即时刷新。")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
@@ -273,7 +273,9 @@ private struct SmallContent: View {
 
     // MARK: 状态语汇（对齐 OverviewSectionView）
 
-    private var statusLabel: String {
+    /// 必须是 `LocalizedStringKey`：声明成 `String` 时 `Text(statusLabel)` 命中的是
+    /// verbatim 重载，完全不查表——此前这三个状态在英文下就一直显示中文。
+    private var statusLabel: LocalizedStringKey {
         if entry.isCharging { return "充电中" }
         if entry.externalConnected { return "已暂停" }
         return "使用电池"

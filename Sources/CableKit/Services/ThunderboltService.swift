@@ -1,6 +1,6 @@
 import Foundation
 
-/// 雷电/USB4 设备（`system_profiler SPThunderboltDataType -json` 适配）。
+/// 雷雳/USB4 设备（`system_profiler SPThunderboltDataType -json` 适配）。
 ///
 /// 本机实测 JSON 结构（macOS 26，Apple Silicon）：
 /// ```
@@ -11,10 +11,10 @@ import Foundation
 /// ]
 /// ```
 /// - 顶层 bus 条目是**本机主控**（device_name_key = "MacBook Air"），不算外接设备。
-/// - 外接设备挂在 `receptacle_N_tag` 下，树形可级联（雷电链/坞站），需**递归展平**：
+/// - 外接设备挂在 `receptacle_N_tag` 下，树形可级联（雷雳链/坞站），需**递归展平**：
 ///   收集 receptacle 子树中所有带 `device_name_key` 的节点。
 /// - `receptacle_status_key == "receptacle_no_devices_connected"` 的 receptacle 无设备；
-///   全部为空时返回空数组（当前无雷电外设的场景已实测）。
+///   全部为空时返回空数组（当前无雷雳外设的场景已实测）。
 public final class ThunderboltService: ThunderboltServiceProtocol, @unchecked Sendable {
     /// `system_profiler` 结果的缓存。与 DisplayService 不同，雷雳没有同等便宜可靠的变化
     /// 探针（IORegistry 雷雳节点在插拔时的行为未在真机验证过，不敢据此判缓存失效），

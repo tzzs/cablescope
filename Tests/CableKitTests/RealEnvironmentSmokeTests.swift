@@ -2,7 +2,7 @@ import XCTest
 @testable import CableKit
 
 /// 真实环境冒烟测试：调用真实 IOKit/profiler 实现，断言不崩溃、类型正确。
-/// **不假设任何设备存在**（当前机器无 USB/雷电外设也必须通过）。
+/// **不假设任何设备存在**（当前机器无 USB/雷雳外设也必须通过）。
 final class RealEnvironmentSmokeTests: XCTestCase {
 
     func testUSBServiceSmoke() async throws {

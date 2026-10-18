@@ -33,7 +33,9 @@ struct RegistryInspectorView: View {
             detail
         }
         .frame(minWidth: 760, minHeight: 480)
-        .navigationTitle("IOKit 属性检查器")
+        // 标题栏文字自己按 \.locale 查好再传 String：标题栏对 LocalizedStringKey 按系统语言
+        // 查表、不看 environment（实测中文系统 + App 英文时这里仍显示中文），见 AGENTS.md。
+        .navigationTitle(AppLocalization.string("IOKit 属性检查器", locale: locale))
         // HIG：条目/属性较多的窗口应提供搜索（过滤侧栏条目与右侧属性键值）。
         .searchable(text: $searchText, placement: .sidebar, prompt: "搜索条目与属性键值")
         .task(id: className) {

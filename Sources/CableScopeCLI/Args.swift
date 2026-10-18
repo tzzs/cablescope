@@ -16,7 +16,9 @@ enum ParsedCommand: Equatable {
 struct UsageError: Error, CustomStringConvertible {
     let description: String
 
-    static let hint = "运行 `swift run CableScopeCLI --help` 查看用法。"
+    static func hint(command: String = Invocation.current) -> String {
+        L("运行 `%@ --help` 查看用法。", command)
+    }
 }
 
 enum Args {
@@ -49,7 +51,7 @@ enum Args {
         case "help":
             return .help
         default:
-            throw UsageError(description: "未知命令「\(command)」，可用命令：\(commandNames.joined(separator: " / "))")
+            throw UsageError(description: L("未知命令「%@」，可用命令：%@", command, commandNames.joined(separator: " / ")))
         }
     }
 
@@ -61,10 +63,10 @@ enum Args {
             if flag == "--json" {
                 json = true
             } else if flag.hasPrefix("--") {
-                throw UsageError(description: "properties 不支持参数「\(flag)」")
+                throw UsageError(description: L("%@ 不支持参数「%@」", "properties", flag))
             } else {
                 guard className == nil else {
-                    throw UsageError(description: "properties 只接受一个类名参数（额外收到「\(flag)」）")
+                    throw UsageError(description: L("properties 只接受一个类名参数（额外收到「%@」）", flag))
                 }
                 className = flag
             }
@@ -82,25 +84,25 @@ enum Args {
             if flag == "--volume" {
                 index += 1
                 guard index < flags.count, !flags[index].hasPrefix("--"), !flags[index].isEmpty else {
-                    throw UsageError(description: "--volume 需要一个挂载点路径或卷名")
+                    throw UsageError(description: L("--volume 需要一个挂载点路径或卷名"))
                 }
                 volume = flags[index]
             } else if flag.hasPrefix("--volume=") {
                 let value = String(flag.dropFirst("--volume=".count))
                 guard !value.isEmpty, !value.hasPrefix("--") else {
-                    throw UsageError(description: "--volume 需要一个挂载点路径或卷名")
+                    throw UsageError(description: L("--volume 需要一个挂载点路径或卷名"))
                 }
                 volume = value
             } else if flag == "--seconds" {
                 index += 1
                 guard index < flags.count else {
-                    throw UsageError(description: "--seconds 需要一个数值（单位：秒）")
+                    throw UsageError(description: L("%@ 需要一个数值（单位：秒）", "--seconds"))
                 }
                 seconds = try parseSeconds(flags[index])
             } else if flag.hasPrefix("--seconds=") {
                 seconds = try parseSeconds(String(flag.dropFirst("--seconds=".count)))
             } else {
-                throw UsageError(description: "throughput 不支持参数「\(flag)」")
+                throw UsageError(description: L("%@ 不支持参数「%@」", "throughput", flag))
             }
             index += 1
         }
@@ -109,7 +111,7 @@ enum Args {
 
     private static func parseSeconds(_ text: String) throws -> Double {
         guard let value = Double(text), value > 0 else {
-            throw UsageError(description: "--seconds 的值「\(text)」无效，需要大于 0 的秒数（允许小数）")
+            throw UsageError(description: L("%@ 的值「%@」无效，需要大于 0 的秒数（允许小数）", "--seconds", text))
         }
         return value
     }
@@ -119,7 +121,7 @@ enum Args {
         for flag in flags {
             switch flag {
             case "--pretty": pretty = true
-            default: throw UsageError(description: "snapshot 不支持参数「\(flag)」")
+            default: throw UsageError(description: L("%@ 不支持参数「%@」", "snapshot", flag))
             }
         }
         return pretty
@@ -127,7 +129,7 @@ enum Args {
 
     private static func rejectFlags(_ flags: [String], command: String) throws {
         if let first = flags.first {
-            throw UsageError(description: "\(command) 不支持参数「\(first)」")
+            throw UsageError(description: L("%@ 不支持参数「%@」", command, first))
         }
     }
 
@@ -139,13 +141,13 @@ enum Args {
             if flag == "--interval" {
                 index += 1
                 guard index < flags.count else {
-                    throw UsageError(description: "--interval 需要一个数值（单位：秒）")
+                    throw UsageError(description: L("%@ 需要一个数值（单位：秒）", "--interval"))
                 }
                 interval = try parseInterval(flags[index])
             } else if flag.hasPrefix("--interval=") {
                 interval = try parseInterval(String(flag.dropFirst("--interval=".count)))
             } else {
-                throw UsageError(description: "watch 不支持参数「\(flag)」")
+                throw UsageError(description: L("%@ 不支持参数「%@」", "watch", flag))
             }
             index += 1
         }
@@ -154,7 +156,7 @@ enum Args {
 
     private static func parseInterval(_ text: String) throws -> Double {
         guard let value = Double(text), value > 0 else {
-            throw UsageError(description: "--interval 的值「\(text)」无效，需要大于 0 的秒数")
+            throw UsageError(description: L("%@ 的值「%@」无效，需要大于 0 的秒数（允许小数）", "--interval", text))
         }
         return value
     }
@@ -164,7 +166,7 @@ enum Args {
         for flag in flags {
             switch flag {
             case "--reset": reset = true
-            default: throw UsageError(description: "rating 不支持参数「\(flag)」")
+            default: throw UsageError(description: L("%@ 不支持参数「%@」", "rating", flag))
             }
         }
         return reset

@@ -108,4 +108,4 @@ Please include:
 - **PR 要求**：新增解析逻辑必须带真机 fixture 测试；`usb-vendors.json` 一条 JSON 记录一个真实 VID 并注明来源；`README.md` 与 `README.zh-CN.md` 必须同步修改。
 - **提交信息**：遵循 [Conventional Commits](https://www.conventionalcommits.org/) 规范，格式 `<type>(<scope>): <description>`；type 用 `feat`/`fix`/`docs`/`test`/`build`/`chore`（视情况可加 `refactor`/`perf`），scope 为改动模块（`kit`/`app`/`cli`/`widget`/`design`/`roadmap` 等），description 沿用现有习惯写中文；破坏性变更在 type/scope 后加 `!` 并/或补 `BREAKING CHANGE:` footer。
 - **措辞红线**：不给"假线"判决；凡非直读的能力结论一律用"至少支持 / 可能"表述。
-- **报 bug**：请附机型与芯片、macOS 版本，以及相关 IOKit 类的输出（`swift run CableScopeCLI properties <类名> --json`）。
+- **报 bug**：请附机型与芯片、macOS 版本，以及相关 IOKit 类的输出（`cablescope properties <类名> --json`，源码目录下为 `swift run CableScopeCLI properties <类名> --json`）。

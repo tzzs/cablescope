@@ -13,6 +13,7 @@ struct MainWindowView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.locale) private var locale
 
     var body: some View {
         ScrollView {
@@ -63,14 +64,22 @@ struct MainWindowView: View {
         }
     }
 
-    /// 返回类型必须是 `LocalizedStringKey` 而不是 `String`：`navigationSubtitle` 同时有
-    /// `LocalizedStringKey` 和 `StringProtocol` 两个重载，传 `String` 变量命中的是后者
-    /// ——verbatim 显示，完全不查表。此前 "等待首次快照…" 明明有英文译文却永远显示
-    /// 中文，就是踩了这个重载。时间戳先格式化成 `String` 再插值，key 即 "最近快照 %@"。
-    private var subtitleText: LocalizedStringKey {
+    /// 由我们自己按 `\.locale` 查表、再以 `String`（verbatim 重载）交给 `navigationSubtitle`。
+    ///
+    /// 两段历史：最早直接传 `String` 变量却没查表，英文译文永远到不了屏幕；后来改成
+    /// `LocalizedStringKey`，但标题栏解析它时按**系统语言**查表、不看 environment 的
+    /// locale——实测中文系统 + App 选英文时显示 "最近快照 10:52:34 PM"（时间已是英文格式，
+    /// 前缀仍是中文）。只有自己查好再传，才对 App 内语言切换真正生效。
+    private var subtitleText: String {
         if let timestamp = viewModel.snapshot?.timestamp {
-            return "最近快照 \(timestamp.formatted(date: .omitted, time: .standard))"
+            return AppLocalization.format("最近快照 %@", locale: locale, Self.timeLabel(timestamp, locale: locale))
         }
-        return "等待首次快照…"
+        return AppLocalization.string("等待首次快照…", locale: locale)
+    }
+
+    /// 快照时间（internal 便于单测）。显式带 `locale`，理由同
+    /// `SessionDetailSectionView.dateLabel`：`formatted()` 默认跟随系统而不是 App 语言。
+    static func timeLabel(_ date: Date, locale: Locale) -> String {
+        date.formatted(.dateTime.hour().minute().second().locale(locale))
     }
 }

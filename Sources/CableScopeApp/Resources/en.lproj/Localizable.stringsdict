@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>%lld 台 USB 设备</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@devices@</string>
+		<key>devices</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld USB device</string>
+			<key>other</key>
+			<string>%lld USB devices</string>
+		</dict>
+	</dict>
+	<key>%lld 台设备</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@devices@</string>
+		<key>devices</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld device</string>
+			<key>other</key>
+			<string>%lld devices</string>
+		</dict>
+	</dict>
+	<key>%lld 台雷雳设备</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@devices@</string>
+		<key>devices</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld Thunderbolt device</string>
+			<key>other</key>
+			<string>%lld Thunderbolt devices</string>
+		</dict>
+	</dict>
+	<key>%lld 次</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@cycles@</string>
+		<key>cycles</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld cycle</string>
+			<key>other</key>
+			<string>%lld cycles</string>
+		</dict>
+	</dict>
+	<key>基于 %lld 次协商观测</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Based on %#@obs@</string>
+		<key>obs</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld negotiation observation</string>
+			<key>other</key>
+			<string>%lld negotiation observations</string>
+		</dict>
+	</dict>
+	<key>整机评级 · %lld 次观测</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>System rating · %#@obs@</string>
+		<key>obs</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld observation</string>
+			<key>other</key>
+			<string>%lld observations</string>
+		</dict>
+	</dict>
+	<key>累计连接 %lld 次</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@times@</string>
+		<key>times</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Connected once</string>
+			<key>other</key>
+			<string>Connected %lld times</string>
+		</dict>
+	</dict>
+</dict>
+</plist>
