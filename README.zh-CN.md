@@ -144,7 +144,7 @@ scripts/check_localization.py # 本地化检查（含 CLI 在内的每条中文�
 - [x] 系统通知（UNUserNotificationCenter）：五类事件分别开关，按端口限流与分组
 - [x] 设置页：登录时启动、启动行为、主题、App 内语言、可选的自动检查更新
 - [x] App、Widget、CLI 全量中英双语
-- [x] USB 实测吞吐（CLI `throughput` 子命令 + App「吞吐实测」区：挂载卷读写测速）
+- [x] USB 实测吞吐（CLI `throughput` 子命令 + App「吞吐实测」区：挂载卷读写测速；Mac App Store 构建中隐藏——MAS 沙盒无法在外接卷写入测速文件）
 - [x] IOKit 通知替代轮询（AppleSmartBattery 兴趣通知 + USB 匹配通知 + 轮询兜底的混合模式）
 - [x] App 图标（经典 Assets.car appiconset + Icon Composer Liquid Glass 分层，Xcode 与 SwiftPM/DMG 两路均已接入）
 - [ ] 正式分发 —— 发版自动化已跑通（release-please → tag → 构建发布 → 同步 Homebrew tap），CLI 的 formula 不需要签名即可发布；已公证的 App 发布仍待配置 Apple 开发者 secrets（`APPLE_ID` / `APPLE_TEAM_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `DEVELOPER_ID_APPLICATION`）

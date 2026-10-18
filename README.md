@@ -144,7 +144,7 @@ scripts/check_localization.py # every Chinese UI string (incl. CLI) must have an
 - [x] System notifications (UNUserNotificationCenter): five event types with per-type switches, per-port throttling and grouping
 - [x] Settings: launch at login, launch behavior, theme, in-app language, optional automatic update check
 - [x] Full Chinese/English localization of the app, widget and CLI
-- [x] Real-world USB throughput measurement (CLI `throughput` subcommand + App "Throughput" section: read/write benchmark on a mounted volume)
+- [x] Real-world USB throughput measurement (CLI `throughput` subcommand + App "Throughput" section: read/write benchmark on a mounted volume; hidden in the Mac App Store build — the MAS sandbox cannot write benchmark files to external volumes)
 - [x] IOKit notifications to replace polling (AppleSmartBattery interest + USB matching notifications with polling fallback)
 - [x] App icon (classic Assets.car appiconset + Icon Composer Liquid Glass layers, both Xcode and SwiftPM/DMG paths)
 - [ ] Official distribution — release automation is live (release-please → tag → build/publish → Homebrew tap sync) and the CLI formula needs no signing; the notarized app release still awaits the Apple Developer secrets (`APPLE_ID` / `APPLE_TEAM_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `DEVELOPER_ID_APPLICATION`)

@@ -21,7 +21,11 @@ struct MainWindowView: View {
                 OverviewSectionView(viewModel: viewModel)
                 CableCardsSectionView(viewModel: viewModel)
                 SessionDetailSectionView(viewModel: viewModel)
-                ThroughputSectionView()
+                // 商店版不渲染吞吐实测：MAS 沙盒无法在 /Volumes/ 下的外接卷写入测速
+                // 文件，功能必然失败而非降级（见 ThroughputSectionView 头部注释）。
+                if ThroughputSectionView.isSupported {
+                    ThroughputSectionView()
+                }
             }
             .padding(16)
         }

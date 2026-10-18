@@ -7,7 +7,22 @@ import SwiftUI
 ///
 /// 不与线缆会话绑定：macOS 不暴露"USB 存储设备 → 挂载卷"的直接映射（同 `PortGrouping` 对
 /// Displays 的处理方式一致——没有可靠归属时不强行归属），因此改为独立区域，列出全部候选卷由用户手动选择。
+///
+/// 商店版整个区块不出现：测速要在 `/Volumes/` 下的外接卷上写入临时大文件，MAS 沙盒
+/// 对用户选定文件之外的所有文件系统写入都会被拒——功能不是降级而是必然失败，一个对
+/// 所有卷都报错的按钮是审核与用户肉眼可见的"坏功能"。门控与 `UpdateChecker`
+/// `.isSelfUpdateAllowed` 同一模式（条件编译只写这一处，两种构建都能编译与测试），
+/// 调用点在 `MainWindowView`。CLI 不受影响（不进沙盒）。
 struct ThroughputSectionView: View {
+    /// 商店版是否提供吞吐实测（条件编译唯一入口，见类型头部注释）。
+    static let isSupported: Bool = {
+        #if APP_STORE
+        return false
+        #else
+        return true
+        #endif
+    }()
+
     @StateObject private var model = ThroughputSectionModel()
     @Environment(\.locale) private var locale
 
