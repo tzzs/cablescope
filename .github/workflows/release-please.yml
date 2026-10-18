@@ -45,6 +45,13 @@ jobs:
       # （日志 "commit could not be parsed" → "Considering: 0 commits"），然后什么都不做、
       # job 照样报 success —— release PR 永远不会生成（v0.6.0 实际踩过：PR #20）。
       # 检查逻辑与恢复路径见 scripts/check_conventional_commits.sh 头部注释。
+      # 守卫脚本需要仓库文件与提交历史；默认浅克隆只拉 1 个提交，
+      # 会撑不住多提交 push 的 before..after 区间检查，所以 fetch-depth: 0。
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
       - name: Guard conventional commit format
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
