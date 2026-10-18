@@ -5,7 +5,29 @@
 
 ### Features
 
+* **app:** 登录时启动 + 启动弹窗按偏好 + 设置页合并为「通用 / 通知」两页 ([e25348d](https://github.com/tzzs/cablescope/commit/e25348da25b3cf42f1e63ac718ddbb6e5086ed00))
+* **app:** 通知说清是哪个口、按端口限流分组，小组件随插拔/充电即时刷新 ([00a9b7a](https://github.com/tzzs/cablescope/commit/00a9b7af607d14dbe467f131c2eb3fdf6cd5c963))
+* **app:** 更新提示识别 Homebrew 安装渠道，新增可选的每日自动检查 ([ed0cef0](https://github.com/tzzs/cablescope/commit/ed0cef0f6486c22455a389380c83b9e0a01f3190))
+* **cli:** CLI 全量中英双语，帮助与提示按实际命令名展示 ([1763cb2](https://github.com/tzzs/cablescope/commit/1763cb254fceb44676ee62b38de38240508f9b2a))
+* **app:** 测速卷列表随 U 盘/移动硬盘挂载与卸载自动刷新 ([0eca7e8](https://github.com/tzzs/cablescope/commit/0eca7e8676718844c7f4f3fc8293e12f7c056445))
 * **app:** 体验与本地化全面审查：登录启动、通知增强、CLI 双语、英文复数与多处 i18n 修复 ([2795753](https://github.com/tzzs/cablescope/commit/2795753836918635948f3f5e2ed785dbc0f3414a))
+
+### Bug Fixes
+
+* **app:** 日期改按 App 语言格式化，e-marker 提示不再用全角分号拼接 ([f4605d9](https://github.com/tzzs/cablescope/commit/f4605d966892f74b204419bb8e63802f768b63da))
+* **i18n:** 英文复数改用 stringsdict，拼接片段合成整句 key，统一术语 ([b70c4b8](https://github.com/tzzs/cablescope/commit/b70c4b855850e3c0791f475af043a4434ec23e1e))
+* **app:** 登录项 .notFound 不再判为不可用，设置页高度按实测收紧 ([7d9618e](https://github.com/tzzs/cablescope/commit/7d9618e41b9150a47fce27b01908ca2d5ca61514))
+* **app:** 商店版去掉自带的检查更新入口 ([a565e21](https://github.com/tzzs/cablescope/commit/a565e210247a85dfc170f2d188fac9405deb729d))
+* **i18n:** 窗口标题栏按 App 语言显示并实时切换，检查脚本拦截死条目 ([e902dc4](https://github.com/tzzs/cablescope/commit/e902dc4654e8c728c3a84af6069667f2c0ad0cdb))
+
+### Performance Improvements
+
+* **app:** 功率历史拆成独立观察对象，每秒采样不再让整个窗口重新求值 ([32568de](https://github.com/tzzs/cablescope/commit/32568deed261469767de0da316f5d5974eeee4fc))
+
+### Documentation
+
+* README 双语同步新功能与 CLI 语言说明，路线图补 M11 ([d477fbd](https://github.com/tzzs/cablescope/commit/d477fbd315536fc1b54e8d922fc6e328a3eede4a))
+* **app:** InfoChip 注释改为推荐整句插值，不再引导 Text + Text 拼接 ([e201b4e](https://github.com/tzzs/cablescope/commit/e201b4e57e0ba87224c6f9b66589001544810997))
 
 ## [0.5.1](https://github.com/tzzs/cablescope/compare/v0.5.0...v0.5.1) (2026-10-09)
 
