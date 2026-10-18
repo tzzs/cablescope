@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/tzzs/cablescope/compare/v0.5.1...v0.6.0) (2026-10-18)
+
+
+### Features
+
+* **app:** 体验与本地化全面审查：登录启动、通知增强、CLI 双语、英文复数与多处 i18n 修复 ([2795753](https://github.com/tzzs/cablescope/commit/2795753836918635948f3f5e2ed785dbc0f3414a))
+
 ## [0.5.1](https://github.com/tzzs/cablescope/compare/v0.5.0...v0.5.1) (2026-10-09)
 
 
