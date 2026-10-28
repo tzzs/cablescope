@@ -8,13 +8,13 @@ macOS 菜单栏工具：检测连接数据线（USB-C / 雷雳）的**充电速�
 
 ## 工作原理
 
-多数 Mac 上系统只看到"协商结果"，看不到线缆本身。在 Apple Silicon 上，CableScope 直读 USB-C 端口控制器（AppleHPM）——包括线缆的 e-marker 芯片——并展示实时协商信息；拿不到 e-marker 数据时，通过**历史协商峰值**推断线缆规格下限（如 PD 协商到 20V×5A ⇒ 必为 5A e-marker 线）。
+多数 Mac 上系统只看到"协商结果"，看不到线缆本身。在 Apple Silicon 上，CableScope 直读 USB-C 端口控制器（AppleHPM）——包括线缆的 e-marker 芯片——并展示实时协商信息；拿不到 e-marker 数据时，通过**历史协商峰值**推断线缆规格下限（如 PD 协商到 20V×5A ⇒ 该线缆至少支持 5A）。
 
 ## 功能
 
 | 维度 | 内容 |
 | --- | --- |
-| ⚡ 充电 | 瞬时功率（W）、电压/电流、PD 合同（与瞬时功率分开显示）、PD 档位表（直读，当前协商档标出）、充电瓶颈归因、电量、实时功率曲线（App） |
+| ⚡ 充电 | 电池侧充电功率（W）、适配器电压、电池电压/电流、PD 合同（独立显示）、PD 档位表（直读，选中档标出）、充电瓶颈归因、电量、实时功率曲线（App） |
 | 🔌 传输 | USB 协商速率（USB 2.0 / 3.x / USB4 / 雷雳）、设备列表 |
 | 🖥 视频 | 显示器列表、分辨率/刷新率、DP 链路速率；外接显示器可精确归属到具体线缆卡片（DisplayPort 传输节点直读端口归属 + EDID 身份匹配） |
 | 🎛 端口控制器 | Apple Silicon 直读 USB-C 端口控制器（AppleHPM / AppleTC）：端口状态、插拔方向、支持的传输能力（CC / USB2 / USB3 / USB4 / DisplayPort）；Intel/老机型自动降级为推断模式 |
@@ -118,8 +118,8 @@ Sources/
 ├── CableScopeCLI/     # 命令行工具
 └── CableScopeApp/     # SwiftUI 菜单栏 App（MenuBarExtra + 主窗口 + Swift Charts 功率曲线）
 Tests/
-├── CableKitTests/       # 184 个测试：数据契约、按端口分桶评级引擎 + 旧格式迁移、端口分组、解析器（真机样例回归）、诊断、厂商库、评级存储、IORegistry 检查器、profiler 缓存 + 真机冒烟
-├── CableScopeCLITests/  # 51 个测试：参数解析（含 throughput）、格式化、watch 快照差异计算、英文输出与语言解析
+├── CableKitTests/       # 248 个测试：数据契约、按端口分桶评级引擎 + 旧格式迁移、端口分组、解析器（真机样例回归）、诊断（含「充电器档位 vs PD 合同」归因）、充电概览组装、子进程封装、显示缓冲扩容、厂商库、评级存储、IORegistry 检查器（含截断可见性）、profiler 缓存 + 真机冒烟
+├── CableScopeCLITests/  # 106 个测试：参数解析（含 throughput）、格式化、watch 快照差异计算、pretty 渲染、rating/throughput/properties 命令体（注入临时目录，绝不碰你真实的评级文件）、英文输出与语言解析
 └── CableScopeAppTests/  # 54 个测试：更新检查（版本号、安装渠道、每日检查）、启动弹窗决策、通知限流、功率历史、通知偏好开关逻辑、英文本地化（含复数）、视图层文案格式化、MonitorViewModel 对真实 CableMonitor 的冒烟测试
 Docs/                  # 数据获取指南 / 优化路线图 / 术语表
 scripts/bundle_app.sh     # .app 打包脚本
@@ -130,13 +130,13 @@ scripts/check_localization.py # 本地化检查（含 CLI 在内的每条中文�
 ## 数据来源（详见 [Docs/03-数据获取指南.md](Docs/03-数据获取指南.md)）
 
 - **USB**：IOKit `IOUSBHostDevice`（协商速率、LocationID、VID/PID）
-- **充电**：IORegistry `AppleSmartBattery`（瞬时功率 = `AdapterDetails.AdapterVoltage` × 顶层 `Amperage`；PD 合同 = `AdapterDetails` 合同值）+ IOKit.ps 备用电量
+- **充电**：IORegistry `AppleSmartBattery`（电池侧功率 = 顶层 `Voltage` × `Amperage`，即流入电池的功率；PD 合同 = `AdapterDetails` 的 `AdapterVoltage` × `Current`）+ IOKit.ps 备用电量
 - **显示器**：CoreGraphics（分辨率/刷新率）+ `NSScreen.localizedName`（macOS 26 移除了 CGDisplayProductName）
 - **雷雳**：`system_profiler SPThunderboltDataType -json` 递归展平
 
 ## 开发状态
 
-- [x] CableKit 适配层（USB/电源/显示器/雷雳 + 快照流 + 评级引擎）— 289/289 测试通过（含 CLI 与 App 测试 target）
+- [x] CableKit 适配层（USB/电源/显示器/雷雳 + 快照流 + 评级引擎）— 408/408 测试通过（含 CLI 与 App 测试 target）
 - [x] CLI 六个子命令（真机验证：PD 合同识别、e-marker 推断、评级持久化）
 - [x] macOS 菜单栏 App（整机概览、每线一卡 + 线缆详情、实时功率曲线、端口评级）
 - [x] IOKit 属性检查器（App 专属窗口 + CLI `properties` 子命令；快照携带全量 `rawProperties`）

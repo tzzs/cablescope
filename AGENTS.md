@@ -46,10 +46,12 @@ Sources/CableKit/
 ├── Models/       # Value-type snapshots: CableSnapshot, CableSession, CableRating, USBCPortSnapshot, ...
 ├── Services/     # One IOKit/system_profiler wrapper per protocol (ServiceProtocols.swift):
 │                 #   USBService, PowerService, DisplayService, ThunderboltService,
-│                 #   PortControllerService (AppleHPM/AppleTC), RegistryService (generic IORegistry dump)
+│                 #   PortControllerService (AppleHPM/AppleTC), RegistryService (generic IORegistry dump),
+│                 #   DisplayPortTransportService, plus Subprocess.swift (shared `system_profiler` runner)
 ├── Monitor/      # CableMonitor: composes all services into one CableSnapshot + change-event AsyncStream
 ├── Rating/       # CableRatingEngine (pure) + RatingStore (persistence) — historical-peak based rating
-└── Diagnostics/  # Pure functions: charging bottleneck attribution, headline text, e-marker trust
+└── Diagnostics/  # Pure functions: charging bottleneck attribution, headline text, e-marker trust,
+                  #   ChargingOverviewBuilder (shared charge-summary assembly for App + Widget)
 Sources/CableScopeCLI/   # thin CLI on top of CableKit
 Sources/CableScopeApp/   # SwiftUI menu bar app (MenuBarExtra + main window + Swift Charts) on top of CableKit
 Sources/CableScopeWidget/  # desktop widget (WidgetKit), Xcode-project-only target
@@ -57,9 +59,13 @@ Sources/CableScopeWidget/  # desktop widget (WidgetKit), Xcode-project-only targ
 
 Consumers depend on the protocols in `Services/ServiceProtocols.swift`, not concrete service types, so tests can mock them.
 
+**The service protocols do not declare `throws`.** Every service already degrades internally — a failed IOKit read returns an empty array / nil, never an error — so `throws` was contract noise that forced every call site into `try?` boilerplate and hid real failures behind `(try? await x) ?? []`. Keep it that way: if a new service can genuinely fail, return the degraded value rather than throwing, and make the degradation visible in the returned snapshot (e.g. empty vs. populated). The compiler is the enforcement mechanism — adding `throws` back would resurrect the `try?` pattern it just flagged.
+
+**Business rules that more than one product surface needs belong in CableKit as a pure function, not in a product target.** The Widget is the reason this matters: it is an Xcode-only target (not in `Package.swift`), so `swift test` never compiles or runs it — logic living there has *zero* test coverage. `ChargingOverviewBuilder` exists because the charge-summary rules (which port headline goes on top, when power counts as "charging", what counts as "no data") were needed by both the App and the Widget; they now live in CableKit, are covered by `Tests/CableKitTests/ChargingOverviewTests.swift`, and each product target only maps the result into its own UI.
+
 ### CableMonitor: hybrid event/poll model
 
-`CableMonitor.snapshotNow()` fans out to all five services concurrently via `async let`; **a single service failing degrades to an empty array/nil for that field, it never fails the whole snapshot**.
+`CableMonitor.snapshotNow()` fans out to all six services concurrently via `async let`; **a single service failing degrades to an empty array/nil for that field, it never fails the whole snapshot**.
 
 `CableMonitor.snapshotStream()` yields an initial snapshot immediately, then re-samples on "event signal OR pollInterval timeout, whichever comes first" (default poll interval 1.5s). Three IOKit notification sources feed the same `DispatchSemaphore`: `AppleSmartBattery` interest notification (near-zero-latency power/charge changes), and USB device publish/terminate matching notifications (plug/unplug). Anything not covered by these (e.g. display/Thunderbolt topology changes) falls back to the poll interval. Content-signature deduplication (excluding id/timestamp) means only real changes get yielded. See the doc comment at the top of `Sources/CableKit/Monitor/CableMonitor.swift` for the full lifecycle/ownership rationale (why `DispatchSemaphore` over `AsyncStream` racing, notification port teardown order, etc.) before touching this file.
 
@@ -83,7 +89,9 @@ Physical cables are inferred, not directly enumerable, so devices/ports are grou
 
 ### Rating engine (`Rating/CableRatingEngine.swift`)
 
-Pure Swift, no IOKit dependency, fully unit-testable. Rates a cable from **historical negotiation peaks**, bucketed per session id (`"usb-0x014"`, port-controller node id, or `"tb-2"`) — peaks only ever increase, they never reset on unplug. Key inference rule: a PD contract negotiating ≥ 20V/5A implies a 5A e-marker chip. Full bucketing/attribution rules are documented in `Docs/03-数据获取指南.md` and in the file's header comment; read both before changing bucket semantics.
+Pure Swift, no IOKit dependency, fully unit-testable. Rates a cable from **historical negotiation peaks**, bucketed per session id (`"usb-0x014"`, port-controller node id, or `"tb-2"`) — peaks only ever increase, they never reset on unplug. Key inference rule: a PD contract negotiating ≥ 20V/5A (`AdapterDetails.Current`) implies the cable **supports at least 5A**. That is the *only* accepted evidence — `WinningPowerSourceOption` is a PDO upper bound, not the negotiated current, and battery-side `Amperage` lives in a different voltage domain (battery 12.6 V ≠ adapter 20 V), so neither proves cable current. Full bucketing/attribution rules are documented in `Docs/03-数据获取指南.md` and in the file's header comment; read both before changing bucket semantics.
+
+**Power is battery-side, not line-side.** `PowerSnapshot.watts` = battery voltage × battery current (top-level `Voltage` × `Amperage`). It is *not* adapter output or cable power — macOS exposes no per-port power reading. Never compare it against the PD contract to conclude "the charger is at full output"; diagnostics may only say whether the contract reached the charger's highest advertised tier.
 
 ### Widget ↔ App preference sharing (`SharedAppPreferences`)
 
@@ -124,6 +132,9 @@ These exist so the tool never claims to know more than it actually read from har
 
 - **Never output a "fake/counterfeit cable" verdict.** If e-marker data looks unusual (zero VID, reserved bit values, unlisted VID), describe what was read ("VID not reported", "unusual value") — never label a cable fake or non-compliant.
 - **Capability claims not read directly from hardware must use lower-bound phrasing** ("supports at least …" / "may …"). Inferred ratings are inferences from negotiation peaks, never certificates.
+- **Watch for compound assertions.** One phrase can bundle several independent claims, and it is enough for *one* of them to be unmeasured for the whole phrase to overstate. The canonical example: "5A e-marker cable" asserts both "is 5A" (inferred from a negotiation peak — sound) **and** "contains an e-marker chip" (never read on that code path at all). It is now phrased "supports at least 5A" everywhere. The e-marker chip's own data has its own display path (`EMarkerSnapshot` → `eMarkerChips`), so nothing is lost — the point is that the two claims must not be welded into one phrase.
+- **Never let a UI keep a slot the data can no longer fill.** A `@State` for an error message that the service layer can no longer populate is a dead branch that reads as "this case is handled" while handling nothing. When a service's contract changes (e.g. "degrade to empty instead of throwing"), sweep the consumers for the now-impossible states.
+- **A limit that silently truncates must be visible.** `RegistryService` caps enumeration at `maxEntries`; the result carries `truncated` so callers can say so. A diagnostic tool that presents a truncated result as "everything" builds its conclusions on a broken premise. Note the truncation probe must count **raw** entries, not successfully-read ones — entries whose property read failed still consumed the enumeration budget.
 
 ## Testing conventions
 
