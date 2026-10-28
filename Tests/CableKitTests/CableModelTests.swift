@@ -68,7 +68,7 @@ final class CableModelTests: XCTestCase {
             power: PowerSnapshot(isCharging: true,
                                  batteryPercent: 61,
                                  adapterVoltageMV: 20_000,
-                                 adapterAmperageMA: 3_627,
+                                 batteryAmperageMA: 3_627,
                                  pdContract: PDContract(voltageMV: 20_000, currentMA: 5_000),
                                  adapterDescription: "pd charger",
                                  cycleCount: 40),

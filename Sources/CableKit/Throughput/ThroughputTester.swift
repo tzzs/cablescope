@@ -50,7 +50,7 @@ public struct ThroughputError: Error, CustomStringConvertible {
     public init(_ description: String) { self.description = description }
 }
 
-/// ThroughputTester（Docs/02 业务层「可选实测吞吐」）：对挂载卷读写测速，区分"协商速率"与"实测值"。
+/// ThroughputTester（Docs/03「实测吞吐」）：对挂载卷读写测速，区分"协商速率"与"实测值"。
 public enum ThroughputTester {
     /// 测速阶段（供调用方打印进度；回调在后台线程触发）
     public enum Phase: Sendable {

@@ -74,6 +74,40 @@ final class ArgsTests: XCTestCase {
         assertUsageError(["watch", "--bogus"], contains: "watch 不支持参数")
     }
 
+    /// `Double("inf")` 能解析成功但不是有限值：透传下去会在
+    /// `UInt64(interval * 1_000_000_000)` 处溢出陷阱（进程直接崩溃），
+    /// "nan" 则让所有比较恒为 false。两者都必须在解析层被拒。
+    ///
+    /// 超大**有限**值（如 "1e20"）同样会崩——`isFinite` 挡不住它，故还要卡上限。
+    func testWatchRejectsNonFiniteInterval() {
+        assertUsageError(["watch", "--interval", "inf"], contains: "无效")
+        assertUsageError(["watch", "--interval", "infinity"], contains: "无效")
+        assertUsageError(["watch", "--interval", "nan"], contains: "无效")
+        assertUsageError(["watch", "--interval=-inf"], contains: "无效")
+    }
+
+    /// 超大有限值：`Double("1e20")` 是有限值，但下游 `UInt64(interval * 1_000_000_000)`
+    /// 会溢出陷阱（Fatal error，进程直接崩，不是报错）。必须在解析层被拒。
+    func testWatchRejectsHugeFiniteInterval() {
+        assertUsageError(["watch", "--interval", "1e20"], contains: "无效")
+        assertUsageError(["watch", "--interval", "1e300"], contains: "无效")
+        assertUsageError(["watch", "--interval", "99999999999999999999"], contains: "无效")
+    }
+
+    /// 极小值：下游 `UInt64(interval * 1e9)` 会**静默截断**成 0（不崩溃），
+    /// 于是 `Task.sleep(nanoseconds: 0)` 立刻返回 → 轮询变成零延迟忙循环，
+    /// 每轮都跑一次完整的 IOKit 采集，CPU 打满。
+    func testWatchRejectsSubMillisecondInterval() {
+        assertUsageError(["watch", "--interval", "1e-12"], contains: "无效")
+        assertUsageError(["watch", "--interval", "0.0001"], contains: "无效")
+        assertUsageError(["watch", "--interval=1e-9"], contains: "无效")
+    }
+
+    /// 下限边界本身是合法的（0.001 秒 = 1ms）。
+    func testWatchAcceptsMinimumInterval() throws {
+        XCTAssertEqual(try Args.parse(["watch", "--interval", "0.001"]), .watch(interval: 0.001))
+    }
+
     // MARK: rating
 
     func testRatingDefaultsAndReset() throws {
@@ -134,6 +168,26 @@ final class ArgsTests: XCTestCase {
         assertUsageError(["throughput", "--seconds", "-1"], contains: "无效")
         assertUsageError(["throughput", "--seconds", "abc"], contains: "无效")
         assertUsageError(["throughput", "--seconds"], contains: "需要一个数值")
+    }
+
+    /// 同 watch --interval：非有限值必须被拒，否则下游 `UInt64(seconds * 1e9)` 溢出。
+    func testThroughputRejectsNonFiniteSeconds() {
+        assertUsageError(["throughput", "--seconds", "inf"], contains: "无效")
+        assertUsageError(["throughput", "--seconds", "nan"], contains: "无效")
+        assertUsageError(["throughput", "--seconds=-inf"], contains: "无效")
+    }
+
+    /// 超大有限值同样会崩（`Duration.seconds(1e300)` / `UInt64(1e20 * 1e9)` 溢出）。
+    func testThroughputRejectsHugeFiniteSeconds() {
+        assertUsageError(["throughput", "--seconds", "1e20"], contains: "无效")
+        assertUsageError(["throughput", "--seconds", "1e300"], contains: "无效")
+    }
+
+    /// 极小值会被 `UInt64(seconds * 1e9)` 静默截断成 0 → 测速阶段瞬时结束，
+    /// 拿不到任何有效数据。
+    func testThroughputRejectsSubMillisecondSeconds() {
+        assertUsageError(["throughput", "--seconds", "1e-12"], contains: "无效")
+        assertUsageError(["throughput", "--seconds", "0.0001"], contains: "无效")
     }
 
     func testThroughputVolumeNeedsValueAndRejectsUnknownFlag() {

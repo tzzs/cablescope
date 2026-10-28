@@ -9,7 +9,7 @@
 
 "%@ 协商速率提升" = "%@ speed upgraded";
 "%@ 线缆评级提升" = "%@ rating upgraded";
-"5A e-marker 线" = "5A e-marker cable";
+"至少支持 5A" = "Supports at least 5A";
 "CC 通信" = "CC Communication";
 "IOKit 属性" = "IOKit Properties";
 "IOKit 属性检查器" = "IOKit Property Inspector";
@@ -78,7 +78,6 @@
 "未检测到外接/可移动卷" = "No external/removable volumes detected";
 "未检测到线缆 / 设备" = "No cables / devices detected";
 "未知设备" = "Unknown Device";
-"枚举失败：%@" = "Enumeration failed: %@";
 "查看原始 IOKit 属性" = "View Raw IOKit Properties";
 "检查更新" = "Check for Updates";
 "检测到视频信号（DisplayPort 交替模式已启用）" = "Video signal detected (DisplayPort Alt Mode enabled)";
@@ -129,7 +128,7 @@
 "速率未知" = "Speed Unknown";
 "链路未知" = "Link Unknown";
 "雷雳设备" = "Thunderbolt Devices";
-"首次确认支持 5A" = "5A support confirmed for the first time";
+"首次确认至少支持 5A" = "First time confirmed support for at least 5A";
 "首次观测 %@ · 历史峰值，拔线不清零" = "First seen %@ · historical peak, never reset on unplug";
 "启动" = "Startup";
 "登录时启动" = "Launch at Login";
@@ -144,10 +143,15 @@
 "更新" = "Updates";
 "自动检查更新" = "Check for Updates Automatically";
 "每天最多一次向 api.github.com 查询最新版本号，不发送任何设备信息。" = "Queries api.github.com for the latest version number at most once a day. No device information is sent.";
-"系统输入 · %@V / %@A" = "System input · %@V / %@A";
+"适配器 %@V · 电池 %@V / %@A" = "Adapter %@V · battery %@V / %@A";
+"适配器 %@V · 电池电流 %@A" = "Adapter %@V · battery current %@A";
+"适配器 %@V" = "Adapter %@V";
 "PD 合同 %@W · 暂未充电" = "PD Contract %@W · not charging yet";
-"%@W 充电中" = "%@W charging";
+"已协商 %lldW" = "Negotiated %lldW";
+"PD 档位 %lldW" = "PD tier %lldW";
 "%@ · 已写入 %@ · 已读取 %@ · 耗时 %@ 秒" = "%@ · wrote %@ · read %@ · %@ sec total";
 "插头方向 A" = "Plug Orientation A";
 "插头方向 B" = "Plug Orientation B";
 "USB-C 正反都能插，这里只是端口上报的物理朝向，不影响充电或传输" = "USB-C plugs work either way up; this is just the physical orientation the port reports and has no effect on charging or data";
+"条目数超过上限，仅显示前 %lld 条" = "More entries exist than the limit; only the first %lld are shown";
+"另有 %lld 个条目的属性无法读取" = "The properties of %lld more entries could not be read";

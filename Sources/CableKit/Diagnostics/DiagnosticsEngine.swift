@@ -11,10 +11,8 @@ public enum ChargingBottleneck: Equatable, Sendable {
     case notConnected
     /// 已接通但未充电（优化充电暂停 / 电池保温 / 读数缺失）
     case paused
-    /// 充电器正按合同满档输出
-    case adapterMax
-    /// 实际抽取低于合同（电池接近充满 / 系统限流）
-    case machineDrawingLess
+    /// 已按合同充电，合同达到（或无法与）充电器最高档（比较）
+    case chargingWithinContract
     /// 合同低于适配器可用档位——线缆可能限制了协商档位
     case cableLikelyLimited
     /// 数据不足，无法归因
@@ -37,11 +35,37 @@ public struct ChargingDiagnostics: Equatable, Sendable {
 public enum DiagnosticsEngine {
     // MARK: 充电归因
 
+    /// 充电器可用档位上限 W：端口 PD 档位表（`options`，充电器上报的全部 fixed 档）里的最大功率。
+    ///
+    /// `options` 是充电器**广告的能力表**，与"协商结果"是两回事：
+    /// - `options` 的最大值 = **充电器**能提供的最高档（如 20V×5A = 100W）；
+    /// - `winning` = 选中了哪一档 PDO，其 `Max Current` 是**该档上限**，不是 RDO 里
+    ///   实际请求的电流——所以它既不能当"合同"，也不能当"线缆能力"的证据。
+    ///
+    /// 拿 `winning` 冒充"充电器能力"会让判定自我循环（拿选中的档跟它自己比，
+    /// 于是"线缆受限"永不触发），多线时更会拿**别的线**的档位当充电器能力而误报。
+    ///
+    /// **保守原则**：只有恰好一个端口带 `powerSource` 时才返回档位表上限；多端口时返回 nil
+    /// —— 避免跨充电器误判。
+    public static func adapterMaxPDOWatts(ports: [USBCPortSnapshot]) -> Double? {
+        let portsWithPowerSource = ports.compactMap { $0.powerSource }
+        guard portsWithPowerSource.count == 1 else { return nil }
+        return portsWithPowerSource[0].options.map(\.maxPowerMW).max().map { Double($0) / 1000 }
+    }
+
     /// - Parameters:
     ///   - power: 当前电源快照
-    ///   - adapterMaxWatts: 端口 PD 档位表里可用的最大功率（WinningPowerSourceOption）；
+    ///   - adapterMaxWatts: **充电器**可用档位上限 W（`adapterMaxPDOWatts(ports:)`）；
     ///     无端口控制器数据（老机型）时传 nil，跳过"线缆受限"分支。
     ///   - locale: 文案生成使用的语言；不传时跟随系统区域设置（CLI/旧调用点行为不变）。
+    ///
+    /// **合同只认 `power.pdContract`。** 端口控制器的 `winning` 是充电器广告的一个
+    /// PDO，其 `Max Current` 是**该档上限**而非 RDO 里实际请求的电流，拿它当合同会把
+    /// "充电器能给的"说成"这根线谈成的"。
+    ///
+    /// **也不比较"实际功率"与合同。** macOS 不提供端口级实测功率，电池侧功率
+    /// （`PowerSnapshot.watts`）还要扣掉整机功耗，拿它跟合同比会得出"充电器没满档"
+    /// 的错误结论——那只是电池没吃满而已。
     public static func diagnoseCharging(power: PowerSnapshot?,
                                         adapterMaxWatts: Double?,
                                         locale: Locale = .current) -> ChargingDiagnostics {
@@ -65,10 +89,8 @@ public enum DiagnosticsEngine {
             return ChargingDiagnostics(verdict: .unknown,
                 summary: KitLocalization.string("正在充电（合同读数缺失）", locale: locale))
         }
-        let realWatts = power.watts ?? 0
 
         // 合同 < 适配器档位上限：线缆（或电池状态）可能压低了协商档位。
-        // 先于"满档输出"判断——机器正按合同满抽、但合同本身低于适配器能力时，问题在线缆而非充电器。
         if let adapterMaxWatts, contractWatts < adapterMaxWatts * 0.95 {
             return ChargingDiagnostics(
                 verdict: .cableLikelyLimited,
@@ -80,33 +102,34 @@ public enum DiagnosticsEngine {
             )
         }
 
-        // 实际输出 ≈ 合同：充电器已满档输出。
-        if realWatts >= contractWatts * 0.9 {
+        // 合同已到（或无法与）充电器最高档（比较）。
+        // 只说"协商到了哪一档"——输出功率没有端口级读数，断言不了。
+        if let adapterMaxWatts {
             return ChargingDiagnostics(
-                verdict: .adapterMax,
-                summary: KitLocalization.string("充电器正按合同满档输出", locale: locale),
+                verdict: .chargingWithinContract,
+                summary: KitLocalization.string(
+                    template: "已协商到充电器最高档 %@W", locale: locale,
+                    args: KitLocalization.fixedFraction(adapterMaxWatts, digits: 0)),
                 detail: KitLocalization.string(
-                    template: "当前 %@W ≈ PD 合同 %@W", locale: locale,
-                    args: KitLocalization.fixedFraction(realWatts, digits: 1),
-                          KitLocalization.fixedFraction(contractWatts, digits: 0))
+                    "实际充电功率取决于电池状态与整机功耗（macOS 不提供端口级功率读数）", locale: locale)
             )
         }
-
         return ChargingDiagnostics(
-            verdict: .machineDrawingLess,
-            summary: KitLocalization.string(
-                template: "实际抽取 %@W，低于合同 %@W", locale: locale,
-                args: KitLocalization.fixedFraction(realWatts, digits: 1),
-                      KitLocalization.fixedFraction(contractWatts, digits: 0)),
-            detail: KitLocalization.string("电池接近充满或系统在限流，属正常现象", locale: locale)
+            verdict: .chargingWithinContract,
+            summary: KitLocalization.string("已按 PD 合同充电", locale: locale),
+            detail: KitLocalization.string(
+                "没有端口档位数据，无法比较充电器上限；实际功率取决于电池状态与整机功耗", locale: locale)
         )
     }
 
     // MARK: 端口一句话头条
 
-    /// 生成端口头条，如 "USB-C · ⚡98.7W · 被动线缆 · 5A（≤100W） · USB4/雷雳可用"。
+    /// 生成端口头条，如 "USB-C · PD 档位 100W · 被动线缆 · 5A（≤100W） · USB4/雷雳可用"。
     /// 无任何可说内容时返回 nil。
-    public static func portHeadline(port: USBCPortSnapshot?, power: PowerSnapshot?,
+    ///
+    /// **只讲本端口直读的事实**：充电功率是整机量（电池侧），多线时无法归属到某一条，
+    /// 放进每端口的头条会让所有端口显示同一个数字。这里只报该端口选中的 PD 档位。
+    public static func portHeadline(port: USBCPortSnapshot?,
                                     locale: Locale = .current) -> String? {
         guard let port else { return nil }
         var parts: [String] = []
@@ -114,11 +137,10 @@ public enum DiagnosticsEngine {
             parts.append(portType)
         }
 
-        if power?.isCharging == true, let watts = power?.watts, watts > 0 {
-            parts.append(KitLocalization.string(template: "⚡%@W", locale: locale,
-                                                args: KitLocalization.fixedFraction(watts, digits: 1)))
-        } else if let winning = port.powerSource?.winning {
-            parts.append(KitLocalization.string(template: "合同 %@W", locale: locale,
+        // winning 是选中的 PDO，`Max Current` 是该档上限——措辞用"PD 档位"，
+        // 不说"合同"（合同电流在 AdapterDetails.Current 里，是整机侧的量）。
+        if let winning = port.powerSource?.winning {
+            parts.append(KitLocalization.string(template: "PD 档位 %@W", locale: locale,
                                                 args: String(Int(winning.watts.rounded()))))
         }
 

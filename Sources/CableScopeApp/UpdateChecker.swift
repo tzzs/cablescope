@@ -32,6 +32,8 @@ enum UpdateChecker {
         var request = URLRequest(url: apiURL)
         request.httpMethod = "GET"
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        // GitHub API 强制要求 User-Agent，缺失直接 403（不带上会被限流甚至拒绝）。
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.timeoutInterval = 5
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -45,6 +47,13 @@ enum UpdateChecker {
         }
         return try JSONDecoder().decode(Release.self, from: data).tagName
     }
+
+    /// 请求 User-Agent：GitHub API 要求每个请求都带，缺失返回 403。
+    /// 带上应用名与版本，便于在 GitHub 侧识别与排查来源请求。
+    static let userAgent: String = {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        return version.map { "CableScope/\($0)" } ?? "CableScope"
+    }()
 
     // MARK: - 版本比较（纯函数）
 
@@ -147,6 +156,9 @@ enum UpdateChecker {
               let repo = URL(string: repositoryURL) else { return }
         defaults.set(Date(), forKey: lastCheckKey)
         guard let latest = try? await latestReleaseTag(for: repo) else { return }
+        // 网络往返期间用户可能已经关掉开关、或 App 正在退出（task 被取消）：
+        // 返回后必须重新确认，否则"关掉自动检查"之后仍会弹一次更新对话框。
+        guard !Task.isCancelled, defaults.bool(forKey: autoCheckKey) else { return }
         let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
         guard isUpdateAvailable(current: current, latest: latest),
               shouldNotifyAutomatically(latest: latest, lastNotified: defaults.string(forKey: lastNotifiedVersionKey))

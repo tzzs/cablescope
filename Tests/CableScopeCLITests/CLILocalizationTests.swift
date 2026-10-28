@@ -59,7 +59,7 @@ final class CLILocalizationTests: XCTestCase {
         CLILanguage.locale = Locale(identifier: "en")
         XCTAssertThrowsError(try Args.parse(["watch", "--interval", "0"])) { error in
             XCTAssertEqual((error as? UsageError)?.description,
-                           "Invalid value “0” for --interval: expected a number of seconds greater than 0 (fractions allowed)")
+                           "Invalid value for \"--interval\": 0 — requires a number >= 0.001 and <= 3600 (decimals allowed)")
         }
         XCTAssertEqual(UsageError.hint(command: "cablescope"), "Run `cablescope --help` for usage.")
     }

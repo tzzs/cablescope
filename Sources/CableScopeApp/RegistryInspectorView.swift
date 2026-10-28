@@ -22,7 +22,10 @@ struct RegistryInspectorView: View {
     @State private var selectedEntryID: UInt64?
     @State private var searchText = ""
     @State private var isLoading = false
-    @State private var errorMessage: String?
+    /// 本次枚举是否因触及条目数上限而被截断（结果不完整，必须提示用户）。
+    @State private var isTruncated = false
+    /// 本次枚举有多少条目的属性读取失败（条目在，但属性读不出来）。
+    @State private var failedCount = 0
     /// 拷贝成功反馈：按钮短暂显示"已拷贝"（HIG：操作应有可见确认）。
     @State private var showCopyConfirmation = false
 
@@ -72,11 +75,32 @@ struct RegistryInspectorView: View {
 
             Divider()
 
-            if let errorMessage {
-                Label(errorMessage, systemImage: "exclamationmark.triangle")
-                    .font(.callout)
-                    .foregroundStyle(.orange)
-                    .padding(10)
+            // 完整性提示：诊断工具里"没显示全"必须说出口，否则用户会把残缺结果
+            // 当成该类的全部条目，排查结论就建立在错误前提上。
+            //
+            // 两种不完整要分开说：截断（有条目被丢弃）与属性读取失败（条目在，
+            // 但属性读不出来）——成因不同，用户的下一步排查方向也不同。
+            if isTruncated {
+                Label {
+                    Text("条目数超过上限，仅显示前 \(RegistryService.maxEntries) 条")
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle")
+                }
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .padding(.horizontal, 10)
+                .padding(.bottom, 6)
+            }
+            if failedCount > 0 {
+                Label {
+                    Text("另有 \(failedCount) 个条目的属性无法读取")
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle")
+                }
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .padding(.horizontal, 10)
+                .padding(.bottom, 6)
             }
 
             entryList
@@ -104,11 +128,9 @@ struct RegistryInspectorView: View {
         }
         .overlay {
             if filtered.isEmpty && !isLoading {
-                if let errorMessage {
-                    EmptyHint(verbatim: errorMessage)
-                } else {
-                    EmptyHint(text: "该类名下没有 registry 条目")
-                }
+                // 枚举失败与"该类无条目"都表现为空列表（服务层契约：失败即降级为空），
+                // 所以这里只有一种空态文案，不做"出错了"的伪区分。
+                EmptyHint(text: "该类名下没有 registry 条目")
             }
         }
         .listStyle(.sidebar)
@@ -221,19 +243,30 @@ struct RegistryInspectorView: View {
 
     private func fetchOnce(class targetClass: String) async {
         isLoading = true
-        defer { isLoading = false }
-        do {
-            let fresh = try await RegistryService().listEntries(matchingClass: targetClass)
-            entries = fresh
-            errorMessage = nil
-            // 选中项优先保留（仍存在时）；否则自动选第一条。
-            if selectedEntryID == nil || !fresh.contains(where: { $0.registryID == selectedEntryID }) {
-                selectedEntryID = fresh.first?.registryID
-            }
-        } catch {
-            let template = AppLocalization.string("枚举失败：%@", locale: AppPreferences.effectiveLocale())
-            errorMessage = String(format: template, error.localizedDescription)
+        let result = await RegistryService().enumerate(matchingClass: targetClass)
+        // 返回后必须重新确认"这次结果还是当前请求的"：
+        // 切换类名会取消旧的 SwiftUI task，但底下的 detached 枚举不可取消、照样会返回。
+        // 不设这道闸，旧类名的结果会在新类名的枚举之后落到界面状态里——侧栏标题写着
+        // 新类名，列表却是旧类的条目，排查结论直接建立在错位的数据上。
+        guard !Self.isStaleResult(requestedClass: targetClass,
+                                  currentClass: className,
+                                  isCancelled: Task.isCancelled) else { return }
+        entries = result.entries
+        isTruncated = result.truncated
+        failedCount = result.failedCount
+        // 选中项优先保留（仍存在时）；否则自动选第一条。
+        if selectedEntryID == nil || !result.entries.contains(where: { $0.registryID == selectedEntryID }) {
+            selectedEntryID = result.entries.first?.registryID
         }
+        isLoading = false
+    }
+
+    /// 异步枚举返回后，结果是否已经过期（任务被取消，或用户已切到别的类名）。
+    ///
+    /// 抽成纯函数是为了能单测——这是"旧结果覆盖新类名列表"这个 bug 的唯一判据，
+    /// 埋在一个 `async` 视图方法里就再也测不到了。
+    static func isStaleResult(requestedClass: String, currentClass: String, isCancelled: Bool) -> Bool {
+        isCancelled || requestedClass != currentClass
     }
 
     // MARK: - 拷贝

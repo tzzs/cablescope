@@ -105,7 +105,7 @@ final class NotificationController {
         }
     }
 
-    /// 开始充电时附上 PD 合同功率（比瞬时功率稳定：刚接通的头几秒瞬时读数还在爬升）。
+    /// 开始充电时附上 PD 合同功率（比电池侧功率稳定：后者随电池状态与系统负载波动）。
     private func chargingBody(_ power: PowerSnapshot?, locale: Locale) -> String {
         guard let contract = power?.pdContract else { return "" }
         let template = AppLocalization.string("PD 合同 %lldW", locale: locale)
@@ -114,7 +114,7 @@ final class NotificationController {
 
     private func connectBody(session: CableSession, port: USBCPortSnapshot?, locale: Locale) -> String {
         var parts: [String] = []
-        if let headline = DiagnosticsEngine.portHeadline(port: port, power: nil, locale: locale) {
+        if let headline = DiagnosticsEngine.portHeadline(port: port, locale: locale) {
             parts.append(headline)
         } else if let speed = session.topUSBSpeed {
             parts.append("\(speed.generation) \(speed.label)")
@@ -150,7 +150,7 @@ final class NotificationController {
 private extension RatingUpgradeDimension {
     func localizedDescription(locale: Locale) -> String {
         switch self {
-        case .fiveAmpConfirmed: return AppLocalization.string("首次确认支持 5A", locale: locale)
+        case .fiveAmpConfirmed: return AppLocalization.string("首次确认至少支持 5A", locale: locale)
         case .displayLink: return AppLocalization.string("显示器链路规格提升", locale: locale)
         }
     }

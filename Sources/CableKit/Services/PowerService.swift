@@ -5,20 +5,28 @@ import IOKit.ps
 /// 电源/充电状态（IORegistry `AppleSmartBattery` 为主，IOPowerSources 为备用电量来源）。
 ///
 /// 键名均已在本机（Apple Silicon，macOS 26 / Xcode 26 SDK）`ioreg -r -c AppleSmartBattery` 验证：
-/// - 顶层标量：`Amperage`(mA，实际抽流)、`ExternalConnected`、`IsCharging`、
-///   `CurrentCapacity`、`MaxCapacity`、`CycleCount`；`AdapterVoltage` 通常不存在于顶层
-/// - `AdapterDetails` 字典（本机实测样例）：`AdapterVoltage=20000`、`Current=5000`（协商合同电流，
-///   区别于顶层实际抽流 Amperage）、`Watts=100`、`Description="pd charger"`、`UsbHvcMenu`…
-///   → `adapterVoltageMV` 回退到 AdapterDetails.AdapterVoltage（配合顶层 Amperage 得到瞬时功率）
-///   → `pdContract` 取合同值（AdapterDetails.AdapterVoltage×Current，如 20V×5A=100W 能力）
+/// - 顶层标量：`Amperage`(mA，电池侧)、`Voltage`(mV，电池电压)、`ExternalConnected`、
+///   `IsCharging`、`CurrentCapacity`、`MaxCapacity`、`CycleCount`；`AdapterVoltage` 通常不存在于顶层
+/// - `AdapterDetails` 字典（本机实测样例）：`AdapterVoltage=20000`、`Current=5000`（协商合同电流）、
+///   `Watts=100`、`Description="pd charger"`、`UsbHvcMenu`…
+///   → `adapterVoltageMV` 回退到 AdapterDetails.AdapterVoltage
+///   → `pdContract` 取合同值（AdapterDetails.AdapterVoltage×Current，如 20V×5A=100W 能力）；
+///     协商电流（Current）读不到时**不构造合同**——顶层 Amperage 不是合同电流，不能拿来用
 /// - 拔掉电源：ExternalConnected=No → 快照 isCharging=false 且电压/电流/合同均为 nil。
 /// - 已接通但暂停充电（电量保持/优化充电暂停，如 86% 时 IsCharging=No 而 ExternalConnected=Yes）：
-///   isCharging=false 但 externalConnected=true，此时顶层 Amperage 可为负（电池侧微小放电），
-///   消费方须用 externalConnected 而非 isCharging 判断"是否插电"。
+///   isCharging=false 但 externalConnected=true，消费方须用 externalConnected 而非 isCharging
+///   判断"是否插电"。
+///
+/// **顶层 `Amperage` 测的是电池侧电流，不是流过线缆的电流。** 本机实测佐证：100W 充电器
+/// 接入、电池 100% 满电时，`AdapterDetails` 报 `Current=5000 / Watts=100`，而顶层
+/// `Amperage` 读数为 **0**——系统直接从适配器取电，电流不经过电池。推论：把
+/// `Amperage` 称为"实际抽流"会让人以为它能反映线缆承载的电流；它其实是"流入电池的电流"，
+/// 满电时恒为 0、暂停充电时可为负（电池侧微小放电）。任何拿它推断线缆能力的逻辑都要
+/// 记住这个量纲。
 public final class PowerService: PowerServiceProtocol {
     public init() {}
 
-    public func currentPower() async throws -> PowerSnapshot? {
+    public func currentPower() async -> PowerSnapshot? {
         await Task.detached(priority: .utility) {
             Self.readPowerSnapshot()
         }.value
@@ -59,15 +67,26 @@ enum PowerParsing {
 
         let adapterDetails = props["AdapterDetails"] as? [String: Any]
         // 实测（macOS 26，Apple Silicon）：顶层通常没有 `AdapterVoltage` 键，该键只在
-        // AdapterDetails 字典里；顶层 `Amperage` 才是实际抽流。瞬时功率 =
-        // AdapterDetails.AdapterVoltage × 顶层 Amperage（如 20V × 2.0A ≈ 40W）。
+        // AdapterDetails 字典里；顶层 `Amperage` 是**流入电池**的电流（不是线缆电流）。
         let voltageMV = intValue(forKey: "AdapterVoltage", in: props)
             ?? adapterDetails.flatMap { intValue(forKey: "AdapterVoltage", in: $0) }
         let amperageMA = intValue(forKey: "Amperage", in: props)
+        // 电池电压：功率换算必须与电池电流同域。`Voltage` 是标准键，
+        // `AppleRawBatteryVoltage` 在部分系统上才是原始值（两者本机实测一致）。
+        let batteryVoltageMV = intValue(forKey: "Voltage", in: props)
+            ?? intValue(forKey: "AppleRawBatteryVoltage", in: props)
 
-        // pdContract 是协商的 PD 合同（能力上限，如 20V×5A=100W），区别于瞬时功率。
-        let contractVoltageMV = adapterDetails.flatMap { intValue(forKey: "AdapterVoltage", in: $0) } ?? voltageMV
-        let contractAmperageMA = adapterDetails.flatMap { intValue(forKey: "Current", in: $0) } ?? amperageMA
+        // pdContract 是协商的 PD 合同（能力上限，如 20V×5A=100W），区别于电池侧功率。
+        //
+        // **合同只在读到协商读数时才构造**（宁缺勿造）：
+        // - 电压：AdapterDetails.AdapterVoltage 优先，顶层 AdapterVoltage 兜底——两者都是
+        //   适配器输出电压，语义上就是合同电压；
+        // - 电流：只认 AdapterDetails.Current（协商合同电流）。顶层 `Amperage` 是**瞬时实际
+        //   电流**，拿它兜底会拼出一个"电池侧功率冒充合同"的假合同——下游诊断拿合同功率与
+        //   功率比较时恒判"充电器满档输出"，还会拿瞬时值去比适配器档位、把线缆误判成瓶颈。
+        let contractVoltageMV = adapterDetails.flatMap { intValue(forKey: "AdapterVoltage", in: $0) }
+            ?? intValue(forKey: "AdapterVoltage", in: props)
+        let contractAmperageMA = adapterDetails.flatMap { intValue(forKey: "Current", in: $0) }
 
         var pdContract: PDContract?
         var adapterDescription: String?
@@ -85,9 +104,11 @@ enum PowerParsing {
         return PowerSnapshot(
             isCharging: charging,
             batteryPercent: batteryPercent(from: props),
-            // 未接适配器时电压/电流无意义，置 nil（顶层可能有 0 残留值）。
+            // 未接适配器时适配器电压/电流无意义，置 nil（顶层可能有 0 残留值）。
+            // 电池电压是电池自身的属性，插不插电都有意义，照常保留。
             adapterVoltageMV: externalConnected ? voltageMV : nil,
-            adapterAmperageMA: externalConnected ? amperageMA : nil,
+            batteryAmperageMA: externalConnected ? amperageMA : nil,
+            batteryVoltageMV: batteryVoltageMV,
             pdContract: pdContract,
             adapterDescription: adapterDescription,
             cycleCount: intValue(forKey: "CycleCount", in: props),
@@ -114,7 +135,7 @@ enum PowerParsing {
         return PowerSnapshot(isCharging: false,
                              batteryPercent: percent,
                              adapterVoltageMV: nil,
-                             adapterAmperageMA: nil,
+                             batteryAmperageMA: nil,
                              pdContract: nil,
                              adapterDescription: nil,
                              cycleCount: nil)

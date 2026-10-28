@@ -87,7 +87,10 @@ public final class CableMonitor: CableMonitorProtocol {
 
     // MARK: - CableMonitorProtocol
 
-    public func snapshotNow() async throws -> CableSnapshot {
+    public func snapshotNow() async -> CableSnapshot {
+        // 六个维度并发拉取；单个维度失败只降级为该字段的空值/空数组，
+        // 整机快照不因个别维度异常而失败（协议契约，见类型注释）。
+        // 各 Service 内部已用 Task.detached 承载同步 IOKit 枚举，不占协作线程池。
         async let usbDevices = usb.listUSBDevices()
         async let powerSnapshot = power.currentPower()
         async let displays = display.listDisplays()
@@ -95,18 +98,18 @@ public final class CableMonitor: CableMonitorProtocol {
         async let portSnapshots = ports.listPorts()
         async let displayPortLinkSnapshots = displayPortTransport.listDisplayPortLinks()
 
-        let usb = (try? await usbDevices) ?? []
-        let thunderbolt = (try? await thunderboltDevices) ?? []
-        let ports = (try? await portSnapshots) ?? []
+        let usb = await usbDevices
+        let thunderbolt = await thunderboltDevices
+        let ports = await portSnapshots
 
         return CableSnapshot(
             usbDevices: usb,
-            power: (try? await powerSnapshot) ?? nil,
-            displays: (try? await displays) ?? [],
+            power: await powerSnapshot,
+            displays: await displays,
             thunderboltDevices: thunderbolt,
             sessions: PortGrouping.buildSessions(usbDevices: usb, thunderboltDevices: thunderbolt, ports: ports),
             ports: ports,
-            displayPortLinks: (try? await displayPortLinkSnapshots) ?? []
+            displayPortLinks: await displayPortLinkSnapshots
         )
     }
 
@@ -130,13 +133,12 @@ public final class CableMonitor: CableMonitorProtocol {
                 // 内容签名：排除 id/timestamp（每次快照必然不同），只比较真实载荷。
                 var lastKey: ContentKey?
                 while !Task.isCancelled {
-                    if let snapshot = try? await self.snapshotNow() {
-                        let key = ContentKey(snapshot: snapshot)
-                        if key != lastKey {
-                            lastKey = key
-                            // .terminated = 消费侧已取消/丢弃流：立即收尾（不依赖 onTermination 时序的双保险）。
-                            if case .terminated = continuation.yield(snapshot) { break }
-                        }
+                    let snapshot = await self.snapshotNow()
+                    let key = ContentKey(snapshot: snapshot)
+                    if key != lastKey {
+                        lastKey = key
+                        // .terminated = 消费侧已取消/丢弃流：立即收尾（不依赖 onTermination 时序的双保险）。
+                        if case .terminated = continuation.yield(snapshot) { break }
                     }
                     // 等待事件信号 OR 超时：信号到达 → 立即采集（电源/USB 变化近零延迟）；
                     // 超时到达 → 兜底采集（三类通知都不覆盖的变化仍被发现）。

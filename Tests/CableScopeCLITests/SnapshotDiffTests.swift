@@ -31,7 +31,8 @@ final class SnapshotDiffTests: XCTestCase {
         PowerSnapshot(isCharging: charging,
                       batteryPercent: percent,
                       adapterVoltageMV: watts?.v,
-                      adapterAmperageMA: watts?.a,
+                      batteryAmperageMA: watts?.a,
+                      batteryVoltageMV: 12_000,
                       pdContract: contract,
                       adapterDescription: nil,
                       cycleCount: nil)
@@ -44,8 +45,30 @@ final class SnapshotDiffTests: XCTestCase {
     }
 
     private func makeSnapshot(usb: [USBDeviceSnapshot] = [], power: PowerSnapshot? = nil,
-                              displays: [DisplaySnapshot] = [], thunderbolt: [ThunderboltDeviceSnapshot] = []) -> CableSnapshot {
-        CableSnapshot(usbDevices: usb, power: power, displays: displays, thunderboltDevices: thunderbolt)
+                              displays: [DisplaySnapshot] = [], thunderbolt: [ThunderboltDeviceSnapshot] = [],
+                              ports: [USBCPortSnapshot] = []) -> CableSnapshot {
+        CableSnapshot(usbDevices: usb, power: power, displays: displays,
+                      thunderboltDevices: thunderbolt, ports: ports)
+    }
+
+    /// 端口控制器快照（只关心 PD 协商档）。
+    private func makePort(portID: String = "Port-USB-C@1",
+                           winning: PDOPhase?) -> USBCPortSnapshot {
+        USBCPortSnapshot(portID: portID,
+                         controllerClass: "AppleHPMInterfaceType10",
+                         portType: "USB-C",
+                         plugOrientation: nil,
+                         isActive: true,
+                         hasActiveCable: true,
+                         connectionCount: 1,
+                         transportsSupported: [],
+                         transportsProvisioned: [],
+                         featuresEnabled: [],
+                         eMarker: nil,
+                         partner: nil,
+                         powerSource: winning.map {
+                             PDOPortPowerSnapshot(sourceName: "USB-PD", options: [$0], winning: $0)
+                         })
     }
 
     // MARK: 电源
@@ -73,13 +96,13 @@ final class SnapshotDiffTests: XCTestCase {
     }
 
     func testWattsChangeThresholdIsOneWatt() {
-        let old = makeSnapshot(power: makePower(watts: (20_000, 2_000))) // 40.0 W
-        // 变化 0.5W：不报告
+        let old = makeSnapshot(power: makePower(watts: (20_000, 2_000))) // 电池侧 12V × 2A = 24.0 W
+        // 变化 0.3W：不报告
         let small = SnapshotDiff.changes(from: old, to: makeSnapshot(power: makePower(watts: (20_000, 2_025))))
         XCTAssertTrue(small.isEmpty, "≤1W 的波动不应产生输出")
-        // 变化 1.5W：报告
-        let big = SnapshotDiff.changes(from: old, to: makeSnapshot(power: makePower(watts: (20_000, 2_075))))
-        XCTAssertTrue(big.contains { $0.contains("功率 40.0 W → 41.5 W") })
+        // 变化 1.2W：报告
+        let big = SnapshotDiff.changes(from: old, to: makeSnapshot(power: makePower(watts: (20_000, 2_100))))
+        XCTAssertTrue(big.contains { $0.contains("功率 24.0 W → 25.2 W") }, "\(big)")
     }
 
     func testWattsReportingStartsAndStops() {
@@ -129,6 +152,43 @@ final class SnapshotDiffTests: XCTestCase {
         XCTAssertTrue(changes.contains { $0.contains("USB 速率未知 → 5 Gbps") })
     }
 
+    /// 内置根 hub 没有 `LocationID` 属性，解析后为 0。多个这类设备此前会撞进同一个
+    /// 字典桶，被 `uniquingKeysWith` 静默丢弃——表现为「插了个 U 盘却没有任何提示」。
+    /// 配对键在 locationID == 0 时须退到 registryID。
+    func testUSBDevicesWithZeroLocationIDDoNotCollide() {
+        // 两个 locationID 均为 0、但 registryID 不同的设备（同为内置 hub 层）。
+        let hubA = USBDeviceSnapshot(registryID: 101, locationID: 0, productName: "内置 Hub",
+                                     vendorName: nil, vendorID: nil, productID: nil, serialNumber: nil,
+                                     bcdUSB: nil, speed: nil)
+        let hubB = USBDeviceSnapshot(registryID: 202, locationID: 0, productName: "第二个 Hub",
+                                     vendorName: nil, vendorID: nil, productID: nil, serialNumber: nil,
+                                     bcdUSB: nil, speed: nil)
+        let old = makeSnapshot(usb: [hubA])
+        let new = makeSnapshot(usb: [hubA, hubB])
+
+        let changes = SnapshotDiff.changes(from: old, to: new)
+        XCTAssertTrue(changes.contains { $0.contains("USB 接入") && $0.contains("第二个 Hub") },
+                      "locationID=0 的第二个设备应被识别为接入：\(changes)")
+
+        // 反向：第二个设备拔出时也应报「断开」，而不是被同桶的另一个设备顶掉。
+        let removed = SnapshotDiff.changes(from: new, to: makeSnapshot(usb: [hubA]))
+        XCTAssertTrue(removed.contains { $0.contains("USB 断开") && $0.contains("第二个 Hub") },
+                      "locationID=0 的设备拔出应被识别：\(removed)")
+    }
+
+    /// 同端口换设备时仍应报「设备变更」而非「断开 + 接入」两条噪音——
+    /// 这依赖 locationID 作主配对键，故上面那个兜底只在 locationID == 0 时生效。
+    func testSamePortDeviceSwapReportsChangeNotDisconnectAndConnect() {
+        let old = makeSnapshot(usb: [makeUSB(location: 0x14100000, name: "旧盘", bps: 480_000_000)])
+        let new = makeSnapshot(usb: [makeUSB(location: 0x14100000, name: "新盘", bps: 480_000_000)])
+        let changes = SnapshotDiff.changes(from: old, to: new)
+
+        XCTAssertTrue(changes.contains { $0.contains("USB 设备变更") && $0.contains("旧盘") && $0.contains("新盘") },
+                      "同端口换设备应报变更：\(changes)")
+        XCTAssertFalse(changes.contains { $0.contains("USB 接入") || $0.contains("USB 断开") },
+                       "同端口换设备不应同时报接入/断开：\(changes)")
+    }
+
     // MARK: 显示器
 
     func testDisplayChanges() {
@@ -171,6 +231,34 @@ final class SnapshotDiffTests: XCTestCase {
         XCTAssertTrue(remove.contains { $0.contains("雷雳断开") && $0.contains("SSD") })
     }
 
+    // MARK: PD 协商档（端口控制器直读）
+
+    /// 之前没有协商档、现在有 → 报"协商开始"。
+    func testPDONegotiationStarted() {
+        let phase = PDOPhase(voltageMV: 20_000, maxCurrentMA: 5_000, maxPowerMW: 100_000, uuid: "b")
+        let changes = SnapshotDiff.changes(from: makeSnapshot(ports: [makePort(winning: nil)]),
+                                           to: makeSnapshot(ports: [makePort(winning: phase)]))
+        XCTAssertTrue(changes.contains { $0.contains("PD 协商开始：20.0V / 5.0A · 100W") }, "\(changes)")
+    }
+
+    /// 协商档变了 → 报"档位 A → B"。
+    func testPDONegotiationChanged() {
+        let before = PDOPhase(voltageMV: 20_000, maxCurrentMA: 3_000, maxPowerMW: 60_000, uuid: "a")
+        let after = PDOPhase(voltageMV: 20_000, maxCurrentMA: 5_000, maxPowerMW: 100_000, uuid: "b")
+        let changes = SnapshotDiff.changes(from: makeSnapshot(ports: [makePort(winning: before)]),
+                                           to: makeSnapshot(ports: [makePort(winning: after)]))
+        XCTAssertTrue(changes.contains { $0.contains("PD 档位 20.0V / 3.0A · 60W → 20.0V / 5.0A · 100W") },
+                      "\(changes)")
+    }
+
+    /// 协商档没变 → 不报（避免噪音）。
+    func testPDONegotiationUnchangedIsSilent() {
+        let phase = PDOPhase(voltageMV: 20_000, maxCurrentMA: 5_000, maxPowerMW: 100_000, uuid: "b")
+        let changes = SnapshotDiff.changes(from: makeSnapshot(ports: [makePort(winning: phase)]),
+                                           to: makeSnapshot(ports: [makePort(winning: phase)]))
+        XCTAssertTrue(changes.isEmpty, "\(changes)")
+    }
+
     // MARK: 基线摘要
 
     func testBaselineSummary() {
@@ -184,5 +272,9 @@ final class SnapshotDiffTests: XCTestCase {
         // 无电源数据时优雅降级
         let bare = SnapshotDiff.baselineSummary(makeSnapshot())
         XCTAssertTrue(bare.contains("暂无数据"))
+        // 端口控制器数据存在时基线里也要报端口数
+        let withPorts = SnapshotDiff.baselineSummary(
+            makeSnapshot(ports: [makePort(winning: nil)]))
+        XCTAssertTrue(withPorts.contains("端口 ×1"), withPorts)
     }
 }

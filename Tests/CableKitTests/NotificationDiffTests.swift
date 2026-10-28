@@ -17,7 +17,7 @@ final class NotificationDiffTests: XCTestCase {
 
     private func power(charging: Bool) -> PowerSnapshot {
         PowerSnapshot(isCharging: charging, batteryPercent: 50,
-                     adapterVoltageMV: charging ? 20_000 : nil, adapterAmperageMA: charging ? 3_000 : nil,
+                     adapterVoltageMV: charging ? 20_000 : nil, batteryAmperageMA: charging ? 3_000 : nil,
                      pdContract: charging ? PDContract(voltageMV: 20_000, currentMA: 3_000) : nil,
                      adapterDescription: nil, cycleCount: nil, externalConnected: charging)
     }
@@ -92,7 +92,7 @@ final class NotificationDiffTests: XCTestCase {
     func testFirstFiveAmpConfirmedIsRatingUpgrade() {
         var engine = CableRatingEngine()
         let threeAmp = CableSnapshot(usbDevices: [], power: PowerSnapshot(
-            isCharging: true, batteryPercent: 50, adapterVoltageMV: 20_000, adapterAmperageMA: 3_000,
+            isCharging: true, batteryPercent: 50, adapterVoltageMV: 20_000, batteryAmperageMA: 3_000,
             pdContract: PDContract(voltageMV: 20_000, currentMA: 3_000),
             adapterDescription: nil, cycleCount: nil, externalConnected: true),
             displays: [], thunderboltDevices: [],
@@ -101,7 +101,7 @@ final class NotificationDiffTests: XCTestCase {
         let (_, baseline0) = NotificationDiff.diff(baseline: nil, snapshot: threeAmp, ratingEngine: engine)
 
         let fiveAmp = CableSnapshot(usbDevices: [], power: PowerSnapshot(
-            isCharging: true, batteryPercent: 50, adapterVoltageMV: 20_000, adapterAmperageMA: 5_000,
+            isCharging: true, batteryPercent: 50, adapterVoltageMV: 20_000, batteryAmperageMA: 5_000,
             pdContract: PDContract(voltageMV: 20_000, currentMA: 5_000),
             adapterDescription: nil, cycleCount: nil, externalConnected: true),
             displays: [], thunderboltDevices: [],

@@ -3,7 +3,7 @@ import IOKit
 
 /// USB 设备枚举（IOKit IOUSBHostDevice 适配）。
 ///
-/// 实现要点（见 Docs/02-技术架构.md / 03-数据获取指南.md）：
+/// 实现要点（见 Docs/03-数据获取指南.md）：
 /// - `IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOUSBHostDevice"), &iterator)`
 ///   匹配的是整棵 Registry plane 上所有 `IOUSBHostDevice` 实例（包括挂在 hub 下的设备与 hub 本身），
 ///   因此**无需**按 hub 递归遍历——迭代器天然是全局扁平匹配。
@@ -15,7 +15,7 @@ import IOKit
 public final class USBService: USBServiceProtocol {
     public init() {}
 
-    public func listUSBDevices() async throws -> [USBDeviceSnapshot] {
+    public func listUSBDevices() async -> [USBDeviceSnapshot] {
         // IOKit 同步枚举放 detached 上下文执行，避免阻塞协作线程池/主线程。
         await Task.detached(priority: .utility) {
             Self.enumerateUSBDevices()

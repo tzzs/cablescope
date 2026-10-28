@@ -20,7 +20,7 @@ public final class DisplayPortTransportService: DisplayPortTransportServiceProto
 
     public init() {}
 
-    public func listDisplayPortLinks() async throws -> [DisplayPortLinkSnapshot] {
+    public func listDisplayPortLinks() async -> [DisplayPortLinkSnapshot] {
         await Task.detached(priority: .utility) {
             Self.enumerateLinks()
         }.value
