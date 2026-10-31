@@ -118,9 +118,9 @@ Sources/
 ├── CableScopeCLI/     # Command-line tool
 └── CableScopeApp/     # SwiftUI menu bar app (MenuBarExtra + main window + Swift Charts power chart)
 Tests/
-├── CableKitTests/       # 248 tests: data contracts, per-port rating engine + migration, grouping, parsers (real-device samples), diagnostics (incl. adapter-capability vs. PD-contract attribution), charging-overview assembly, subprocess runner, display-buffer growth, vendor directory, rating store, registry inspector (incl. truncation reporting), profiler caching + live smoke tests
-├── CableScopeCLITests/  # 106 tests: argument parsing (incl. throughput), formatting, watch snapshot diffing, pretty rendering, rating/throughput/properties command bodies (temp-dir injected, never touches your real ratings file), English output + language resolution
-└── CableScopeAppTests/  # 54 tests: update checker (versions, install channel, daily check), launch decision, notification throttling, power history, notification-preference gating, English localization incl. plurals, view-layer formatting, MonitorViewModel smoke test against a real CableMonitor
+├── CableKitTests/       # 243 tests: data contracts, per-port rating engine + migration, grouping, parsers (real-device samples), diagnostics (incl. adapter-capability vs. PD-contract attribution), charging-overview assembly, subprocess runner, display-buffer growth, vendor directory, rating store, registry inspector (incl. truncation reporting), profiler caching + live smoke tests
+├── CableScopeCLITests/  # 108 tests: argument parsing (incl. throughput), formatting, watch snapshot diffing, pretty rendering, rating/throughput/properties command bodies (temp-dir injected, never touches your real ratings file), English output + language resolution
+└── CableScopeAppTests/  # 61 tests: update checker (versions, install channel, daily check), launch decision, notification throttling, power history, notification-preference gating, notification-settings deep link, English localization incl. plurals, view-layer formatting, MonitorViewModel smoke test against a real CableMonitor
 Docs/                  # Data-source guide (IOKit), optimization roadmap & glossary
 scripts/bundle_app.sh     # .app bundling script
 scripts/check_layering.sh # enforces the layering rule (no IOKit/CoreGraphics/system_profiler outside CableKit)
@@ -136,7 +136,7 @@ scripts/check_localization.py # every Chinese UI string (incl. CLI) must have an
 
 ## Status
 
-- [x] CableKit adapter layer (USB/power/displays/Thunderbolt + snapshot stream + rating engine) — 408/408 tests passing (including the CLI and App test targets)
+- [x] CableKit adapter layer (USB/power/displays/Thunderbolt + snapshot stream + rating engine) — 412/412 tests passing (including the CLI and App test targets)
 - [x] All six CLI subcommands (validated on real hardware: PD contract detection, e-marker inference, rating persistence)
 - [x] macOS menu bar app (system overview, one card per cable with per-cable detail, live power chart, per-port rating)
 - [x] IOKit property inspector (App window + CLI `properties` subcommand; snapshots carry full `rawProperties`)
