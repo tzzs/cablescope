@@ -27,7 +27,7 @@ public final class ThunderboltService: ThunderboltServiceProtocol, @unchecked Se
         self.profilerCache = TTLCache(ttl: cacheTTL)
     }
 
-    public func listThunderboltDevices() async throws -> [ThunderboltDeviceSnapshot] {
+    public func listThunderboltDevices() async -> [ThunderboltDeviceSnapshot] {
         let cache = profilerCache
         return await Task.detached(priority: .utility) {
             cache.value(for: 0) { Self.readThunderboltDevices() }
@@ -48,21 +48,7 @@ public final class ThunderboltService: ThunderboltServiceProtocol, @unchecked Se
     // MARK: - Process 辅助
 
     private static func runProcess(_ launchPath: String, arguments: [String]) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: launchPath)
-        process.arguments = arguments
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-        do {
-            try process.run()
-        } catch {
-            return nil
-        }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { return nil }
-        return String(data: data, encoding: .utf8)
+        Subprocess.run(launchPath, arguments: arguments)
     }
 }
 

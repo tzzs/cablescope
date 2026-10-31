@@ -8,13 +8,13 @@ macOS menu bar tool that inspects connected cables (USB-C / Thunderbolt) for **c
 
 ## How It Works
 
-On most Macs, macOS only sees the *negotiated result* of a cable, never the cable itself. On Apple Silicon, CableScope reads the USB-C port controllers (AppleHPM) directly — including the cable's e-marker chip — and surfaces live negotiation info; where e-marker data is unavailable, it infers a **lower bound** on the cable's spec from **historical negotiation peaks** (e.g. PD negotiating 20V × 5A ⇒ the cable must have a 5A e-marker).
+On most Macs, macOS only sees the *negotiated result* of a cable, never the cable itself. On Apple Silicon, CableScope reads the USB-C port controllers (AppleHPM) directly — including the cable's e-marker chip — and surfaces live negotiation info; where e-marker data is unavailable, it infers a **lower bound** on the cable's spec from **historical negotiation peaks** (e.g. PD negotiating 20V × 5A ⇒ the cable supports at least 5A).
 
 ## Features
 
 | Area | Details |
 | --- | --- |
-| ⚡ Charging | Instantaneous power (W), voltage/current, PD contract (shown separately from instantaneous power), PD tier table with the currently negotiated tier marked, charging bottleneck attribution, battery level, live power chart (App) |
+| ⚡ Charging | Battery-side charging power (W), adapter voltage, battery voltage/current, PD contract (shown separately), PD tier table with the selected tier marked, charging bottleneck attribution, battery level, live power chart (App) |
 | 🔌 Data | Negotiated USB speed (USB 2.0 / 3.x / USB4 / Thunderbolt), device list |
 | 🖥 Video | Display list, resolution/refresh rate, DP link rate; external displays are attributed to the specific cable's card (DisplayPort transport node reports its own port directly, matched to the display by EDID identity) |
 | 🎛 Port controller | USB-C port controller direct read on Apple Silicon (AppleHPM / AppleTC): port status, plug orientation, supported transports (CC / USB2 / USB3 / USB4 / DisplayPort); Intel and older Macs degrade to inference-only mode |
@@ -118,9 +118,9 @@ Sources/
 ├── CableScopeCLI/     # Command-line tool
 └── CableScopeApp/     # SwiftUI menu bar app (MenuBarExtra + main window + Swift Charts power chart)
 Tests/
-├── CableKitTests/       # 184 tests: data contracts, per-port rating engine + migration, grouping, parsers (real-device samples), diagnostics, vendor directory, rating store, registry inspector, profiler caching + live smoke tests
-├── CableScopeCLITests/  # 51 tests: argument parsing (incl. throughput), formatting, watch snapshot diffing, English output + language resolution
-└── CableScopeAppTests/  # 54 tests: update checker (versions, install channel, daily check), launch decision, notification throttling, power history, notification-preference gating, English localization incl. plurals, view-layer formatting, MonitorViewModel smoke test against a real CableMonitor
+├── CableKitTests/       # 243 tests: data contracts, per-port rating engine + migration, grouping, parsers (real-device samples), diagnostics (incl. adapter-capability vs. PD-contract attribution), charging-overview assembly, subprocess runner, display-buffer growth, vendor directory, rating store, registry inspector (incl. truncation reporting), profiler caching + live smoke tests
+├── CableScopeCLITests/  # 108 tests: argument parsing (incl. throughput), formatting, watch snapshot diffing, pretty rendering, rating/throughput/properties command bodies (temp-dir injected, never touches your real ratings file), English output + language resolution
+└── CableScopeAppTests/  # 61 tests: update checker (versions, install channel, daily check), launch decision, notification throttling, power history, notification-preference gating, notification-settings deep link, English localization incl. plurals, view-layer formatting, MonitorViewModel smoke test against a real CableMonitor
 Docs/                  # Data-source guide (IOKit), optimization roadmap & glossary
 scripts/bundle_app.sh     # .app bundling script
 scripts/check_layering.sh # enforces the layering rule (no IOKit/CoreGraphics/system_profiler outside CableKit)
@@ -130,13 +130,13 @@ scripts/check_localization.py # every Chinese UI string (incl. CLI) must have an
 ## Data Sources (see [Docs/03-数据获取指南.md](Docs/03-数据获取指南.md) for details)
 
 - **USB**: IOKit `IOUSBHostDevice` (negotiated speed, LocationID, VID/PID)
-- **Charging**: IORegistry `AppleSmartBattery` (instantaneous power = `AdapterDetails.AdapterVoltage` × top-level `Amperage`; PD contract = values in `AdapterDetails`) + `ioreg`-based battery info via IOKit.ps
+- **Charging**: IORegistry `AppleSmartBattery` (battery-side power = top-level `Voltage` × `Amperage`, i.e. power flowing into the battery; PD contract = `AdapterDetails.AdapterVoltage` × `Current`) + battery info via IOKit.ps
 - **Displays**: CoreGraphics (resolution/refresh rate) + `NSScreen.localizedName` (macOS 26 removed CGDisplayProductName)
 - **Thunderbolt**: `system_profiler SPThunderboltDataType -json`, recursively flattened
 
 ## Status
 
-- [x] CableKit adapter layer (USB/power/displays/Thunderbolt + snapshot stream + rating engine) — 289/289 tests passing (including the CLI and App test targets)
+- [x] CableKit adapter layer (USB/power/displays/Thunderbolt + snapshot stream + rating engine) — 412/412 tests passing (including the CLI and App test targets)
 - [x] All six CLI subcommands (validated on real hardware: PD contract detection, e-marker inference, rating persistence)
 - [x] macOS menu bar app (system overview, one card per cable with per-cable detail, live power chart, per-port rating)
 - [x] IOKit property inspector (App window + CLI `properties` subcommand; snapshots carry full `rawProperties`)

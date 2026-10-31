@@ -7,7 +7,7 @@ final class RealEnvironmentSmokeTests: XCTestCase {
 
     func testUSBServiceSmoke() async throws {
         let service = USBService()
-        let devices = try await service.listUSBDevices()
+        let devices = await service.listUSBDevices()
         // 空结果合法；有结果时逐项校验类型完整性
         for device in devices {
             XCTAssertNotEqual(device.registryID, 0)
@@ -22,7 +22,7 @@ final class RealEnvironmentSmokeTests: XCTestCase {
 
     func testPowerServiceSmoke() async throws {
         let service = PowerService()
-        let power = try await service.currentPower()
+        let power = await service.currentPower()
         if let power {
             // 类型与取值范围校验（不假设充电状态）
             if let percent = power.batteryPercent {
@@ -31,7 +31,7 @@ final class RealEnvironmentSmokeTests: XCTestCase {
             if let v = power.adapterVoltageMV {
                 XCTAssertGreaterThan(v, 0)
             }
-            if let a = power.adapterAmperageMA {
+            if let a = power.batteryAmperageMA {
                 // 顶层 Amperage 是电池侧瞬时电流，符号随充放方向变化：
                 // 保温暂停/电池放电时为负（2026-09-13 真机实测 -540mA），只校验量级；
                 // 仅在正在充电时要求为正。
@@ -50,7 +50,7 @@ final class RealEnvironmentSmokeTests: XCTestCase {
 
     func testDisplayServiceSmoke() async throws {
         let service = DisplayService()
-        let displays = try await service.listDisplays()
+        let displays = await service.listDisplays()
         for display in displays {
             XCTAssertGreaterThan(display.pixelWidth, 0)
             XCTAssertGreaterThan(display.pixelHeight, 0)
@@ -63,7 +63,7 @@ final class RealEnvironmentSmokeTests: XCTestCase {
 
     func testThunderboltServiceSmoke() async throws {
         let service = ThunderboltService()
-        let devices = try await service.listThunderboltDevices()
+        let devices = await service.listThunderboltDevices()
         for device in devices {
             XCTAssertFalse(device.name.isEmpty)
             if let speed = device.linkSpeedLabel {
@@ -74,7 +74,7 @@ final class RealEnvironmentSmokeTests: XCTestCase {
 
     func testPortControllerServiceSmoke() async throws {
         let service = PortControllerService()
-        let ports = try await service.listPorts()
+        let ports = await service.listPorts()
         // 空结果合法（老机型/Intel 无 AppleHPM 节点）；有结果时逐项校验结构完整性
         for port in ports {
             XCTAssertTrue(port.portID.hasPrefix("Port-"), "端口 ID 应为路径末段（Port-USB-C@N），实际 \(port.portID)")
@@ -97,7 +97,7 @@ final class RealEnvironmentSmokeTests: XCTestCase {
     func testRegistryServiceSmoke() async throws {
         let service = RegistryService()
         for wellKnown in RegistryService.wellKnownClasses {
-            let entries = try await service.listEntries(matchingClass: wellKnown.className)
+            let entries = await service.listEntries(matchingClass: wellKnown.className)
             // 空结果合法（当前机器可能没有该类的实例）；有结果时校验结构完整性与截断上限
             XCTAssertLessThanOrEqual(entries.count, RegistryService.maxEntries)
             for entry in entries {
@@ -110,7 +110,7 @@ final class RealEnvironmentSmokeTests: XCTestCase {
 
     func testCableMonitorSnapshotNowSmoke() async throws {
         let monitor = CableMonitor()
-        let snapshot = try await monitor.snapshotNow()
+        let snapshot = await monitor.snapshotNow()
         XCTAssertFalse(snapshot.id.uuidString.isEmpty)
         XCTAssertLessThanOrEqual(snapshot.timestamp.timeIntervalSinceNow, 5, "快照时间应为当前时刻")
         // 容错组合：整体永不抛错（上面未 throw 即通过），各维度类型正确

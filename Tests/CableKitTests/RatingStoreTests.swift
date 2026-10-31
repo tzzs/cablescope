@@ -31,7 +31,7 @@ final class RatingStoreTests: XCTestCase {
         )
         var engine = CableRatingEngine()
         let power = PowerSnapshot(isCharging: true, batteryPercent: 50,
-                                  adapterVoltageMV: 20_000, adapterAmperageMA: Int(watts * 1000 / 20),
+                                  adapterVoltageMV: 20_000, batteryAmperageMA: Int(watts * 1000 / 20),
                                   pdContract: PDContract(voltageMV: 20_000, currentMA: 5_000),
                                   adapterDescription: nil, cycleCount: nil)
         let snapshot = CableSnapshot(usbDevices: [device], power: power,

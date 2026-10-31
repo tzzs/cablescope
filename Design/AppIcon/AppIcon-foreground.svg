@@ -4,5 +4,6 @@
   <g id="foreground" fill="none" stroke="#F3F9FF" stroke-linecap="round" stroke-linejoin="round">
     <path d="M 352 765 C 267 711 211 617 211 512 C 211 346 346 211 512 211 C 678 211 813 346 813 512 C 813 617 757 711 672 765" stroke-width="52"/>
     <rect x="337" y="438" width="350" height="148" rx="74" stroke-width="48"/>
+    <path d="M 412 512 H 612" stroke-width="34"/>
   </g>
 </svg>

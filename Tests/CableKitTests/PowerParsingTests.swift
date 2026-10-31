@@ -4,13 +4,14 @@ import XCTest
 /// PowerService 的 IORegistry 属性解析测试。
 /// 样例结构来自真机 `ioreg -r -c AppleSmartBattery`（macOS 26，Apple Silicon）。
 final class PowerParsingTests: XCTestCase {
-    /// 真机回归样例：顶层没有 AdapterVoltage，瞬时电压只能回退到 AdapterDetails；
-    /// 瞬时功率（20V×2.014A≈40W）与 PD 合同（20V×5A=100W）语义分离。
+    /// 真机回归样例：顶层没有 AdapterVoltage，适配器电压只能回退到 AdapterDetails；
+    /// 电池侧功率（12.6V×2.014A≈25W）与 PD 合同（20V×5A=100W）语义分离。
     func testRealShapedPropertiesInstantaneousVsContract() {
         let props: [String: Any] = [
             "ExternalConnected": true,
             "IsCharging": true,
             "Amperage": 2014,
+            "Voltage": 12597,
             "CurrentCapacity": 80,
             "MaxCapacity": 100,
             "CycleCount": 40,
@@ -26,8 +27,10 @@ final class PowerParsingTests: XCTestCase {
         XCTAssertTrue(power.isCharging)
         XCTAssertTrue(power.externalConnected)
         XCTAssertEqual(power.adapterVoltageMV, 20000, "顶层无 AdapterVoltage 时应回退到 AdapterDetails")
-        XCTAssertEqual(power.adapterAmperageMA, 2014, "瞬时电流取顶层 Amperage")
-        XCTAssertEqual(power.watts ?? 0, 20.0 * 2.014, accuracy: 0.01, "瞬时功率 = 电压 × 实际抽流")
+        XCTAssertEqual(power.batteryAmperageMA, 2014, "电池电流取顶层 Amperage")
+        XCTAssertEqual(power.batteryVoltageMV, 12597, "电池电压取顶层 Voltage")
+        XCTAssertEqual(power.watts ?? 0, 12.597 * 2.014, accuracy: 0.01,
+                       "电池侧功率 = 电池电压 × 电池电流（不能拿适配器电压混乘）")
         XCTAssertEqual(power.pdContract?.voltageMV, 20000)
         XCTAssertEqual(power.pdContract?.currentMA, 5000, "PD 合同电流取 AdapterDetails.Current")
         XCTAssertEqual(power.pdContract?.watts ?? 0, 100, accuracy: 0.01)
@@ -43,12 +46,66 @@ final class PowerParsingTests: XCTestCase {
             "IsCharging": true,
             "AdapterVoltage": 9000,
             "Amperage": 3000,
+            "Voltage": 12000,
             "AdapterDetails": ["AdapterVoltage": 20000, "Current": 5000],
         ]
         let power = PowerParsing.parse(props: props)
         XCTAssertEqual(power.adapterVoltageMV, 9000)
-        XCTAssertEqual(power.watts ?? 0, 27, accuracy: 0.01)
+        XCTAssertEqual(power.watts ?? 0, 36, accuracy: 0.01, "电池 12V × 3A")
         XCTAssertEqual(power.pdContract?.watts ?? 0, 100, accuracy: 0.01, "合同仍取 AdapterDetails")
+    }
+
+    /// AdapterDetails 缺失时不得用顶层 Amperage（瞬时抽流）拼出"假合同"：
+    /// 合同电流只认 AdapterDetails.Current，读不到就没有合同。
+    func testMissingAdapterDetailsProducesNoContract() {
+        let props: [String: Any] = [
+            "ExternalConnected": true,
+            "IsCharging": true,
+            "AdapterVoltage": 20000,
+            "Amperage": 5000,
+            "Voltage": 12000,
+        ]
+        let power = PowerParsing.parse(props: props)
+
+        XCTAssertEqual(power.adapterVoltageMV, 20000)
+        XCTAssertEqual(power.batteryAmperageMA, 5000)
+        XCTAssertEqual(power.watts ?? 0, 60, accuracy: 0.01, "电池 12V × 5A")
+        XCTAssertNil(power.pdContract, "没有协商电流读数时不得构造合同（瞬时抽流 ≠ 合同）")
+    }
+
+    /// AdapterDetails 存在但缺 Current 键：同样不构造合同。
+    func testAdapterDetailsWithoutCurrentProducesNoContract() {
+        let props: [String: Any] = [
+            "ExternalConnected": true,
+            "IsCharging": true,
+            "Amperage": 2014,
+            "Voltage": 12597,
+            "AdapterDetails": ["AdapterVoltage": 20000, "Watts": 100, "Description": "pd charger"],
+        ]
+        let power = PowerParsing.parse(props: props)
+
+        XCTAssertEqual(power.adapterVoltageMV, 20000)
+        XCTAssertEqual(power.watts ?? 0, 12.597 * 2.014, accuracy: 0.01)
+        XCTAssertNil(power.pdContract, "缺 Current 键时不得用顶层 Amperage 兜底成合同")
+        XCTAssertEqual(power.adapterDescription, "pd charger")
+    }
+
+    /// 顶层 AdapterVoltage 可作合同电压回退（它是适配器输出电压，语义上算合同电压），
+    /// 但合同电流仍必须来自 AdapterDetails.Current。
+    func testTopLevelAdapterVoltageAsContractVoltageFallback() {
+        let props: [String: Any] = [
+            "ExternalConnected": true,
+            "IsCharging": true,
+            "AdapterVoltage": 20000,
+            "Amperage": 4000,
+            "Voltage": 12000,
+            "AdapterDetails": ["Current": 5000],
+        ]
+        let power = PowerParsing.parse(props: props)
+
+        XCTAssertEqual(power.pdContract?.voltageMV, 20000)
+        XCTAssertEqual(power.pdContract?.currentMA, 5000)
+        XCTAssertEqual(power.pdContract?.watts ?? 0, 100, accuracy: 0.01)
     }
 
     func testUnpluggedClearsAdapterInfo() {
@@ -56,6 +113,7 @@ final class PowerParsingTests: XCTestCase {
             "ExternalConnected": false,
             "IsCharging": false,
             "Amperage": -1200, // 电池放电为负值
+            "Voltage": 12000,
             "AdapterVoltage": 0,
             "CurrentCapacity": 70,
             "MaxCapacity": 100,
@@ -65,7 +123,7 @@ final class PowerParsingTests: XCTestCase {
         XCTAssertFalse(power.isCharging)
         XCTAssertFalse(power.externalConnected)
         XCTAssertNil(power.adapterVoltageMV)
-        XCTAssertNil(power.adapterAmperageMA)
+        XCTAssertNil(power.batteryAmperageMA)
         XCTAssertNil(power.pdContract)
         XCTAssertNil(power.adapterDescription)
         XCTAssertEqual(power.batteryPercent ?? 0, 70, accuracy: 0.01)
@@ -89,6 +147,7 @@ final class PowerParsingTests: XCTestCase {
             "ExternalConnected": true,
             "IsCharging": false,
             "Amperage": -540,
+            "Voltage": 12597,
             "CurrentCapacity": 86,
             "MaxCapacity": 100,
             "AdapterDetails": [
@@ -103,8 +162,9 @@ final class PowerParsingTests: XCTestCase {
         XCTAssertFalse(power.isCharging, "暂停充电时不得到误报正在充电")
         XCTAssertTrue(power.externalConnected, "插电状态必须如实上报，UI 靠它区分已接通/未接通")
         XCTAssertEqual(power.adapterVoltageMV, 20000)
-        XCTAssertEqual(power.adapterAmperageMA, -540)
-        XCTAssertEqual(power.watts ?? 0, 20.0 * -0.54, accuracy: 0.01, "瞬时功率保留原始负值，由 UI 层决定是否展示")
+        XCTAssertEqual(power.batteryAmperageMA, -540)
+        XCTAssertEqual(power.watts ?? 0, 12.597 * -0.54, accuracy: 0.01,
+                       "电池侧功率保留原始负值，由 UI 层决定是否展示")
         XCTAssertEqual(power.pdContract?.watts ?? 0, 100, accuracy: 0.01, "保温时 PD 合同依然可读")
     }
 
@@ -114,6 +174,7 @@ final class PowerParsingTests: XCTestCase {
             "ExternalConnected": "Yes",
             "IsCharging": "Yes",
             "Amperage": 1000,
+            "Voltage": 12000,
             "AdapterDetails": ["AdapterVoltage": 5000, "Current": 3000],
         ]
         let power = PowerParsing.parse(props: props)

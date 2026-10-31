@@ -20,13 +20,18 @@ struct SectionCard<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Label(title, systemImage: systemImage)
-                    .font(.headline)
-                if let caption {
-                    Text(caption)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    sectionTitle
+                    if let caption {
+                        captionText(caption).fixedSize()
+                    }
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    sectionTitle
+                    if let caption {
+                        captionText(caption)
+                    }
                 }
             }
             content
@@ -34,6 +39,20 @@ struct SectionCard<Content: View>: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var sectionTitle: some View {
+        Label(title, systemImage: systemImage)
+            .font(.headline)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func captionText(_ caption: LocalizedStringKey) -> some View {
+        Text(caption)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -141,7 +160,10 @@ struct InfoChip: View {
         }
         .font(.caption)
         .fontWeight(isProminent ? .bold : .medium)
-        .lineLimit(1)
+        // 不设 lineLimit：英文文案常比中文长得多（如 e-marker 可信度说明），
+        // 单行截断会把解释砍成"…"，换行反而读得全。宽度约束由 FlowLayout 以行宽
+        // 为上限测量后传下来。
+        .fixedSize(horizontal: false, vertical: true)
         .monospacedDigit()
         .foregroundStyle(color)
         .padding(.horizontal, 8)

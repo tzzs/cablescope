@@ -8,11 +8,22 @@ final class CableRatingEngineTests: XCTestCase {
         return PowerSnapshot(isCharging: charging,
                              batteryPercent: 50,
                              adapterVoltageMV: voltsMV,
-                             adapterAmperageMA: ampsMA,
+                             batteryAmperageMA: ampsMA,
+                             batteryVoltageMV: 12_000,
                              pdContract: contract,
                              adapterDescription: nil,
                              cycleCount: nil,
                              externalConnected: external)
+    }
+
+    /// 端口控制器快照（活跃端口 + 可选协商档）
+    private static func makePort(portID: String, winning: PDOPhase? = nil) -> USBCPortSnapshot {
+        USBCPortSnapshot(portID: portID, controllerClass: "AppleHPMInterfaceType10",
+                         portType: "USB-C", plugOrientation: nil, isActive: true, hasActiveCable: false,
+                         connectionCount: nil, transportsSupported: ["CC"], transportsProvisioned: ["CC"],
+                         featuresEnabled: [], eMarker: nil, partner: nil,
+                         powerSource: winning.map { PDOPortPowerSnapshot(sourceName: "USB-PD",
+                                                                         options: [$0], winning: $0) })
     }
 
     func testRatingAggregatesPeaks() throws {
@@ -31,8 +42,8 @@ final class CableRatingEngineTests: XCTestCase {
 
         let rating = engine.overallRating()
         XCTAssertEqual(rating.maxUSBBitsPerSecond, 10_000_000_000)
-        XCTAssertEqual(rating.maxChargingWatts ?? 0, 100, accuracy: 0.01)
-        XCTAssertTrue(rating.is5ACable, "20V/5A 合同应触发 e-marker 推断")
+        XCTAssertEqual(rating.maxChargingWatts ?? 0, 60, accuracy: 0.01, "电池侧功率 12V × 5A")
+        XCTAssertTrue(rating.is5ACable, "20V/5A 合同应触发「至少支持 5A」推断")
         XCTAssertEqual(rating.sampleCount, 2)
     }
 
@@ -88,7 +99,7 @@ final class CableRatingEngineTests: XCTestCase {
                                     displays: [], thunderboltDevices: []))
 
         let portRating = engine.rating(forSessionID: "usb-0x141")
-        XCTAssertEqual(portRating?.maxChargingWatts ?? 0, 60, accuracy: 0.01)
+        XCTAssertEqual(portRating?.maxChargingWatts ?? 0, 36, accuracy: 0.01, "电池侧功率 12V × 3A")
         XCTAssertFalse(portRating?.is5ACable ?? true, "20V/3A 不触发 5A")
         XCTAssertNil(engine.rating(forSessionID: CableRatingEngine.systemKey), "单线时电源归属该线，不应产生整机桶")
     }
@@ -108,7 +119,7 @@ final class CableRatingEngineTests: XCTestCase {
 
         XCTAssertNil(engine.rating(forSessionID: "usb-0x141")?.maxChargingWatts, "多线时电源不归属单线")
         XCTAssertNil(engine.rating(forSessionID: "usb-0x142")?.maxChargingWatts)
-        XCTAssertEqual(engine.rating(forSessionID: CableRatingEngine.systemKey)?.maxChargingWatts ?? 0, 60, accuracy: 0.01)
+        XCTAssertEqual(engine.rating(forSessionID: CableRatingEngine.systemKey)?.maxChargingWatts ?? 0, 36, accuracy: 0.01)
         // USB 速率仍按线分桶
         XCTAssertEqual(engine.rating(forSessionID: "usb-0x141")?.maxUSBBitsPerSecond, 480_000_000)
         XCTAssertEqual(engine.rating(forSessionID: "usb-0x142")?.maxUSBBitsPerSecond, 40_000_000_000)
@@ -120,12 +131,7 @@ final class CableRatingEngineTests: XCTestCase {
         var engine = CableRatingEngine()
 
         func makePort(portID: String, winning: PDOPhase? = nil) -> USBCPortSnapshot {
-            USBCPortSnapshot(portID: portID, controllerClass: "AppleHPMInterfaceType10",
-                             portType: "USB-C", plugOrientation: nil, isActive: true, hasActiveCable: false,
-                             connectionCount: nil, transportsSupported: ["CC"], transportsProvisioned: ["CC"],
-                             featuresEnabled: [], eMarker: nil, partner: nil,
-                             powerSource: winning.map { PDOPortPowerSnapshot(sourceName: "USB-PD",
-                                                                             options: [$0], winning: $0) })
+            Self.makePort(portID: portID, winning: winning)
         }
         let winning = PDOPhase(voltageMV: 20_000, maxCurrentMA: 5_000, maxPowerMW: 100_000, uuid: nil)
 
@@ -137,13 +143,98 @@ final class CableRatingEngineTests: XCTestCase {
                                             makePort(portID: "Port-USB-C@2", winning: winning)]))
 
         let chargerRating = engine.rating(forSessionID: "Port-USB-C@2")
-        XCTAssertEqual(chargerRating?.maxChargingWatts ?? 0, 100, accuracy: 0.01,
-                       "充电数据归属 winning 端口的会话（sessions 由 record 现算；功率取 20V×5A）")
+        XCTAssertEqual(chargerRating?.maxChargingWatts ?? 0, 60, accuracy: 0.01,
+                       "充电数据归属 winning 端口的会话（sessions 由 record 现算；功率取电池侧 12V×5A）")
         XCTAssertTrue(chargerRating?.is5ACable ?? false)
         XCTAssertNil(engine.rating(forSessionID: "Port-USB-C@1")?.maxChargingWatts,
                      "显示器线不应记到充电功率")
         XCTAssertNil(engine.rating(forSessionID: CableRatingEngine.systemKey)?.maxChargingWatts,
                      "可归属时不进整机桶")
+    }
+
+    /// 端口选中 20V/5A 的 PDO **不**构成 5A 证据（回归）。
+    ///
+    /// `WinningPowerSourceOption` 是充电器广告的一个 PDO，`Max Current` 是该档上限，
+    /// 不是 RDO 里实际请求的电流：3A 线也可能选中这个 PDO（只是 RDO 只敢要 3A）。
+    /// 拿它推断"线缆至少支持 5A"会把充电器的能力算到线缆头上。
+    func test5ANotInferredFromWinningFiveAOption() {
+        var engine = CableRatingEngine()
+
+        let winning5A = PDOPhase(voltageMV: 20_000, maxCurrentMA: 5_000, maxPowerMW: 100_000, uuid: nil)
+        engine.record(CableSnapshot(usbDevices: [],
+                                    power: nil,
+                                    displays: [],
+                                    thunderboltDevices: [],
+                                    ports: [Self.makePort(portID: "Port-USB-C@1", winning: winning5A)]))
+
+        XCTAssertFalse(engine.rating(forSessionID: "Port-USB-C@1")?.is5ACable ?? true,
+                       "选中的 PDO 上限不是协商电流，不能证明线缆承载 5A")
+        XCTAssertFalse(engine.overallRating().is5ACable)
+    }
+
+    /// 3A 档不触发 5A 推断（只在下界成立时才置位）。
+    func test5ANotInferredFromPortNegotiated3APhase() {
+        var engine = CableRatingEngine()
+
+        let winning3A = PDOPhase(voltageMV: 20_000, maxCurrentMA: 3_000, maxPowerMW: 60_000, uuid: nil)
+        engine.record(CableSnapshot(usbDevices: [],
+                                    power: nil,
+                                    displays: [],
+                                    thunderboltDevices: [],
+                                    ports: [Self.makePort(portID: "Port-USB-C@1", winning: winning3A)]))
+
+        XCTAssertFalse(engine.rating(forSessionID: "Port-USB-C@1")?.is5ACable ?? true)
+        XCTAssertFalse(engine.overallRating().is5ACable)
+    }
+
+    /// 电池侧电流达到 5A **不**构成 5A 证据（回归）。
+    ///
+    /// 顶层 `Amperage` 是流入电池的电流：电池 12.6V 吸收 5A ≈ 63W，对应适配器 20V 侧
+    /// 仅约 3.2A。跨电压域相乘（20V × 5A = 100W）会凭空造出一个不存在的功率读数，
+    /// 不能反推线缆承载了 5A。
+    func test5ANotInferredFromBatteryCurrent() {
+        var engine = CableRatingEngine()
+        let device = USBDeviceSnapshot(registryID: 1, locationID: 0x14100000, productName: "SSD",
+                                       vendorName: nil, vendorID: nil, productID: nil, serialNumber: nil,
+                                       bcdUSB: nil, speed: USBSpeed(bitsPerSecond: 10_000_000_000))
+        let power = PowerSnapshot(isCharging: true,
+                                  batteryPercent: 50,
+                                  adapterVoltageMV: 20_000,
+                                  batteryAmperageMA: 5_000,
+                                  batteryVoltageMV: 12_600,
+                                  pdContract: nil,
+                                  adapterDescription: nil,
+                                  cycleCount: nil,
+                                  externalConnected: true)
+
+        engine.record(CableSnapshot(usbDevices: [device], power: power,
+                                    displays: [], thunderboltDevices: []))
+
+        XCTAssertFalse(engine.rating(forSessionID: "usb-0x141")?.is5ACable ?? true,
+                       "电池侧 5A 不等于线缆侧 5A")
+        XCTAssertFalse(engine.overallRating().is5ACable)
+    }
+
+    /// 抽流不足 5A 时不得推断 5A 线。
+    func test5ANotInferredFromSmallDraw() {
+        var engine = CableRatingEngine()
+        let device = USBDeviceSnapshot(registryID: 1, locationID: 0x14100000, productName: "SSD",
+                                       vendorName: nil, vendorID: nil, productID: nil, serialNumber: nil,
+                                       bcdUSB: nil, speed: USBSpeed(bitsPerSecond: 10_000_000_000))
+        let power = PowerSnapshot(isCharging: true,
+                                  batteryPercent: 50,
+                                  adapterVoltageMV: 20_000,
+                                  batteryAmperageMA: 3_000,
+                                  pdContract: nil,
+                                  adapterDescription: nil,
+                                  cycleCount: nil,
+                                  externalConnected: true)
+
+        engine.record(CableSnapshot(usbDevices: [device], power: power,
+                                    displays: [], thunderboltDevices: []))
+
+        XCTAssertFalse(engine.rating(forSessionID: "usb-0x141")?.is5ACable ?? true)
+        XCTAssertFalse(engine.overallRating().is5ACable)
     }
 
     /// 显示器信息参与评级：链路速率与刷新率取历史峰值

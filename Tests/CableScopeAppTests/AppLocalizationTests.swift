@@ -40,7 +40,7 @@ final class AppLocalizationTests: XCTestCase {
             "对端 VID %@": "Partner VID %@",
             "e-marker 厂商 %@": "e-marker vendor %@",
             "类 %@ · registryID %llu · %lld 个属性": "Class %@ · registryID %llu · %lld properties",
-            "首次确认支持 5A": "5A support confirmed for the first time",
+            "首次确认至少支持 5A": "First time confirmed support for at least 5A",
             "显示器链路规格提升": "Display link spec upgraded",
         ]
         for (key, english) in expected {

@@ -21,7 +21,7 @@ final class DiagnosticsTests: XCTestCase {
             isCharging: isCharging,
             batteryPercent: 50,
             adapterVoltageMV: external ? realVoltageMV : nil,
-            adapterAmperageMA: external ? realAmperageMA : nil,
+            batteryAmperageMA: external ? realAmperageMA : nil,
             pdContract: external ? PDContract(voltageMV: contractVoltageMV ?? 0,
                                               currentMA: contractAmperageMA ?? 0) : nil,
             adapterDescription: "pd charger",
@@ -77,13 +77,13 @@ final class DiagnosticsTests: XCTestCase {
         }
     }
 
-    func testAdapterMaxOutput() {
-        // 实时 ≈ 合同（20V×5A=100W 合同，实时 95W+）。
+    func testContractAtAdapterMaxTier() {
+        // 合同 100W 已到充电器最高档（20V×5A）。
         let result = DiagnosticsEngine.diagnoseCharging(
-            power: power(isCharging: true, external: true, realAmperageMA: 4_800),
+            power: power(isCharging: true, external: true),
             adapterMaxWatts: 100
         )
-        XCTAssertEqual(result.verdict, .adapterMax)
+        XCTAssertEqual(result.verdict, .chargingWithinContract)
     }
 
     func testCableLikelyLimitedRequiresAdapterMax() {
@@ -97,13 +97,16 @@ final class DiagnosticsTests: XCTestCase {
         XCTAssertEqual(result.verdict, .cableLikelyLimited)
     }
 
-    func testMachineDrawingLessWithoutAdapterMax() {
-        // 无端口控制器数据（老机型）：实时 40W < 合同 100W，不能断言是线缆问题。
+    /// 没有充电器档位表（老机型）时只报"已按合同充电"，不编造"满档输出"结论。
+    ///
+    /// 旧实现会拿电池侧功率与合同比较，得出"实际抽取低于合同"；那不是充电器的输出
+    /// 功率（macOS 不提供端口级读数），结论站不住。
+    func testNoAdapterTierDataStillReportsContractOnly() {
         let result = DiagnosticsEngine.diagnoseCharging(
             power: power(isCharging: true, external: true, realAmperageMA: 2_000),
             adapterMaxWatts: nil
         )
-        XCTAssertEqual(result.verdict, .machineDrawingLess)
+        XCTAssertEqual(result.verdict, .chargingWithinContract)
     }
 
     func testUnknownWithoutPowerData() {
@@ -112,11 +115,109 @@ final class DiagnosticsTests: XCTestCase {
 
     func testUnknownWhenContractMissing() {
         let noContract = PowerSnapshot(isCharging: true, batteryPercent: 50,
-                                       adapterVoltageMV: 20_000, adapterAmperageMA: 2_000,
+                                       adapterVoltageMV: 20_000, batteryAmperageMA: 2_000,
                                        pdContract: nil, adapterDescription: nil, cycleCount: nil,
                                        externalConnected: true)
         XCTAssertEqual(DiagnosticsEngine.diagnoseCharging(power: noContract, adapterMaxWatts: 100).verdict,
                        .unknown)
+    }
+
+    // MARK: 端口侧参数语义（充电器能力 vs 实际协商档）
+
+    /// 构造一个带 PD 档位表的端口。
+    ///
+    /// - Parameters:
+    ///   - optionWatts: 充电器上报的档位表（每档的 W）。
+    ///   - winningWatts: 实际协商到的档（nil = 未协商）。
+    ///   - hasPowerSource: 空闲端口根本没有 `powerSource`（`IOPortFeaturePowerSource`
+    ///     只挂在带电源的端口上），传 false 构造这种情形。
+    private func makePort(portID: String,
+                          optionWatts: [Double],
+                          winningWatts: Double?,
+                          hasPowerSource: Bool = true) -> USBCPortSnapshot {
+        func phase(_ watts: Double, _ uuid: String) -> PDOPhase {
+            PDOPhase(voltageMV: 20_000, maxCurrentMA: Int(watts * 1000 / 20), maxPowerMW: Int(watts * 1000),
+                     uuid: uuid)
+        }
+        let options = optionWatts.enumerated().map { phase($0.element, "opt-\($0.offset)") }
+        let winning = winningWatts.flatMap { watts -> PDOPhase? in
+            options.first { Double($0.maxPowerMW) / 1000 == watts }
+        }
+        let powerSource: PDOPortPowerSnapshot? = hasPowerSource
+            ? PDOPortPowerSnapshot(sourceName: "USB-PD", options: options, winning: winning)
+            : nil
+        return USBCPortSnapshot(
+            portID: portID, controllerClass: "AppleHPMInterfaceType10",
+            portType: "USB-C", plugOrientation: nil, isActive: true, hasActiveCable: true,
+            connectionCount: 1,
+            transportsSupported: ["CIO"], transportsProvisioned: ["CIO"], featuresEnabled: [],
+            eMarker: nil, partner: nil, powerSource: powerSource)
+    }
+
+    /// 充电器能力取**档位表的最大值**，不是当前协商档。
+    ///
+    /// 这条是"线缆受限"判定能否成立的前提：充电器能给 100W、这根线只谈到 60W，
+    /// 只有拿 100W（档位表上限）去比才判得出来。拿 60W（协商档）去比就是自己跟自己比。
+    func testAdapterMaxPDOWattsUsesOptionTableNotWinningPhase() {
+        let port = makePort(portID: "Port-USB-C@1", optionWatts: [60, 100], winningWatts: 60)
+        XCTAssertEqual(DiagnosticsEngine.adapterMaxPDOWatts(ports: [port]), 100)
+    }
+
+    /// 没有档位表（无端口控制器数据）→ nil，不编造充电器能力。
+    func testAdapterMaxPDOWattsNilWithoutPortData() {
+        XCTAssertNil(DiagnosticsEngine.adapterMaxPDOWatts(ports: []))
+    }
+
+    /// **两个**端口都带 power source → nil（跨充电器无法归属，宁可不猜）。
+    ///
+    /// 笔记本一边被 30W 充电器供电、一边用另一个 USB-C 口给硬盘供电时，
+    /// 两个端口都会报档位表。此时若跨端口取 max，就会拿 100W 那条的上限去比
+    /// 30W 充电器的合同 → 误报"线缆受限"，而真正的限制来自那个小充电器。
+    func testAdapterMaxPDOWattsNilWithTwoPoweredPorts() {
+        let a = makePort(portID: "Port-USB-C@1", optionWatts: [30], winningWatts: 30)
+        let b = makePort(portID: "Port-USB-C@2", optionWatts: [60, 100], winningWatts: 60)
+        XCTAssertNil(DiagnosticsEngine.adapterMaxPDOWatts(ports: [a, b]))
+    }
+
+    /// 一个端口带 power source、另一个没有 → 仍能用前者（空闲口不参与）。
+    func testAdapterMaxPDOWattsIgnoresPortsWithoutPowerSource() {
+        let charging = makePort(portID: "Port-USB-C@2", optionWatts: [60, 100], winningWatts: 60)
+        let idle = makePort(portID: "Port-USB-C@1", optionWatts: [], winningWatts: nil, hasPowerSource: false)
+        XCTAssertEqual(DiagnosticsEngine.adapterMaxPDOWatts(ports: [idle, charging]), 100)
+    }
+
+    /// 端口选中的 PD 档位**不是合同**：没有 `pdContract` 时仍必须说"读数缺失"。
+    ///
+    /// `WinningPowerSourceOption` 选中的是充电器广告的一个 PDO，`Max Current` 是该档
+    /// 上限而非 RDO 里实际请求的电流；3A 线也可能选中 20V/5A 那个 PDO。拿它当合同
+    /// 会把"充电器能给的"说成"这根线谈成的"。
+    func testWinningPhaseIsNotUsedAsContract() {
+        let noContract = PowerSnapshot(isCharging: true, batteryPercent: 50,
+                                       adapterVoltageMV: 20_000, batteryAmperageMA: 2_000,
+                                       pdContract: nil, adapterDescription: nil, cycleCount: nil,
+                                       externalConnected: true)
+        let port = makePort(portID: "Port-USB-C@1", optionWatts: [60, 100], winningWatts: 60)
+        let result = DiagnosticsEngine.diagnoseCharging(
+            power: noContract,
+            adapterMaxWatts: DiagnosticsEngine.adapterMaxPDOWatts(ports: [port]))
+        XCTAssertEqual(result.verdict, .unknown)
+    }
+
+    /// 端到端回归：单端口、充电器档位表到 100W、合同只谈到 60W → 判出"线缆受限"。
+    ///
+    /// 这条正是旧实现判不出来的场景——旧实现把"当前协商档"当充电器能力，
+    /// 于是拿 60W 跟 60W 比，"线缆受限"永远不触发。
+    func testSinglePortCableLimitedIsDetectedEndToEnd() {
+        let port = makePort(portID: "Port-USB-C@1", optionWatts: [60, 100], winningWatts: 60)
+        let contract60 = PowerSnapshot(isCharging: true, batteryPercent: 50,
+                                       adapterVoltageMV: 20_000, batteryAmperageMA: 3_000,
+                                       pdContract: PDContract(voltageMV: 20_000, currentMA: 3_000),
+                                       adapterDescription: nil, cycleCount: nil,
+                                       externalConnected: true)
+        let result = DiagnosticsEngine.diagnoseCharging(
+            power: contract60,
+            adapterMaxWatts: DiagnosticsEngine.adapterMaxPDOWatts(ports: [port]))
+        XCTAssertEqual(result.verdict, .cableLikelyLimited)
     }
 
     // MARK: 端口头条
@@ -137,13 +238,13 @@ final class DiagnosticsTests: XCTestCase {
                 options: [PDOPhase(voltageMV: 20_000, maxCurrentMA: 5_000, maxPowerMW: 100_000, uuid: "B")],
                 winning: PDOPhase(voltageMV: 20_000, maxCurrentMA: 5_000, maxPowerMW: 100_000, uuid: "B"))
         )
-        let chargingPower = power(isCharging: true, external: true, realAmperageMA: 4_900)
-
-        let headline = DiagnosticsEngine.portHeadline(port: port, power: chargingPower,
+        let headline = DiagnosticsEngine.portHeadline(port: port,
                                                        locale: Locale(identifier: "zh-Hans"))
         XCTAssertNotNil(headline)
         XCTAssertTrue(headline?.contains("USB-C") ?? false)
-        XCTAssertTrue(headline?.contains("⚡") ?? false)
+        // 端口头条只报本端口的 PD 档位，不掺整机电池侧功率（多线时会张张卡一样）。
+        XCTAssertTrue(headline?.contains("PD 档位 100W") ?? false, headline ?? "")
+        XCTAssertFalse(headline?.contains("⚡") ?? true, "端口头条不应再出现整机功率：\(headline ?? "")")
         XCTAssertTrue(headline?.contains("被动线缆") ?? false)
         XCTAssertTrue(headline?.contains("5A") ?? false)
         XCTAssertTrue(headline?.contains("USB4/雷雳") ?? false)

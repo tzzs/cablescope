@@ -66,14 +66,15 @@ final class FormattingTests: XCTestCase {
 
     func testShortSummaryCharging() {
         let power = PowerSnapshot(isCharging: true, batteryPercent: 80,
-                                  adapterVoltageMV: 20_000, adapterAmperageMA: 2014,
+                                  adapterVoltageMV: 20_000, batteryAmperageMA: 2014,
+                                  batteryVoltageMV: 12_000,
                                   pdContract: nil, adapterDescription: nil, cycleCount: nil)
-        XCTAssertEqual(power.shortSummary, "40.3 W · 充电中")
+        XCTAssertEqual(power.shortSummary, "24.2 W · 充电中", "电池侧功率 = 12V × 2.014A")
     }
 
     func testShortSummaryIdleWithoutWatts() {
         let power = PowerSnapshot(isCharging: false, batteryPercent: 80,
-                                  adapterVoltageMV: nil, adapterAmperageMA: nil,
+                                  adapterVoltageMV: nil, batteryAmperageMA: nil,
                                   pdContract: nil, adapterDescription: nil, cycleCount: nil)
         XCTAssertEqual(power.shortSummary, "未接通电源")
     }
@@ -81,7 +82,7 @@ final class FormattingTests: XCTestCase {
     /// 保温/优化充电暂停：插电但 IsCharging=false、瞬时电流为负，不得展示负功率
     func testShortSummaryConnectedButPaused() {
         let power = PowerSnapshot(isCharging: false, batteryPercent: 86,
-                                  adapterVoltageMV: 20_000, adapterAmperageMA: -540,
+                                  adapterVoltageMV: 20_000, batteryAmperageMA: -540,
                                   pdContract: PDContract(voltageMV: 20_000, currentMA: 5_000),
                                   adapterDescription: "pd charger", cycleCount: 40,
                                   externalConnected: true)

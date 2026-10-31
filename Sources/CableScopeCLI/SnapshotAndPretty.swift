@@ -5,14 +5,19 @@ import Foundation
 
 extension CableScopeCLI {
     static func runSnapshot(pretty: Bool) async throws {
-        let snapshot = try await acquireSnapshot()
+        let snapshot = await acquireSnapshot()
+        print(try jsonText(snapshot, pretty: pretty))
+    }
+
+    /// 快照 JSON 文本（纯函数：只依赖快照，便于单测）。
+    static func jsonText(_ snapshot: CableSnapshot, pretty: Bool) throws -> String {
         let data: Data
         do {
             data = try snapshot.toJSON(pretty: pretty)
         } catch {
             throw RuntimeError(L("JSON 编码失败：%@", String(describing: error)))
         }
-        print(String(data: data, encoding: .utf8) ?? "{}")
+        return String(data: data, encoding: .utf8) ?? "{}"
     }
 }
 
@@ -20,7 +25,7 @@ extension CableScopeCLI {
 
 extension CableScopeCLI {
     static func runPretty() async throws {
-        let snapshot = try await acquireSnapshot()
+        let snapshot = await acquireSnapshot()
         print(render(snapshot))
     }
 
@@ -51,8 +56,9 @@ extension CableScopeCLI {
         guard let power else { return "  " + L("暂无数据") }
 
         var lines: [String] = []
-        // 标题数字的取舍：充电中显示瞬时功率；已接通但未充电（保温/优化充电暂停，
-        // 电池侧电流为负）时瞬时功率无意义，显示 PD 合同能力；未接通时不显示数字。
+        // 标题数字的取舍：充电中显示电池侧功率（流入电池的功率，macOS 唯一能给的功率读数）；
+        // 已接通但未充电（保温/优化充电暂停，电池侧电流为负）时功率无意义，显示 PD 合同能力；
+        // 未接通时不显示数字。
         let headline: String
         if power.isCharging {
             headline = L("充电中") + wattsSuffix(power.watts)
@@ -63,15 +69,19 @@ extension CableScopeCLI {
         }
         lines.append("  " + Term.bold(headline))
 
-        if let voltage = power.adapterVoltageMV, let amperage = power.adapterAmperageMA {
-            lines.append("  " + L("电压/电流  %@ / %@", Fmt.volts(voltage), Fmt.amps(amperage)))
-        } else if let contract = power.pdContract {
-            lines.append("  " + L("电压/电流  %@ / %@", Fmt.volts(contract.voltageMV), Fmt.amps(contract.currentMA)))
+        // 适配器电压与电池电流**分属两个电压域**，不能拼成"电压 / 电流"一对——
+        // 顶层 Amperage 是流入电池的电流，不是线缆/适配器电流。分行标注，读者才不会
+        // 把 20V × 0A 误当成输入功率。
+        if let voltage = power.adapterVoltageMV {
+            lines.append("  " + L("适配器电压  %@", Fmt.volts(voltage)))
+        }
+        if let batteryVoltage = power.batteryVoltageMV, let amperage = power.batteryAmperageMA {
+            lines.append("  " + L("电池  %@ / %@", Fmt.volts(batteryVoltage), Fmt.amps(amperage)))
         }
 
         if let contract = power.pdContract {
             var pd = L("PD 合同  %@ × %@", Fmt.volts(contract.voltageMV), Fmt.amps(contract.currentMA))
-            if contract.implies5ACable { pd += L("（5A e-marker 线）") }
+            if contract.implies5ACable { pd += L("（至少支持 5A）") }
             lines.append("  " + pd)
         }
 

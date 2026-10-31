@@ -119,7 +119,11 @@ public struct PDContract: Codable, Hashable, Sendable {
     /// 功率 W
     public var watts: Double { Double(voltageMV) / 1000.0 * Double(currentMA) / 1000.0 }
 
-    /// PD 合同 >= 20V/5A ⇒ 线缆必有 e-marker（5A 线）
+    /// PD 合同 >= 20V/5A ⇒ 线缆至少具备 5A 承载能力。
+    ///
+    /// 物理依据：≤3A 线承载不了 5A，所以协商到 5A 档就证明这根线不是普通 3A 线。
+    /// 注意这是**推断**（来自协商结果，不是读 e-marker 芯片），故产品话术用
+    /// "至少支持 5A"（见 `Docs/05-术语表.md`），不说"5A e-marker 线"。
     public var implies5ACable: Bool { voltageMV >= 20_000 && currentMA >= 5_000 }
 
     public init(voltageMV: Int, currentMA: Int) {
@@ -137,10 +141,17 @@ public struct PowerSnapshot: Codable, Hashable, Sendable {
     public let externalConnected: Bool
     /// 电池电量百分比 0-100
     public let batteryPercent: Double?
-    /// 当前适配器电压 mV
+    /// 当前适配器电压 mV（来自 `AdapterDetails.AdapterVoltage`）
     public let adapterVoltageMV: Int?
-    /// 当前适配器电流 mA
-    public let adapterAmperageMA: Int?
+    /// 流入**电池**的电流 mA（来自顶层 `Amperage`）。
+    ///
+    /// 名字里的 "battery" 是关键：它**不是**流过线缆的电流，也不是适配器的输出电流。
+    /// 满电时读数为 0（系统直接从适配器取电，电流不经过电池），保温暂停时可为负。
+    /// 任何"线缆承载了多少电流"的推断都不能拿它当证据（见 `CableRatingEngine` 的注释）。
+    public let batteryAmperageMA: Int?
+    /// 电池电压 mV（顶层 `Voltage` / `AppleRawBatteryVoltage`）。
+    /// 用于把电池电流换算成**电池侧**功率——与适配器电压分属两个电压域，不能混乘。
+    public let batteryVoltageMV: Int?
     /// PD 合同（若可解析）
     public let pdContract: PDContract?
     /// 适配器描述/PD 协议信息（来自 AdapterDetails，尽力而为）
@@ -150,16 +161,25 @@ public struct PowerSnapshot: Codable, Hashable, Sendable {
     /// IORegistry 全量原始属性（AppleSmartBattery 的完整字典，含 AdapterDetails 嵌套）
     public let rawProperties: [String: IORegistryValue]
 
-    /// 当前充电功率 W
+    /// 电池充电功率 W（流入电池的功率）。
+    ///
+    /// **量纲要准**：电池电压 × 电池电流。早先用的是适配器电压 × 电池电流——那是把
+    /// 两个电压域的量相乘（适配器 20V、电池 12.6V 时会高估约 1.6 倍），而且完全忽略
+    /// 系统自身功耗，因此既不是线缆功率也不是适配器输出功率。
+    ///
+    /// macOS 不提供端口级实测功率，所以这里只能给出**电池侧**功率；展示层不得把它
+    /// 称作"充电器输出"或与 PD 合同比较来断言"满档输出"。
+    /// 电池电压读不到时返回 nil——宁可不显示，也不给一个错的数量级。
     public var watts: Double? {
-        guard let v = adapterVoltageMV, let a = adapterAmperageMA else { return nil }
+        guard let v = batteryVoltageMV, let a = batteryAmperageMA else { return nil }
         return Double(v) / 1000.0 * Double(a) / 1000.0
     }
 
     public init(isCharging: Bool,
                 batteryPercent: Double?,
                 adapterVoltageMV: Int?,
-                adapterAmperageMA: Int?,
+                batteryAmperageMA: Int?,
+                batteryVoltageMV: Int? = nil,
                 pdContract: PDContract?,
                 adapterDescription: String?,
                 cycleCount: Int?,
@@ -169,7 +189,8 @@ public struct PowerSnapshot: Codable, Hashable, Sendable {
         self.externalConnected = externalConnected
         self.batteryPercent = batteryPercent
         self.adapterVoltageMV = adapterVoltageMV
-        self.adapterAmperageMA = adapterAmperageMA
+        self.batteryAmperageMA = batteryAmperageMA
+        self.batteryVoltageMV = batteryVoltageMV
         self.pdContract = pdContract
         self.adapterDescription = adapterDescription
         self.cycleCount = cycleCount

@@ -10,7 +10,9 @@ public struct CableRating: Codable, Hashable, Sendable {
     public let maxUSBBitsPerSecond: Int?
     /// 历史观测到的最高充电功率 W
     public let maxChargingWatts: Double?
-    /// 是否出现过 5A 合同（⇒ e-marker 5A 线）
+    /// 是否推断出**至少支持 5A**。唯一证据是 PD 合同（`AdapterDetails.Current`）——
+    /// 端口协商档是该 PDO 的上限、电池侧电流不在适配器电压域，两者都证明不了线缆承载 5A。
+    /// 无论如何措辞都只能是下界（"至少支持"），不是认证结论。
     public let is5ACable: Bool
     /// 历史观测到的最高 DP 链路速率标签
     public let maxDisplayLinkRate: String?
@@ -53,7 +55,7 @@ public struct CableRating: Codable, Hashable, Sendable {
             parts.append(KitLocalization.string("未观测到高速 USB 协商", locale: locale))
         }
         if is5ACable, let w = maxChargingWatts, w > 0 {
-            parts.append(KitLocalization.string(template: "⚡ %@W（5A e-marker 线）", locale: locale,
+            parts.append(KitLocalization.string(template: "⚡ %@W（至少支持 5A）", locale: locale,
                                                 args: KitLocalization.fixedFraction(w, digits: 0)))
         } else if let w = maxChargingWatts, w > 0 {
             parts.append(KitLocalization.string(template: "⚡ %@W", locale: locale,

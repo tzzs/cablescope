@@ -86,7 +86,7 @@ extension DisplaySnapshot {
 }
 
 extension PowerSnapshot {
-    /// 一行摘要，如 "65.4 W · 充电中"；保温暂停时为 "已接通电源 · 未在充电"（瞬时功率为负，不展示）。
+    /// 一行摘要，如 "24.2 W · 充电中"；保温暂停时为 "已接通电源 · 未在充电"（电池侧功率为负，不展示）。
     var shortSummary: String {
         if isCharging, let watts {
             return L("%@ · 充电中", Fmt.watts(watts))
