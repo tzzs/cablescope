@@ -1,52 +1,17 @@
-<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-  <title>CableScope App Icon</title>
-  <desc>A USB-C port sitting at the pivot of an open rating-gauge arc. macOS 26 Liquid Glass layered source: background / foreground groups (no middle/halo layer for now). The rounded-rect mask is applied by the system and is intentionally not baked in.</desc>
-
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>CableScope · 柔黑</title>
+  <desc>柔黑背景上，左右对称的探测环包围 USB-C 接口。画布不含系统圆角遮罩。</desc>
   <defs>
-    <linearGradient id="bg-gradient" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#3143E0"/>
-      <stop offset="0.55" stop-color="#1D2CA8"/>
-      <stop offset="1" stop-color="#0B1044"/>
-    </linearGradient>
-    <radialGradient id="bg-sheen" cx="0.28" cy="0.16" r="0.65">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.14"/>
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="bg-vignette" cx="0.5" cy="0.5" r="0.72">
-      <stop offset="0.62" stop-color="#060B2B" stop-opacity="0"/>
-      <stop offset="1" stop-color="#060B2B" stop-opacity="0.34"/>
-    </radialGradient>
-    <linearGradient id="arc-gradient" x1="0.2" y1="0" x2="0.8" y2="1">
-      <stop offset="0" stop-color="#8BEFFF"/>
-      <stop offset="0.45" stop-color="#4FC2FF"/>
-      <stop offset="1" stop-color="#2F7BF0"/>
+    <linearGradient id="background-gradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1A1B1E"/>
+      <stop offset="1" stop-color="#111215"/>
     </linearGradient>
   </defs>
-
-  <!-- BACKGROUND LAYER — edge-to-edge, system masks it into the rounded rectangle -->
   <g id="background">
-    <rect width="1024" height="1024" fill="url(#bg-gradient)"/>
-    <rect width="1024" height="1024" fill="url(#bg-sheen)"/>
-    <rect width="1024" height="1024" fill="url(#bg-vignette)"/>
+    <rect width="1024" height="1024" fill="url(#background-gradient)"/>
   </g>
-
-  <!-- MIDDLE LAYER — intentionally omitted for now (kept simple: background + foreground only).
-       The halo lives separately in AppIcon-middle.svg / CableScope.icon (hidden) if we
-       decide to bring the glow back later. -->
-
-  <!-- FOREGROUND LAYER — flat vector mark: rating-gauge arc + USB-C port at its pivot.
-       Glass (specular / translucency / shadow) is added by Icon Composer, not baked in. -->
-  <g id="foreground">
-    <!-- Rating-gauge arc: 140° sweep (radius 300, pivot at the port's center 512,619.5),
-         hand-written as two cubic Béziers instead of an SVG arc ("A") command — Icon
-         Composer's SVG importer does not resolve elliptical arcs and silently flattens
-         them into a straight chord between the endpoints. -->
-    <path d="M 230.1 516.9 C 273.23 398.39, 385.88 319.5, 512 319.5
-             C 638.12 319.5, 750.77 398.39, 793.9 516.9"
-          fill="none" stroke="url(#arc-gradient)"
-          stroke-width="48" stroke-linecap="round"/>
-    <!-- USB-C port, sitting at the arc's pivot -->
-    <rect x="352" y="534.5" width="320" height="170" rx="85"
-          fill="none" stroke="#FFFFFF" stroke-width="40"/>
+  <g id="foreground" fill="none" stroke="#F3F9FF" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 352 765 C 267 711 211 617 211 512 C 211 346 346 211 512 211 C 678 211 813 346 813 512 C 813 617 757 711 672 765" stroke-width="52"/>
+    <rect x="337" y="438" width="350" height="148" rx="74" stroke-width="48"/>
   </g>
 </svg>
