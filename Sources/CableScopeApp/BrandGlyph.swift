@@ -3,11 +3,16 @@ import SwiftUI
 
 /// CableScope 品牌线缆图标：状态栏图标和菜单面板标题共用。
 ///
-/// 直接复用 App 图标（`Design/AppIcon`）的造型——弧形评级表盘 + USB-C 端口——而不是
-/// 借用语义相近但造型不同的系统 SF Symbol「cable.connector」（普通线缆插头图案）。
-/// `StatusBarGlyph.pdf` 是该造型按等比例简化出的单色矢量稿：PDF 是 AppKit 里历史最久、
-/// 最可靠的分辨率无关模板图格式，`isTemplate = true` 后会像 SF Symbol 一样自动跟随
-/// 菜单栏 / 深浅色模式的前景色着色。
+/// 复用 App 图标（`Design/AppIcon`）里的 USB-C 接口造型；大尺寸 App 图标保留探测环，
+/// 状态栏则按 15×11.25pt 的小尺寸场景去掉探测环，只保留接口外框和内部舌片。
+/// 这样两处共享同一套几何语言，又避免探测环在狭小菜单栏槽位里挤压接口。
+/// `StatusBarGlyph.pdf` 是单色矢量 template：PDF 是 AppKit 里历史最久、最可靠的
+/// 分辨率无关图格式，`isTemplate = true` 后会像 SF Symbol 一样自动跟随菜单栏 /
+/// 深浅色模式的前景色着色。
+///
+/// **App 图标改版时必须同步重新生成**（`Design/AppIcon/generate-statusbar-glyph.swift`）：
+/// 它是独立资源，不会跟着 `AppIcon.xcassets` 自动更新——`23cc925` 换掉 App 图标后
+/// 菜单栏仍停在旧造型，正是因为漏了这一步。
 enum BrandGlyph {
     /// PDF 原生画布是 72×54pt（矢量设计尺寸），直接拿来当状态栏图标会明显偏大偏粗——
     /// `MenuBarExtra` 的状态项图标走的是 AppKit 的 `NSStatusBarButton` 渲染管线，
