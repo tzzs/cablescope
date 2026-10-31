@@ -14,6 +14,8 @@ import IOKit
 public final class RegistryService: RegistryServiceProtocol {
     /// 单次枚举的条目数上限。
     public static let maxEntries = 256
+    /// 全局属性搜索读取详情的最大索引条目数。
+    public static let maxGlobalSearchEntries = 512
 
     /// 常用类名清单（属性检查器的默认选择项；枚举结果可能为空，属正常现象）。
     public static let wellKnownClasses: [WellKnownClass] = [
@@ -30,6 +32,129 @@ public final class RegistryService: RegistryServiceProtocol {
     ]
 
     public init() {}
+
+    /// 枚举系统公布的全部 registry plane，并只采集列表与导航所需的轻量字段。
+    public func buildGlobalIndex() async -> RegistryIndexResult {
+        await Task.detached(priority: .utility) { Self.makeGlobalIndex() }.value
+    }
+
+    /// 按 plane path 打开一个索引条目后读取完整属性。
+    public func readEntry(_ item: RegistryEntryIndexItem) async -> RegistryDetailResult {
+        await Task.detached(priority: .utility) { Self.readIndexedEntry(item) }.value
+    }
+
+    private static func makeGlobalIndex() -> RegistryIndexResult {
+        let root = IORegistryGetRootEntry(kIOMainPortDefault)
+        guard root != 0 else {
+            return RegistryIndexResult(entries: [], indexedPlanes: [], failedPlanes: ["IORegistry"],
+                                       truncated: false, failedCount: 1)
+        }
+        defer { IOObjectRelease(root) }
+        var rootPropertiesRef: Unmanaged<CFMutableDictionary>?
+        let rootStatus = IORegistryEntryCreateCFProperties(root, &rootPropertiesRef, kCFAllocatorDefault, 0)
+        defer { rootPropertiesRef?.release() }
+        guard rootStatus == KERN_SUCCESS,
+              let rootProperties = rootPropertiesRef?.takeUnretainedValue() as? [String: Any],
+              let rawPlanes = rootProperties["IORegistryPlanes"] as? [String: Any] else {
+            return RegistryIndexResult(entries: [], indexedPlanes: [], failedPlanes: ["IORegistryPlanes"],
+                                       truncated: false, failedCount: 1)
+        }
+
+        let planes = rawPlanes.keys.sorted()
+        var records: [UInt64: RegistryEntryIndexItem] = [:]
+        var indexedPlanes: [String] = []
+        var failedPlanes: [String] = []
+        var failedCount = 0
+        var truncated = false
+        for plane in planes {
+            guard let result = indexPlane(root: root, plane: plane) else {
+                failedPlanes.append(plane)
+                continue
+            }
+            indexedPlanes.append(plane)
+            failedCount += result.failedCount
+            truncated = truncated || result.truncated
+            for item in result.entries {
+                if let existing = records[item.registryID] {
+                    var paths = existing.planePaths
+                    paths[plane] = item.planePaths[plane]
+                    records[item.registryID] = RegistryEntryIndexItem(registryID: item.registryID,
+                                                                       name: existing.name ?? item.name,
+                                                                       className: existing.className == "Unknown" ? item.className : existing.className,
+                                                                       planePaths: paths)
+                } else {
+                    records[item.registryID] = item
+                }
+            }
+        }
+        return RegistryIndexResult(entries: records.values.sorted {
+            ($0.className, $0.displayTitle, $0.registryID) < ($1.className, $1.displayTitle, $1.registryID)
+        }, indexedPlanes: indexedPlanes, failedPlanes: failedPlanes, truncated: truncated, failedCount: failedCount)
+    }
+
+    /// 每个 plane 单独持有迭代器；每个条目在处理后立即释放，避免高基数 plane 累积内核句柄。
+    private static func indexPlane(root: io_registry_entry_t, plane: String) -> PlaneIndexResult? {
+        var iterator: io_iterator_t = 0
+        guard IORegistryEntryCreateIterator(root, plane, UInt32(kIORegistryIterateRecursively), &iterator) == KERN_SUCCESS else {
+            return nil
+        }
+        defer { IOObjectRelease(iterator) }
+        var entries: [RegistryEntryIndexItem] = []
+        var failedCount = 0
+        var truncated = false
+        var count = 0
+        while true {
+            let entry = IOIteratorNext(iterator)
+            guard entry != 0 else { break }
+            count += 1
+            if count > maxEntries * 64 {
+                IOObjectRelease(entry)
+                truncated = true
+                break
+            }
+            if let item = indexItem(entry, plane: plane) {
+                entries.append(item)
+            } else {
+                failedCount += 1
+            }
+            IOObjectRelease(entry)
+        }
+        return PlaneIndexResult(entries: entries, truncated: truncated, failedCount: failedCount)
+    }
+
+    private static func indexItem(_ entry: io_registry_entry_t, plane: String) -> RegistryEntryIndexItem? {
+        var registryID: UInt64 = 0
+        guard IORegistryEntryGetRegistryEntryID(entry, &registryID) == KERN_SUCCESS,
+              let path = entryPath(entry, plane: plane) else { return nil }
+        return RegistryEntryIndexItem(registryID: registryID, name: entryName(entry),
+                                      className: objectClass(entry) ?? "Unknown", planePaths: [plane: path])
+    }
+
+    private static func readIndexedEntry(_ item: RegistryEntryIndexItem) -> RegistryDetailResult {
+        for plane in item.planePaths.keys.sorted() {
+            guard let path = item.planePaths[plane] else { continue }
+            let entry = IORegistryEntryFromPath(kIOMainPortDefault, path)
+            guard entry != 0 else { continue }
+            defer { IOObjectRelease(entry) }
+            var propertiesRef: Unmanaged<CFMutableDictionary>?
+            let status = IORegistryEntryCreateCFProperties(entry, &propertiesRef, kCFAllocatorDefault, 0)
+            defer { propertiesRef?.release() }
+            guard status == KERN_SUCCESS, let ref = propertiesRef,
+                  let properties = ref.takeUnretainedValue() as? [String: Any] else { continue }
+            return RegistryDetailResult(entry: RegistryEntrySnapshot(registryID: item.registryID, name: item.name,
+                                                                      className: item.className,
+                                                                      properties: IORegistryValue.dictionary(from: properties)),
+                                        failed: false)
+        }
+        return RegistryDetailResult(entry: nil, failed: true)
+    }
+
+    private static func entryPath(_ entry: io_registry_entry_t, plane: String) -> String? {
+        var buffer = [CChar](repeating: 0, count: 4096)
+        guard plane.withCString({ IORegistryEntryGetPath(entry, $0, &buffer) }) == KERN_SUCCESS else { return nil }
+        let path = String(cString: buffer)
+        return path.isEmpty ? nil : path
+    }
 
     /// 带完整性标志的枚举。
     ///
@@ -63,8 +188,9 @@ public final class RegistryService: RegistryServiceProtocol {
         while entries.count < maxEntries {
             let entry = IOIteratorNext(iterator)
             if entry == 0 { break }
-            defer { IOObjectRelease(entry) }
-            if let snapshot = readEntry(from: entry, requestedClass: className) {
+            let snapshot = readEntry(from: entry, requestedClass: className)
+            IOObjectRelease(entry)
+            if let snapshot {
                 entries.append(snapshot)
             } else {
                 failedCount += 1
@@ -92,6 +218,13 @@ public final class RegistryService: RegistryServiceProtocol {
         return RegistryEnumerationResult(entries: entries.sorted { $0.registryID < $1.registryID },
                                          truncated: truncated,
                                          failedCount: failedCount)
+    }
+
+    /// 分 plane 索引结果，所有每条目 IOKit 句柄都在 indexPlane 中即时释放。
+    private struct PlaneIndexResult {
+        let entries: [RegistryEntryIndexItem]
+        let truncated: Bool
+        let failedCount: Int
     }
 
     /// 判定枚举结果是否被条目数上限截断（纯函数，便于单测）。

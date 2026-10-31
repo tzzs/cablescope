@@ -33,10 +33,11 @@ public protocol DisplayPortTransportServiceProtocol: Sendable {
 }
 
 public protocol RegistryServiceProtocol: Sendable {
-    /// 按任意 IOKit 类名枚举 IORegistry 条目，携带全量原始属性。
-    ///
-    /// 必须同时报出**结果是否完整**：条目数是否触顶被截断、有多少条目的属性读取失败。
-    /// 诊断工具把不完整的结果说成"全部"，排查结论就建立在残缺数据上。
+    /// 轻量跨 registry plane 索引。索引只读取条目名、类名、ID 与路径，不读取属性树。
+    func buildGlobalIndex() async -> RegistryIndexResult
+    /// 按索引记录的 plane path 读取选中条目的完整属性。
+    func readEntry(_ item: RegistryEntryIndexItem) async -> RegistryDetailResult
+    /// 按任意 IOKit 类名枚举 IORegistry 条目，携带全量原始属性（CLI 兼容接口）。
     func enumerate(matchingClass className: String) async -> RegistryEnumerationResult
 }
 

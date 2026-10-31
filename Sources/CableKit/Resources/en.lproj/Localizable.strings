@@ -171,6 +171,7 @@
 "可移动" = "removable";
 "外部" = "external";
 "未找到类「%@」的 IORegistry 条目。" = "No IORegistry entries for class “%@”.";
+"IORegistry plane 来源：%@" = "IORegistry plane sources: %@";
 "类「%@」共 %lld 条条目（枚举上限 %lld）" = "Class “%@” — entries: %lld (enumeration limit %lld)";
 "类「%@」共 %lld 条条目（已截断，枚举上限 %lld）" = "Class “%@” — entries: %lld (truncated at the enumeration limit of %lld)";
 "警告：条目数超过上限 %lld，结果已截断（仅显示前 %lld 条）。" = "Warning: more entries exist than the limit of %lld; the result is truncated (only the first %lld are shown).";
