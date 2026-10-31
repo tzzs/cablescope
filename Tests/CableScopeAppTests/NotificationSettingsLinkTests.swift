@@ -10,7 +10,13 @@ final class NotificationSettingsLinkTests: XCTestCase {
     func testAppSettingsURLPointsAtAppSpecificNotificationsPage() throws {
         let url = try XCTUnwrap(NotificationSettingsLink.appSettingsURL(bundleIdentifier: "com.cablescope.app"))
         XCTAssertEqual(url.scheme, "x-apple.systempreferences")
-        XCTAssertEqual(url.path, "com.apple.Notifications-Settings.extension")
+        // 断言完整字符串而不是 `url.path`：`x-apple.systempreferences` 是非层级 scheme，
+        // 各系统版本的 Foundation 对 opaque URL 的 path 解析不一致（macOS 15 上 `path`
+        // 返回空串，较新版本才返回扩展名）。深链是否可用只取决于完整字符串。
+        XCTAssertEqual(
+            url.absoluteString,
+            "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=com.cablescope.app"
+        )
         let query = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
         XCTAssertEqual(query, [URLQueryItem(name: "id", value: "com.cablescope.app")])
     }

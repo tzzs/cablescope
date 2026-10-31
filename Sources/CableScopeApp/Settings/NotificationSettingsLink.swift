@@ -16,13 +16,18 @@ import Foundation
 /// 落到一个略宽泛的位置，也好过按钮点了没反应。
 enum NotificationSettingsLink {
     /// App 专属通知页的深链（纯函数，便于单测）。
+    ///
+    /// 刻意用字面量拼 URL，而不是 `URLComponents.path` + `components.url`：
+    /// `x-apple.systempreferences` 是**非层级（opaque）scheme**，不同系统版本的
+    /// Foundation 解析规则并不一致——macOS 15 上 `URL.path` 返回空串，而较新的版本
+    /// 返回 "com.apple.Notifications-Settings.extension"。深链能不能打开取决于完整
+    /// 字符串，所以这里直接构造字符串，只借 `URLComponents` 编码查询值。
     static func appSettingsURL(bundleIdentifier: String = Bundle.main.bundleIdentifier ?? "") -> URL? {
         guard !bundleIdentifier.isEmpty else { return nil }
-        var components = URLComponents()
-        components.scheme = "x-apple.systempreferences"
-        components.path = "com.apple.Notifications-Settings.extension"
-        components.queryItems = [URLQueryItem(name: "id", value: bundleIdentifier)]
-        return components.url
+        var query = URLComponents()
+        query.queryItems = [URLQueryItem(name: "id", value: bundleIdentifier)]
+        guard let encodedQuery = query.percentEncodedQuery else { return nil }
+        return URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?\(encodedQuery)")
     }
 
     /// 通用通知面板（App 专属深链打不开时的兜底）。
