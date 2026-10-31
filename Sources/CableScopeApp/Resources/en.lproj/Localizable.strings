@@ -30,7 +30,8 @@
 "刷新" = "Refresh";
 "刷新卷列表" = "Refresh Volume List";
 "前往下载页" = "Go to Download Page";
-"前往系统设置开启" = "Open System Settings";
+"在系统设置里找到 CableScope，打开「允许通知」。" = "Find CableScope in System Settings and turn on \"Allow Notifications\".";
+"打开 CableScope 通知设置" = "Open CableScope Notification Settings";
 "功率" = "Power";
 "协商速率 ≠ 实际吞吐；测的是所选外接卷的真实读写速度" = "Negotiated speed ≠ actual throughput; this measures real read/write speed on the selected volume";
 "协商速率提升" = "Speed Upgraded";

@@ -173,10 +173,13 @@ private struct NotificationSettingsTab: View {
                         Label("系统未授权通知，以下开关不会实际生效", systemImage: "exclamationmark.triangle.fill")
                             .font(.callout.weight(.medium))
                             .foregroundStyle(.orange)
-                        Button("前往系统设置开启") {
-                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
-                                NSWorkspace.shared.open(url)
-                            }
+                        // 必须说清"打开哪个开关"：系统设置里 CableScope 那页有多组控件
+                        // （提醒样式、声音、预览、分组），用户很容易改错地方还以为已经开了。
+                        Text("在系统设置里找到 CableScope，打开「允许通知」。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("打开 CableScope 通知设置") {
+                            NotificationSettingsLink.open()
                         }
                     }
                 }
@@ -194,7 +197,7 @@ private struct NotificationSettingsTab: View {
         .formStyle(.grouped)
         .frame(width: settingsWidth, height: needsAttention || !NotificationAvailability.isAvailable ? 400 : 300)
         .task { await requestAuthorizationIfNeededAndRefresh() }
-        // 用户点"前往系统设置开启"切过去之后，App 会失焦；等他们改完权限切回来、
+        // 用户点"打开 CableScope 通知设置"切过去之后，App 会失焦；等他们改完权限切回来、
         // App 重新变为活跃状态时顺手再查一遍——不然横幅会一直停在"未授权"的旧状态，
         // 得关掉设置窗口重开才会刷新，用户会以为自己没设置对。
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
