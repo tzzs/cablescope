@@ -85,10 +85,8 @@ final class MonitorViewModel: ObservableObject {
         isRefreshing = true
         Task { [weak self] in
             guard let self else { return }
-            let snapshot = try? await self.monitor.snapshotNow()
-            if let snapshot {
-                self.ingest(snapshot)
-            }
+            let snapshot = await self.monitor.snapshotNow()
+            self.ingest(snapshot)
             self.isRefreshing = false
         }
     }
@@ -101,10 +99,9 @@ final class MonitorViewModel: ObservableObject {
     var isExternalConnected: Bool { snapshot?.power?.externalConnected ?? false }
 
     /// 当前充电功率（仅充电中且读数 > 0 时有效；保温暂停时 Amperage 为负，自然落入 nil）。
+    /// 规则与 Widget 共用 `ChargingOverviewBuilder.chargingWatts`——两处各写一份必然漂移。
     var displayWatts: Double? {
-        guard let power = snapshot?.power, power.isCharging,
-              let watts = power.watts, watts > 0 else { return nil }
-        return watts
+        ChargingOverviewBuilder.chargingWatts(snapshot?.power)
     }
 
     /// 当前协商到的最高 USB 速率（"最新 USB 速率"）。
@@ -176,15 +173,17 @@ final class MonitorViewModel: ObservableObject {
         snapshot?.ports.compactMap { $0.powerSource?.winning?.voltageMV }.max()
     }
 
-    var negotiatedPDOWatts: Double? {
-        snapshot?.ports.compactMap { $0.powerSource?.winning?.watts }.max()
-    }
 
     /// 充电瓶颈诊断（派生自当前快照，纯展示）。
+    ///
+    /// 只比两个**充电器侧**的量：充电器档位表的上限（`options` 最大值）与电源快照里的
+    /// PD 合同（`AdapterDetails.Current`）。端口控制器的 `winning` 是选中的 PDO 上限，
+    /// 既不是合同、也不是线缆能力，不能拿来参与判断。
     var chargingDiagnostics: ChargingDiagnostics? {
         guard let power = snapshot?.power else { return nil }
+        let ports = snapshot?.ports ?? []
         return DiagnosticsEngine.diagnoseCharging(power: power,
-                                                  adapterMaxWatts: negotiatedPDOWatts,
+                                                  adapterMaxWatts: DiagnosticsEngine.adapterMaxPDOWatts(ports: ports),
                                                   locale: AppPreferences.effectiveLocale())
     }
 
@@ -197,7 +196,12 @@ final class MonitorViewModel: ObservableObject {
 
     // MARK: - 内部
 
-    private func ingest(_ snapshot: CableSnapshot) {
+    /// 摄入一份快照：更新派生状态、记录并落盘评级、派发通知事件。
+    ///
+    /// 内部可见（而非 `private`）是为了让单测能注入构造好的快照——否则状态派生规则
+    /// （会话选择回退、电源归属、PDO 选取、显示器匹配）只能在真机"碰巧插了某根线"时才
+    /// 被碰到。`refresh()` 与快照流走的仍是同一条路径。
+    func ingest(_ snapshot: CableSnapshot) {
         self.snapshot = snapshot
 
         // 选中会话被拔除时自动回退到第一根，避免详情区悬空。

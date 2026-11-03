@@ -2,7 +2,7 @@
 # live in the "Commands" section of AGENTS.md — this just shortcuts the ones
 # typed most often, without duplicating subcommand specifics.
 
-.PHONY: help build test test-kit test-cli run-cli run-app bundle bundle-release open xcodegen clean
+.PHONY: help build test coverage test-kit test-cli run-cli run-app bundle bundle-release open xcodegen clean
 
 help: ## List all available commands
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -12,6 +12,10 @@ build: ## Build CableKit / CableScopeCLI / CableScopeApp
 
 test: ## Run all tests (CableKitTests + CableScopeCLITests)
 	swift test
+
+coverage: ## Run tests with coverage and enforce the necessary-logic threshold
+	swift test --enable-code-coverage
+	python3 scripts/check_coverage.py
 
 test-kit: ## Run CableKitTests only (see AGENTS.md for --filter down to a class/method)
 	swift test --filter CableKitTests

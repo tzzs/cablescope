@@ -11,9 +11,7 @@ import Foundation
 extension CableScopeCLI {
     static func runThroughput(volume: String?, seconds: Double) async throws {
         let candidates = ThroughputTester.listCandidateVolumes()
-        let secondsText = seconds == seconds.rounded()
-            ? String(format: "%.0f", seconds)
-            : String(format: "%.1f", seconds)
+        let secondsText = secondsLabel(seconds)
 
         // 定位目标卷：指定 --volume 时按路径/卷名匹配；未指定且恰有一个外部卷则直接使用
         let target: (url: URL, name: String)
@@ -52,14 +50,28 @@ extension CableScopeCLI {
             throw RuntimeError(error.description)
         }
 
+        for line in resultLines(result) {
+            print(line)
+        }
+    }
+
+    /// 每阶段时长的展示文本：整数秒不带小数点（"5"），小数秒保留一位（"2.5"）。
+    static func secondsLabel(_ seconds: Double) -> String {
+        seconds == seconds.rounded() ? String(format: "%.0f", seconds) : String(format: "%.1f", seconds)
+    }
+
+    /// 测速结果的展示行（纯函数：不依赖真实卷，便于单测）。
+    static func resultLines(_ result: ThroughputResult) -> [String] {
         let writeText = result.writeMBps.map { String(format: "%.1f MB/s", $0) } ?? L("无有效数据")
         let readText = result.readMBps.map { String(format: "%.1f MB/s", $0) } ?? L("无有效数据")
-        print("✅ " + L("写入 %@ · 读取 %@", writeText, readText))
-        print("   " + Term.dim(L("已写入 %@ MB · 已读取 %@ MB · 总耗时 %@ 秒",
-                                String(format: "%.1f", Double(result.bytesWritten) / 1_000_000),
-                                String(format: "%.1f", Double(result.bytesRead) / 1_000_000),
-                                String(format: "%.1f", result.elapsedSeconds))))
-        print(Term.dim(L("实测吞吐 ≠ 协商速率：吞吐受介质/文件系统/缓存影响，仅供参考；协商速率请看 snapshot / rating")))
+        return [
+            "✅ " + L("写入 %@ · 读取 %@", writeText, readText),
+            "   " + Term.dim(L("已写入 %@ MB · 已读取 %@ MB · 总耗时 %@ 秒",
+                              String(format: "%.1f", Double(result.bytesWritten) / 1_000_000),
+                              String(format: "%.1f", Double(result.bytesRead) / 1_000_000),
+                              String(format: "%.1f", result.elapsedSeconds))),
+            Term.dim(L("实测吞吐 ≠ 协商速率：吞吐受介质/文件系统/缓存影响，仅供参考；协商速率请看 snapshot / rating")),
+        ]
     }
 
     // MARK: - 卷匹配与候选展示
@@ -78,15 +90,22 @@ extension CableScopeCLI {
         return nil
     }
 
-    private static func printCandidates(_ candidates: [(url: URL, name: String, isRemovable: Bool)]) {
+    /// 候选卷的展示行（纯函数，便于单测）。
+    static func candidateLines(_ candidates: [(url: URL, name: String, isRemovable: Bool)]) -> [String] {
         guard !candidates.isEmpty else {
-            print(Term.dim(L("当前没有可测速的候选卷（可移动/外部卷）。")))
-            return
+            return [Term.dim(L("当前没有可测速的候选卷（可移动/外部卷）。"))]
         }
-        print(L("候选卷："))
+        var lines = [L("候选卷：")]
         for candidate in candidates {
             let tag = L(candidate.isRemovable ? "可移动" : "外部")
-            print("  - \(candidate.name)  \(candidate.url.path)  [\(tag)]")
+            lines.append("  - \(candidate.name)  \(candidate.url.path)  [\(tag)]")
+        }
+        return lines
+    }
+
+    private static func printCandidates(_ candidates: [(url: URL, name: String, isRemovable: Bool)]) {
+        for line in candidateLines(candidates) {
+            print(line)
         }
     }
 }

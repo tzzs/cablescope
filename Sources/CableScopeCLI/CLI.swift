@@ -5,7 +5,7 @@ import Foundation
 //
 // 退出码约定：
 // - 0  正常（含 --help）
-// - 1  运行期错误（快照失败、写盘失败等，输出到 stderr）
+// - 1  运行期错误（写盘失败、JSON 编码失败等，输出到 stderr）
 // - 2  用法错误（未知子命令/参数，输出到 stderr）
 
 @main
@@ -39,14 +39,10 @@ struct CableScopeCLI {
         }
     }
 
-    /// 采集一次快照（snapshot / pretty / rating 共用）
-    static func acquireSnapshot() async throws -> CableSnapshot {
-        let monitor = CableMonitor()
-        do {
-            return try await monitor.snapshotNow()
-        } catch {
-            throw RuntimeError(L("快照采集失败：%@", String(describing: error)))
-        }
+    /// 采集一次快照（snapshot / pretty / rating 共用）。
+    /// 服务层已内建降级（单个维度读不到只丢该维度），故这里不会抛错。
+    static func acquireSnapshot() async -> CableSnapshot {
+        await CableMonitor().snapshotNow()
     }
 
     private static func fail(_ message: String, exitCode: Int32) -> Never {
@@ -83,12 +79,12 @@ enum Help {
 
         选项:
           --pretty        snapshot: JSON 美化输出
-          --interval N    watch: 轮询兜底间隔秒数（默认 2，支持小数）
+          --interval N    watch: 轮询兜底间隔秒数（默认 2，支持小数，范围 0.001–3600）
           --reset         rating: 清空历史评级
           --json          properties: JSON 输出
           --volume PATH   throughput: 目标卷（挂载点路径或卷名，模糊匹配；缺省时
                           仅有一个外部卷则自动选择）
-          --seconds N     throughput: 每阶段秒数（默认 5，支持小数，须大于 0）
+          --seconds N     throughput: 每阶段秒数（默认 5，支持小数，范围 0.001–3600）
           -h, --help      显示本帮助
 
         示例:
@@ -130,12 +126,12 @@ enum Help {
 
         Options:
           --pretty        snapshot: pretty-print the JSON
-          --interval N    watch: fallback poll interval in seconds (default 2, fractions allowed)
+          --interval N    watch: fallback poll interval in seconds (default 2, fractions allowed, 0.001–3600)
           --reset         rating: clear the rating history
           --json          properties: JSON output
           --volume PATH   throughput: target volume (mount point or volume name, fuzzy match;
                           picked automatically when there is exactly one external volume)
-          --seconds N     throughput: seconds per phase (default 5, fractions allowed, must be > 0)
+          --seconds N     throughput: seconds per phase (default 5, fractions allowed, 0.001–3600)
           -h, --help      Show this help
 
         Examples:

@@ -118,6 +118,23 @@ def load_translated_keys(module):
     return keys
 
 
+def duplicate_keys(table):
+    """保留原始 key 比较，避免把不同格式符的合法条目误当重复。"""
+    path = ROOT / "Sources" / table / "Resources" / "en.lproj" / "Localizable.strings"
+    seen, duplicates = {}, []
+    if not path.exists():
+        return duplicates
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        match = STRINGS_ENTRY.match(line)
+        if match:
+            key = match.group(1)
+            if key in seen:
+                duplicates.append((key, seen[key], lineno))
+            else:
+                seen[key] = lineno
+    return duplicates
+
+
 def unused_keys(table, allowlist):
     """译文表里有、但对应模块源码中已没有任何字面量引用的 key（死条目）。
 
@@ -172,6 +189,13 @@ def main():
             print(f"  {where}\n    {text}")
         print()
     for table in sorted({TABLE_MODULE.get(m, m) for m in MODULES}):
+        duplicates = duplicate_keys(table)
+        if duplicates:
+            failed = True
+            print(f"{table}：以下译文 key 重复定义，请合并为一个条目")
+            for key, first, repeated in duplicates:
+                print(f"    {key}（第 {first}、{repeated} 行）")
+            print()
         dead = unused_keys(table, allowlist)
         if not dead:
             continue

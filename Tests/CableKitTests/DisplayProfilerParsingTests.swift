@@ -42,6 +42,25 @@ final class DisplayProfilerParsingTests: XCTestCase {
         XCTAssertNil(DisplayProfilerParsing.linkRateLabel(from: [:]))
     }
 
+    /// 多个键都含 "link" 时必须给出**稳定**的结果。
+    ///
+    /// `[String: Any]` 的迭代顺序取决于哈希种子。Swift 的哈希种子**按进程固定**，
+    /// 所以同一进程内多次调用顺序一致（这一点无法在本进程内测出来）；真正会变的是
+    /// **跨进程**——同一台机器上两次启动，同一份 `system_profiler` 输出可能给出不同的
+    /// 迭代顺序，于是同一次插拔在两次运行里报出不同的链路速率。改为按键名字典序遍历后，
+    /// 结果与哈希种子无关，跨进程也可复现。
+    func testLinkRateIsDeterministicWhenMultipleKeysMatch() {
+        let ndrv: [String: Any] = [
+            "spdisplays_link_rate": "spdisplays_hbr3",
+            "spdisplays_link_rate_min": "spdisplays_hbr2",
+            "zzz_link_extra": "spdisplays_hbr1",
+            "_spdisplays_displayID": "1",
+        ]
+        // 字典序最小且符合条件的键是 "spdisplays_link_rate"（先于 "spdisplays_link_rate_min"）。
+        // 这条精确断言才是判别力所在：原生哈希序下命中哪个键是不确定的。
+        XCTAssertEqual(DisplayProfilerParsing.linkRateLabel(from: ndrv), "hbr3")
+    }
+
     func testDisplayIDRegisteredAsHexAndDecimal() {
         var dict: [CGDirectDisplayID: ProfilerDisplayInfo] = [:]
         // "3f" 是合法 hex；同时 "3f" 不是合法 decimal，只注册 hex

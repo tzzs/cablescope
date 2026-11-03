@@ -101,7 +101,7 @@ final class PortGroupingTests: XCTestCase {
         PowerSnapshot(isCharging: externalConnected,
                       batteryPercent: 80,
                       adapterVoltageMV: 20_000,
-                      adapterAmperageMA: 5_000,
+                      batteryAmperageMA: 5_000,
                       pdContract: PDContract(voltageMV: 20_000, currentMA: 5_000),
                       adapterDescription: nil,
                       cycleCount: nil,

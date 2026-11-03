@@ -7,8 +7,11 @@ import Foundation
 /// "要不要发"（按 `AppPreferences` 的总开关/细分开关）和"怎么发"（`UNUserNotificationCenter`）。
 ///
 /// - 冷启动（首个快照）不产生任何事件，规则在 `NotificationDiff` 里，这里不用特殊处理；
-/// - 同一端口的插拔、充电开始/停止各自按 5 秒限流（`NotificationThrottle`），线头接触
-///   不良时不刷屏；插拔/充电事件同时触发小组件即时刷新（`WidgetRefresher`）；
+/// - **限流按「事件方向」分 key**（`plug.in.<id>` / `plug.out.<id>`、`charging.start` /
+///   `charging.stop`），同一方向 5 秒内只放行一次。共用 key 会让「拔下后马上插回」这种
+///   最常见的测试/使用动作被拔线的时间戳吞掉——实测电源日志 04:18:09 拔、04:18:13 插，
+///   插线通知因距拔线不足 5 秒被静默丢弃，用户看到的就是「只有拔出有提示」。按方向分 key
+///   后，接触不良的抖动仍然被限制在每 5 秒每个方向最多一条，不会刷屏；
 /// - 通知授权懒请求（首次真正要发时才问）；不满足 `NotificationAvailability.isAvailable`
 ///   时静默禁用（SwiftPM 裸可执行、或未签名调试构建——两者都会让
 ///   `UNUserNotificationCenter.current()` 崩掉整个进程，详见该类型的注释）。
@@ -26,6 +29,22 @@ final class NotificationController {
         guard NotificationAvailability.isAvailable else { return }
         // 前台（菜单栏形态常驻前台上下文）也要弹横幅，而不是静默入中心。
         UNUserNotificationCenter.current().delegate = ForegroundPresenter.shared
+    }
+
+    /// 限流 key：**按事件方向区分**。
+    ///
+    /// 插线与拔线是两个独立事实，共用一个 key 会让「拔下后几秒内插回」的插线通知被拔线
+    /// 的时间戳挡掉（`NotificationThrottle` 只认 key，不认方向）。分 key 之后同向抖动仍
+    /// 被 5 秒窗口抑制，反向事件互不影响。
+    nonisolated static func throttleKey(for event: CableNotificationEvent) -> String {
+        switch event {
+        case .sessionConnected(let sessionID): return "plug.in.\(sessionID)"
+        case .sessionDisconnected(let sessionID): return "plug.out.\(sessionID)"
+        case .chargingStarted: return "charging.start"
+        case .chargingStopped: return "charging.stop"
+        case .usbSpeedUpgraded(let sessionID, _): return "speed.\(sessionID)"
+        case .ratingUpgraded(let sessionID, _): return "rating.\(sessionID)"
+        }
     }
 
     func process(snapshot: CableSnapshot,
@@ -53,84 +72,45 @@ final class NotificationController {
                          previousSessions: [String: CableSession],
                          port: @escaping (CableSession) -> USBCPortSnapshot?,
                          locale: Locale) {
+        let kind: AppPreferences.NotificationKind
+        // 插拔与充电状态变化会连着抖，按方向限流；速率/评级提升是低频事件，不限流。
+        let isThrottled: Bool
         switch event {
-        case .sessionConnected(let sessionID):
-            guard AppPreferences.isNotificationEnabled(.plugUnplug),
-                  throttle.allow("plug.\(sessionID)"),
-                  let session = snapshot.sessions.first(where: { $0.id == sessionID }) else { return }
-            let template = AppLocalization.string("已连接 %@", locale: locale)
-            deliver(title: String(format: template, session.shortPortLabel(locale: locale)),
-                    body: connectBody(session: session, port: port(session), locale: locale),
-                    thread: sessionID)
-
-        case .sessionDisconnected(let sessionID):
-            guard AppPreferences.isNotificationEnabled(.plugUnplug),
-                  throttle.allow("plug.\(sessionID)") else { return }
-            let body: String
-            if let session = previousSessions[sessionID] {
-                let template = AppLocalization.string("%@ 已断开", locale: locale)
-                body = String(format: template, session.shortPortLabel(locale: locale))
-            } else {
-                body = ""
-            }
-            deliver(title: AppLocalization.string("线缆已断开", locale: locale), body: body, thread: sessionID)
-
+        case .sessionConnected, .sessionDisconnected:
+            kind = .plugUnplug
+            isThrottled = true
         case .chargingStarted:
-            guard AppPreferences.isNotificationEnabled(.chargingStarted),
-                  throttle.allow("charging") else { return }
-            deliver(title: AppLocalization.string("开始充电", locale: locale),
-                    body: chargingBody(snapshot.power, locale: locale),
-                    thread: "charging")
-
+            kind = .chargingStarted
+            isThrottled = true
         case .chargingStopped:
-            guard AppPreferences.isNotificationEnabled(.chargingStopped),
-                  throttle.allow("charging") else { return }
-            deliver(title: AppLocalization.string("已停止充电", locale: locale), body: "", thread: "charging")
-
-        case .usbSpeedUpgraded(let sessionID, let speed):
-            guard AppPreferences.isNotificationEnabled(.speedUpgraded),
-                  let session = snapshot.sessions.first(where: { $0.id == sessionID }) else { return }
-            let template = AppLocalization.string("%@ 协商速率提升", locale: locale)
-            deliver(title: String(format: template, session.shortPortLabel(locale: locale)),
-                    body: "\(speed.generation) \(speed.label)",
-                    thread: sessionID)
-
-        case .ratingUpgraded(let sessionID, let dimension):
-            guard AppPreferences.isNotificationEnabled(.ratingUpgraded),
-                  let session = snapshot.sessions.first(where: { $0.id == sessionID }) else { return }
-            let template = AppLocalization.string("%@ 线缆评级提升", locale: locale)
-            deliver(title: String(format: template, session.shortPortLabel(locale: locale)),
-                    body: dimension.localizedDescription(locale: locale),
-                    thread: sessionID)
+            kind = .chargingStopped
+            isThrottled = true
+        case .usbSpeedUpgraded:
+            kind = .speedUpgraded
+            isThrottled = false
+        case .ratingUpgraded:
+            kind = .ratingUpgraded
+            isThrottled = false
         }
+
+        guard AppPreferences.isNotificationEnabled(kind) else { return }
+        // 先确认要发的会话存在，再消耗限流窗口——否则一次查不到会话的失败
+        // 也会占掉这个方向 5 秒的额度。
+        guard let draft = NotificationComposer.draft(for: event,
+                                                     snapshot: snapshot,
+                                                     previousSessions: previousSessions,
+                                                     port: port,
+                                                     locale: locale) else { return }
+        if isThrottled, !throttle.allow(Self.throttleKey(for: event)) { return }
+        deliver(draft)
     }
 
-    /// 开始充电时附上 PD 合同功率（比瞬时功率稳定：刚接通的头几秒瞬时读数还在爬升）。
-    private func chargingBody(_ power: PowerSnapshot?, locale: Locale) -> String {
-        guard let contract = power?.pdContract else { return "" }
-        let template = AppLocalization.string("PD 合同 %lldW", locale: locale)
-        return String(format: template, Int(contract.watts.rounded()))
-    }
-
-    private func connectBody(session: CableSession, port: USBCPortSnapshot?, locale: Locale) -> String {
-        var parts: [String] = []
-        if let headline = DiagnosticsEngine.portHeadline(port: port, power: nil, locale: locale) {
-            parts.append(headline)
-        } else if let speed = session.topUSBSpeed {
-            parts.append("\(speed.generation) \(speed.label)")
-        } else if session.deviceCount == 0 {
-            parts.append(AppLocalization.string("端口无设备", locale: locale))
-        }
-        return parts.joined(separator: " · ")
-    }
-
-    /// - Parameter thread: 通知中心按它分组——同一个端口的插拔/提升归在一起，而不是平铺一长串。
-    private func deliver(title: String, body: String, thread: String) {
+    private func deliver(_ draft: NotificationDraft) {
         let center = UNUserNotificationCenter.current()
         let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        content.threadIdentifier = thread
+        content.title = draft.title
+        content.body = draft.body
+        content.threadIdentifier = draft.thread
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
 
         // 授权只在本进程第一次真正要发时请求一次；之后直接投递——未授权时 add 本身就是
@@ -143,15 +123,6 @@ final class NotificationController {
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
             guard granted else { return }
             center.add(request)
-        }
-    }
-}
-
-private extension RatingUpgradeDimension {
-    func localizedDescription(locale: Locale) -> String {
-        switch self {
-        case .fiveAmpConfirmed: return AppLocalization.string("首次确认支持 5A", locale: locale)
-        case .displayLink: return AppLocalization.string("显示器链路规格提升", locale: locale)
         }
     }
 }

@@ -5,6 +5,12 @@ import SwiftUI
 /// 点选后下方详情区展示该线的设备链与端口评级。
 struct CableCardsSectionView: View {
     @ObservedObject var viewModel: MonitorViewModel
+    /// 卡片网格是否持有键盘焦点。
+    ///
+    /// 没有它时"已选中"与"键盘焦点在这里"画的是同一圈 accent 描边：窗口失焦后
+    /// 选中卡依旧高亮，用户无法判断方向键此刻会不会生效。单独给焦点态加一圈外环，
+    /// 两种状态才区分得开。
+    @FocusState private var gridFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -20,6 +26,7 @@ struct CableCardsSectionView: View {
                         CableCardView(
                             session: session,
                             isSelected: session.id == viewModel.selectedSession?.id,
+                            showsFocusRing: gridFocused && session.id == viewModel.selectedSession?.id,
                             rating: viewModel.rating(forSessionID: session.id),
                             power: viewModel.power(for: session),
                             port: viewModel.port(for: session)
@@ -29,6 +36,7 @@ struct CableCardsSectionView: View {
                     }
                 }
                 .focusable()
+                .focused($gridFocused)
                 // 键盘可达性（HIG）：获得焦点后 ←/→/↑/↓ 在卡片间移动选中。
                 .onMoveCommand { movement in
                     switch movement {
@@ -37,8 +45,8 @@ struct CableCardsSectionView: View {
                     @unknown default: break
                     }
                 }
-                // 卡片自带 accent 选中描边，足以指示位置；抑制系统焦点环，
-                // 避免启动时初始焦点在选中描边外再叠一圈蓝色光晕。
+                // 系统焦点环会叠在卡片的选中描边上；焦点态改由选中卡的外环表达
+                // （见 `showsFocusRing`），这里抑制系统默认效果。
                 .focusEffectDisabled()
             }
         }
@@ -65,6 +73,8 @@ struct CableCardsSectionView: View {
 struct CableCardView: View {
     let session: CableSession
     let isSelected: Bool
+    /// 键盘焦点落在本卡（= 网格有焦点且本卡被选中）时画外环，与"已选中"区分开。
+    var showsFocusRing: Bool = false
     let rating: CableRating?
     let power: PowerSnapshot?
     var port: USBCPortSnapshot? = nil
@@ -94,9 +104,12 @@ struct CableCardView: View {
 
                 FlowLayout(spacing: 5) {
                     if let power {
-                        if power.isCharging, let watts = power.watts, watts > 0 {
+                        if power.isCharging, let contract = power.pdContract, contract.watts > 0 {
+                            // 卡片上不显示电池侧功率：那是整机量（多线时每张卡都会显示同一个
+                            // 数字），会被读成"这根线的功率"。显示协商合同——它才是这根线
+                            // 实际谈下来的档位（3A 线会被压在 ≤60W）。
                             InfoChip(
-                                Text("\(watts, format: .number.precision(.fractionLength(1)))W 充电中"),
+                                Text("已协商 \(Int(contract.watts.rounded()))W"),
                                 systemImage: "bolt.fill",
                                 color: .orange,
                                 isProminent: true
@@ -105,9 +118,9 @@ struct CableCardView: View {
                             InfoChip(text: "已接通电源", systemImage: "powerplug.fill", color: .blue)
                         }
                     } else if let winning = port?.powerSource?.winning {
-                        // 整机电源不可归属到本线（多端口同时有合同等），端口直读的
-                        // 协商合同仍能说明"这根线在收电"。
-                        InfoChip(text: "PD 合同 \(Int(winning.watts.rounded()))W",
+                        // 整机电源不可归属到本线（多端口同时有合同等）。端口选中的 PD 档位
+                        // 是**该档上限**，不是协商合同，措辞必须区分开。
+                        InfoChip(text: "PD 档位 \(Int(winning.watts.rounded()))W",
                                  systemImage: "bolt.fill", color: .blue)
                     }
                     if let speed = session.topUSBSpeed {
@@ -118,7 +131,11 @@ struct CableCardView: View {
                     }
                     if rating?.is5ACable == true, port?.eMarker == nil {
                         // 有直读 e-marker 时上面已给出更准确的档位；仅在无直读数据时展示历史推断。
-                        InfoChip(text: "5A e-marker", systemImage: "checkmark.seal.fill", color: .orange)
+                        //
+                        // 措辞必须是"至少支持 5A"而不是"5A e-marker"：这里的 5A 来自
+                        // PD 合同推断（协商到 20V/5A），**从未直读过 e-marker 芯片**，
+                        // 说成"e-marker 线"就是断言了一个没读到的事实（AGENTS.md 文案红线）。
+                        InfoChip(text: "至少支持 5A", systemImage: "checkmark.seal.fill", color: .orange)
                     }
                 }
 
@@ -148,6 +165,13 @@ struct CableCardView: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
+            )
+            // 键盘焦点外环：比选中描边再往外一圈，两者同时存在时也分得清。
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 2)
+                    .padding(-3)
+                    .opacity(showsFocusRing ? 1 : 0)
             )
             .contentShape(RoundedRectangle(cornerRadius: 12))
             .accessibilityElement(children: .combine)
@@ -209,13 +233,24 @@ struct CableCardView: View {
 struct FlowLayout: Layout {
     var spacing: CGFloat = 6
 
+    /// 以**行宽为上限**测量每个子视图，而不是 `.unspecified`。
+    ///
+    /// `.unspecified` 量到的是"理想宽度"：单条英文 chip（如 e-marker 可信度说明）可能比
+    /// 卡片还宽，于是它既不会被折到下一行（`x + width > maxWidth` 时 x 还是 0），也不会
+    /// 自己换行，最终横向溢出卡片。把可用宽度作为 proposal 传下去，chip 内部文本才有机会
+    /// 折行/截断；换行判断也才有意义。
+    private func measure(_ view: LayoutSubview, maxWidth: CGFloat) -> CGSize {
+        view.sizeThatFits(ProposedViewSize(width: maxWidth, height: nil))
+    }
+
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let maxWidth = proposal.width ?? .infinity
         var x: CGFloat = 0
         var y: CGFloat = 0
         var rowHeight: CGFloat = 0
+        var widest: CGFloat = 0
         for view in subviews {
-            let size = view.sizeThatFits(.unspecified)
+            let size = measure(view, maxWidth: maxWidth)
             if x > 0, x + size.width > maxWidth {
                 x = 0
                 y += rowHeight + spacing
@@ -223,8 +258,11 @@ struct FlowLayout: Layout {
             }
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
+            widest = max(widest, size.width)
         }
-        return CGSize(width: proposal.width ?? x, height: y + rowHeight)
+        // 没有给宽度约束时（proposal.width == nil）用内容宽度；`x` 末尾多算了一个 spacing。
+        let contentWidth = max(widest, x - (subviews.isEmpty ? 0 : spacing))
+        return CGSize(width: proposal.width ?? contentWidth, height: y + rowHeight)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
@@ -232,7 +270,7 @@ struct FlowLayout: Layout {
         var y = bounds.minY
         var rowHeight: CGFloat = 0
         for view in subviews {
-            let size = view.sizeThatFits(.unspecified)
+            let size = measure(view, maxWidth: bounds.width)
             if x > bounds.minX, x + size.width > bounds.maxX {
                 x = bounds.minX
                 y += rowHeight + spacing

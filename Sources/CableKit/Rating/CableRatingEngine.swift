@@ -3,7 +3,17 @@ import Foundation
 /// 评级引擎默认实现：按线缆会话（物理端口）聚合历史快照峰值（纯 Swift，无 IOKit 依赖，可单测）。
 ///
 /// 关键规则见 Docs/03-数据获取指南.md：
-/// - PD 合同 ≥ 20V/5A ⇒ e-marker 5A 线
+/// - 5A 线推断**只有一个证据来源**：PD 合同（`AdapterDetails.AdapterVoltage × Current`）
+///   达到 ≥ 20V/5A。合同电流是协商出来的（sink 请求、source 接受），≤3A 线物理上无法
+///   承载 5A，故协商到 5A 即证明线缆至少支持 5A——这是可靠的**下界**推断。
+///
+///   曾经还有两个来源，均已移除，因为它们证明不了自己声称的事：
+///   - **端口协商档（WinningPowerSourceOption）**：它选中的是充电器广告的一个 PDO，
+///     `Max Current` 是该档的**上限**而非 RDO 里实际请求的电流。3A 线也可能选中
+///     20V/5A 那个 PDO（只是 RDO 只敢要 3A），所以它不构成 5A 证据。
+///   - **电池侧电流**：顶层 `Amperage` 是流入电池的电流。电池 12.6V 吸收 5A ≈ 63W，
+///     对应适配器 20V 侧仅约 3.2A——跨电压域相乘（20V × 5A）会凭空得出 100W，
+///     不能反推线缆承载了 5A。
 /// - USB 协商速率取历史峰值（峰值只会抬高评级，不会因拔线清零）
 ///
 /// 分桶规则（v2 存储格式，key 为会话 id）：
@@ -65,6 +75,8 @@ public struct CableRatingEngine: CableRatingEngineProtocol {
         let attributableID = PortGrouping.attributablePowerSessionID(sessions: sessions,
                                                                      ports: snapshot.ports,
                                                                      power: snapshot.power)
+
+        // 5A 证据只认 PD 合同（见文件头注释：协商档与电池电流都证明不了 5A 承载能力）。
 
         // 整机桶：显示器 + 未归属电源。只在真正记录了数据时推进计数，避免空桶。
         var sys = histories[Self.systemKey] ?? PortHistory()

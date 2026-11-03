@@ -32,9 +32,8 @@ extension CableScopeCLI {
                     while !Task.isCancelled {
                         do { try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000)) }
                         catch { break }
-                        if let snapshot = try? await monitor.snapshotNow() {
-                            continuation.yield(snapshot)
-                        }
+                        let snapshot = await monitor.snapshotNow()
+                        continuation.yield(snapshot)
                     }
                 }
                 continuation.onTermination = { _ in
@@ -176,18 +175,21 @@ enum SnapshotDiff {
     }
 
     private static func diffUSB(old: [USBDeviceSnapshot], new: [USBDeviceSnapshot], into out: inout [String]) {
-        // 跨快照按 LocationID（物理端口）配对
-        let oldByLocation = Dictionary(old.map { ($0.locationID, $0) }, uniquingKeysWith: { first, _ in first })
-        let newByLocation = Dictionary(new.map { ($0.locationID, $0) }, uniquingKeysWith: { first, _ in first })
+        // 跨快照按「槽位」配对：槽位 = 物理端口（locationID）；locationID 为 0 的设备
+        // （内置根 hub 没有 LocationID 属性、路径回退也失败时）改用 registryID 兜底，
+        // 否则多个这类设备会撞进同一个字典桶、被 uniquingKeysWith 静默丢弃，
+        // 表现为「插拔了却没有任何提示」。
+        let oldBySlot = Dictionary(old.map { (SlotKey(device: $0), $0) }, uniquingKeysWith: { first, _ in first })
+        let newBySlot = Dictionary(new.map { (SlotKey(device: $0), $0) }, uniquingKeysWith: { first, _ in first })
 
-        for (_, device) in newByLocation where oldByLocation[device.locationID] == nil {
+        for (slot, device) in newBySlot where oldBySlot[slot] == nil {
             out.append(L("USB 接入：%@ · %@", device.displayName, device.speedDescription))
         }
-        for (_, device) in oldByLocation where newByLocation[device.locationID] == nil {
+        for (slot, device) in oldBySlot where newBySlot[slot] == nil {
             out.append(L("USB 断开：%@", device.displayName))
         }
-        for (_, newDevice) in newByLocation {
-            guard let oldDevice = oldByLocation[newDevice.locationID] else { continue }
+        for (slot, newDevice) in newBySlot {
+            guard let oldDevice = oldBySlot[slot] else { continue }
             if oldDevice.productName != newDevice.productName {
                 out.append(L("USB 设备变更：%@ → %@", oldDevice.displayName, newDevice.displayName))
             }
@@ -196,6 +198,25 @@ enum SnapshotDiff {
             } else if oldDevice.speed == nil, let after = newDevice.speed?.bitsPerSecond {
                 out.append(L("USB 速率未知 → %@", USBSpeed(bitsPerSecond: after).label))
             }
+        }
+    }
+
+    /// USB 设备的跨快照配对键。
+    ///
+    /// 优先用 `locationID`（物理端口）：同一端口换设备时会报「设备变更」而不是
+    /// 「断开 + 接入」两条噪音。`locationID == 0` 时退到 `registryID`
+    /// （IORegistry entry id，同一次枚举内唯一）——内置根 hub 没有 LocationID 属性，
+    /// 若仍用 0 作键，多个这类设备会互相覆盖。
+    private struct SlotKey: Hashable {
+        private enum Storage: Hashable {
+            case port(UInt32)
+            case entry(UInt64)
+        }
+
+        private let storage: Storage
+
+        init(device: USBDeviceSnapshot) {
+            storage = device.locationID != 0 ? .port(device.locationID) : .entry(device.registryID)
         }
     }
 

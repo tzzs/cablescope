@@ -26,7 +26,7 @@ public final class PortControllerService: PortControllerServiceProtocol {
 
     public init() {}
 
-    public func listPorts() async throws -> [USBCPortSnapshot] {
+    public func listPorts() async -> [USBCPortSnapshot] {
         await Task.detached(priority: .utility) {
             Self.enumeratePorts()
         }.value

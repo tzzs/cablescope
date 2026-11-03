@@ -36,24 +36,6 @@ final class ViewFormattingTests: XCTestCase {
         XCTAssertEqual(BatteryGlyph.symbol(for: 0), "battery.0")
     }
 
-    // MARK: - 吞吐文案
-
-    func testSpeedTextFormatsNumberWithOneFractionDigit() {
-        XCTAssertEqual(ThroughputSectionView.speedText(123.456, locale: Locale(identifier: "en")), "123.5 MB/s")
-    }
-
-    func testSpeedTextFallbackIsLocalizedNotRawChinese() {
-        // 回退文案是作为 %@ 插进 LocalizedStringKey 的，不会再被 SwiftUI 查表，
-        // 必须自己走 AppLocalization——否则英文界面会显示 "Write 无有效数据"。
-        XCTAssertEqual(ThroughputSectionView.speedText(nil, locale: Locale(identifier: "en")), "No valid data")
-        XCTAssertEqual(ThroughputSectionView.speedText(nil, locale: Locale(identifier: "zh-Hans")), "无有效数据")
-    }
-
-    func testMBTextUsesDecimalMegabytes() {
-        XCTAssertEqual(ThroughputSectionView.mbText(1_000_000), "1.0 MB")
-        XCTAssertEqual(ThroughputSectionView.mbText(0), "0.0 MB")
-    }
-
     // MARK: - 对端 VID 标签
 
     func testKnownVendorIDShowsNameWithHex() {

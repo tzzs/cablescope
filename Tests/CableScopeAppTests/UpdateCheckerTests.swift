@@ -84,4 +84,44 @@ final class UpdateCheckerTests: XCTestCase {
     func testAutomaticCheckIsOffByDefault() {
         XCTAssertEqual(AppPreferences.registrationDefaults[UpdateChecker.autoCheckKey] as? Bool, false)
     }
+
+    // MARK: - 对话框文案（纯函数）
+
+    /// 直装渠道：给下载页按钮，不给 brew 命令。
+    func testDialogContentForDirectInstallOffersDownloadPage() {
+        let content = UpdateChecker.dialogContent(current: "1.2.3", latest: "1.3.0",
+                                                  locale: Locale(identifier: "zh-Hans"), channel: .direct)
+
+        XCTAssertEqual(content.message, "发现新版本 1.3.0")
+        XCTAssertEqual(content.informative, "当前版本：1.2.3")
+        XCTAssertEqual(content.primaryButtonTitle, "前往下载页")
+        XCTAssertFalse(content.informative.contains("brew"))
+    }
+
+    /// Homebrew 渠道：必须给出 brew 命令，否则用户手动覆盖会让 brew 记录与实际文件脱节。
+    func testDialogContentForHomebrewIncludesUpgradeCommand() {
+        let content = UpdateChecker.dialogContent(current: "1.2.3", latest: "1.3.0",
+                                                  locale: Locale(identifier: "zh-Hans"),
+                                                  channel: .homebrewFormula)
+
+        XCTAssertTrue(content.informative.contains("brew upgrade cablescope-app"))
+        XCTAssertEqual(content.primaryButtonTitle, "拷贝命令")
+    }
+
+    /// 开发版（无版本号）不能显示成空白。
+    func testDialogContentFallsBackToDevBuildLabel() {
+        let content = UpdateChecker.dialogContent(current: nil, latest: "1.3.0",
+                                                  locale: Locale(identifier: "zh-Hans"), channel: .direct)
+
+        XCTAssertTrue(content.informative.contains("开发版"))
+    }
+
+    /// 英文界面下对话框文案必须是英文。
+    func testDialogContentFollowsRequestedLocale() {
+        let content = UpdateChecker.dialogContent(current: "1.2.3", latest: "1.3.0",
+                                                  locale: Locale(identifier: "en"), channel: .direct)
+
+        XCTAssertEqual(content.message, "New version available: 1.3.0")
+        XCTAssertEqual(content.primaryButtonTitle, "Go to Download Page")
+    }
 }

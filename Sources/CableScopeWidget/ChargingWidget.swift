@@ -8,7 +8,7 @@ import WidgetKit
 // - widget 进程里 IOKit 读取可能受限/降速：只用两路最便宜的数据
 //   （PowerService().currentPower() + PortControllerService().listPorts()），
 //   不拉 USB/显示器/雷雳全量快照。两个 Service 内部均已 Task.detached，await 不阻塞。
-// - 每路独立 `try?` 容错，任何失败都降级为占位 entry，永不崩溃、永不抛出。
+// - 每路读取内部自行降级（服务层不抛错），任何失败都降级为占位 entry，永不崩溃。
 // - IOKit 是"现场读取"，不适合预生成多条未来 entry：时间线固定 1 条，
 //   15 分钟后请求系统刷新（.after）。
 
@@ -93,6 +93,11 @@ struct ChargingProvider: TimelineProvider {
 
     /// 组合两路读取 → entry。单路失败只降级对应字段。
     ///
+    /// 组装规则（哪条端口头条置顶、功率何时算作"正在充"、什么算"没有数据"）在
+    /// `CableKit.ChargingOverviewBuilder` 这个纯函数里——Widget target 是 Xcode-only
+    /// target、不在 `Package.swift` 中，把规则留在这里就没法被 `swift test` 覆盖，
+    /// 且同一条规则会在 App 与 Widget 两处各写一遍各自漂移。这里只做读取与映射。
+    ///
     /// - Parameter locale: 头条文案的语言。默认取 App 的语言偏好；App 选"跟随系统"或
     ///   读不到偏好时回退 `.current`（＝ CableKit 侧的原默认行为）。
     static func collectEntry(date: Date,
@@ -102,44 +107,30 @@ struct ChargingProvider: TimelineProvider {
         let power = await powerTask
         let ports = await portsTask
 
-        guard power != nil || !ports.isEmpty else {
+        let overview = ChargingOverviewBuilder.build(power: power, ports: ports, locale: locale)
+        guard overview.hasData else {
             return .placeholder(date: date)
         }
 
-        // 端口头条：medium 逐行展示；置顶条优先取正在收电（winning）的端口。
-        let headlines = ports.compactMap {
-            DiagnosticsEngine.portHeadline(port: $0, power: power, locale: locale)
-        }
-        let winningPort = ports.first { $0.powerSource?.winning != nil }
-        let topHeadline = DiagnosticsEngine.portHeadline(port: winningPort, power: power, locale: locale)
-            ?? headlines.first
-
         return ChargingEntry(
             date: date,
-            watts: chargingWatts(power),
-            winningPDOWatts: ports.compactMap { $0.powerSource?.winning?.watts }.max(),
-            topPortHeadline: topHeadline,
-            portHeadlines: headlines,
-            batteryPercent: power?.batteryPercent,
-            isCharging: power?.isCharging ?? false,
-            externalConnected: power?.externalConnected ?? false,
-            hasData: true
+            watts: overview.watts,
+            winningPDOWatts: overview.winningPDOWatts,
+            topPortHeadline: overview.topPortHeadline,
+            portHeadlines: overview.portHeadlines,
+            batteryPercent: overview.batteryPercent,
+            isCharging: overview.isCharging,
+            externalConnected: overview.externalConnected,
+            hasData: overview.hasData
         )
     }
 
-    /// 充电功率展示语义（对齐 MonitorViewModel.displayWatts）：
-    /// 仅充电中且读数 > 0；保温暂停时 Amperage 为负，自然落入 nil。
-    private static func chargingWatts(_ power: PowerSnapshot?) -> Double? {
-        guard let power, power.isCharging, let watts = power.watts, watts > 0 else { return nil }
-        return watts
-    }
-
     private static func readPower() async -> PowerSnapshot? {
-        (try? await PowerService().currentPower()) ?? nil
+        await PowerService().currentPower()
     }
 
     private static func readPorts() async -> [USBCPortSnapshot] {
-        (try? await PortControllerService().listPorts()) ?? []
+        await PortControllerService().listPorts()
     }
 }
 

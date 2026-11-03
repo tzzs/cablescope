@@ -3,6 +3,7 @@
 #
 # 环境变量（均可省略，省略时保持原有行为）：
 # - APP_VERSION        写入 Info.plist 的 CFBundleShortVersionString（缺省 0.1.0）
+# - APP_BUILD_VERSION  写入 Info.plist 的 CFBundleVersion（缺省为当前时间 YYYYMMDDHHMM）
 # - CODESIGN_IDENTITY  Developer ID 签名身份（缺省空 = 不签名，产出未签名 bundle；
 #                      CI 无证书环境由此保持可用）。设置后使用 hardened runtime 签名。
 # - SWIFT_BUILD_FLAGS  追加给 swift build 的额外参数（按空格分词）。Homebrew 的
@@ -13,6 +14,7 @@ cd "$(dirname "$0")/.."
 
 CONFIGURATION="${1:-release}"
 APP_VERSION="${APP_VERSION:-0.1.0}"
+APP_BUILD_VERSION="${APP_BUILD_VERSION:-$(date +%Y%m%d%H%M)}"
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-}"
 SWIFT_BUILD_FLAGS="${SWIFT_BUILD_FLAGS:-}"
 
@@ -38,7 +40,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
     <key>CFBundleExecutable</key>        <string>CableScopeApp</string>
     <key>CFBundlePackageType</key>       <string>APPL</string>
     <key>CFBundleShortVersionString</key><string>${APP_VERSION}</string>
-    <key>CFBundleVersion</key>           <string>1</string>
+    <key>CFBundleVersion</key>           <string>${APP_BUILD_VERSION}</string>
     <key>CFBundleIconFile</key>          <string>AppIcon</string>
     <key>LSMinimumSystemVersion</key>    <string>14.0</string>
     <key>LSUIElement</key>               <true/>

@@ -61,9 +61,7 @@ struct SessionDetailSectionView: View {
                         .textSelection(.enabled)
                 }
 
-                if let headline = DiagnosticsEngine.portHeadline(port: port,
-                                                                 power: viewModel.power(for: session),
-                                                                 locale: locale) {
+                if let headline = DiagnosticsEngine.portHeadline(port: port, locale: locale) {
                     InfoChip(verbatim: headline, systemImage: "cable.connector", color: .blue, isProminent: true)
                 }
 

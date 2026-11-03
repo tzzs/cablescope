@@ -109,9 +109,21 @@ enum Args {
         return (volume: volume, seconds: seconds)
     }
 
+    /// CLI 秒数参数的范围：避免换算纳秒时上溢，或截断为 0 后持续忙轮询。
+    static let maxDurationSeconds: Double = 3600
+    /// 下限（秒）：防止极小值被截断成 0 → `Task.sleep(nanoseconds: 0)` 忙轮询烧 CPU。
+    static let minDurationSeconds: Double = 0.001
+
     private static func parseSeconds(_ text: String) throws -> Double {
-        guard let value = Double(text), value > 0 else {
-            throw UsageError(description: L("%@ 的值「%@」无效，需要大于 0 的秒数（允许小数）", "--seconds", text))
+        guard let value = Double(text), value >= minDurationSeconds, value <= maxDurationSeconds else {
+            throw UsageError(description: L("%@ 的值「%@」无效，需要大于等于 0.001 且不超过 3600 的秒数（允许小数）", "--seconds", text))
+        }
+        return value
+    }
+
+    private static func parseInterval(_ text: String) throws -> Double {
+        guard let value = Double(text), value >= minDurationSeconds, value <= maxDurationSeconds else {
+            throw UsageError(description: L("%@ 的值「%@」无效，需要大于等于 0.001 且不超过 3600 的秒数（允许小数）", "--interval", text))
         }
         return value
     }
@@ -152,13 +164,6 @@ enum Args {
             index += 1
         }
         return interval
-    }
-
-    private static func parseInterval(_ text: String) throws -> Double {
-        guard let value = Double(text), value > 0 else {
-            throw UsageError(description: L("%@ 的值「%@」无效，需要大于 0 的秒数（允许小数）", "--interval", text))
-        }
-        return value
     }
 
     private static func parseRating(_ flags: [String]) throws -> Bool {

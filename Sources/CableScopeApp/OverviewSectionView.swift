@@ -53,14 +53,25 @@ struct OverviewSectionView: View {
                     .foregroundStyle(.secondary)
             }
 
-            if let voltageMV = power.adapterVoltageMV, let amperageMA = power.adapterAmperageMA {
-                // 整句一个 key：FormatStyle 插值在 LocalizedStringKey 里生成的就是 %@，key 即
-                // "系统输入 · %@V / %@A"。此前拆成 Text + Text 片段拼接，译文只能逐段对应、
-                // 语序锁死；更早的整句插值失效，是因为当时插的是预先格式化好的 String 变量。
-                Text("系统输入 · \(Double(voltageMV) / 1000, format: .number.precision(.fractionLength(1)))V / \(Double(amperageMA) / 1000, format: .number.precision(.fractionLength(2)))A")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
+            // 适配器电压与电池电流分属两个电压域，**不能**写成"20.0V / 0.00A"一对：
+            // 顶层 Amperage 是流入电池的电流，不是适配器输入电流（满电时恒为 0）。
+            if let voltageMV = power.adapterVoltageMV {
+                if let batteryVoltageMV = power.batteryVoltageMV, let amperageMA = power.batteryAmperageMA {
+                    Text("适配器 \(Double(voltageMV) / 1000, format: .number.precision(.fractionLength(1)))V · 电池 \(Double(batteryVoltageMV) / 1000, format: .number.precision(.fractionLength(1)))V / \(Double(amperageMA) / 1000, format: .number.precision(.fractionLength(2)))A")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                } else if let amperageMA = power.batteryAmperageMA {
+                    Text("适配器 \(Double(voltageMV) / 1000, format: .number.precision(.fractionLength(1)))V · 电池电流 \(Double(amperageMA) / 1000, format: .number.precision(.fractionLength(2)))A")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                } else {
+                    Text("适配器 \(Double(voltageMV) / 1000, format: .number.precision(.fractionLength(1)))V")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
             }
 
             chargingDiagnosticRow
@@ -92,8 +103,7 @@ struct OverviewSectionView: View {
 
     private static func diagnosticIcon(_ verdict: ChargingBottleneck) -> String {
         switch verdict {
-        case .adapterMax: return "checkmark.circle.fill"
-        case .machineDrawingLess: return "battery.75"
+        case .chargingWithinContract: return "checkmark.circle.fill"
         case .cableLikelyLimited: return "exclamationmark.triangle.fill"
         case .paused: return "moon.zzz.fill"
         case .notConnected: return "bolt.slash"
@@ -103,8 +113,7 @@ struct OverviewSectionView: View {
 
     private static func diagnosticColor(_ verdict: ChargingBottleneck) -> Color {
         switch verdict {
-        case .adapterMax: return .green
-        case .machineDrawingLess: return .blue
+        case .chargingWithinContract: return .green
         case .cableLikelyLimited: return .orange
         case .paused: return .blue
         case .notConnected: return .secondary
@@ -158,7 +167,7 @@ struct OverviewSectionView: View {
                 }
                 if contract.implies5ACable {
                     kvRow(icon: "checkmark.seal.fill", title: "线缆推断") {
-                        InfoChip(text: "5A e-marker 线", color: .orange, isProminent: true)
+                        InfoChip(text: "至少支持 5A", color: .orange, isProminent: true)
                     }
                 }
             }
