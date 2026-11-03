@@ -20,7 +20,7 @@ final class ThroughputTests: XCTestCase {
     // MARK: 错误文案的语言
 
     /// 测速失败提示必须跟随调用方语言。此前这些文案是直接拼出来的中文字面量，
-    /// 英文界面下测速失败会弹出中文——`ThroughputSectionView` 里为此留过一条 TODO。
+    /// 测速失败提示必须跟随调用方语言，CLI 与其他调用者可能使用非系统 locale。
     /// 用 `secondsPerPhase: 0` 触发参数校验，不碰任何真实 I/O，结果完全确定。
     func testErrorMessagesFollowRequestedLocale() async {
         for (locale, expectedPrefix) in [(Locale(identifier: "en"), "Seconds per phase must be greater than 0"),

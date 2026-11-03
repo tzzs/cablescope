@@ -12,11 +12,25 @@ final class WidgetRefresher {
     static let widgetKind = "CableScopeChargingWidget"
 
     private let minimumInterval: TimeInterval
+    private let bundleIdentifier: () -> String?
+    private let reloadTimelines: () -> Void
     private var lastReload: Date?
     private var pendingReload: Task<Void, Never>?
 
-    init(minimumInterval: TimeInterval = 15) {
+    /// - Parameters:
+    ///   - minimumInterval: 两次刷新之间的最小间隔；窗口期内被吞掉的请求合并成窗口
+    ///     结束时的一次补发。
+    ///   - bundleIdentifier: 是否有 bundle 的判据（SwiftPM 裸可执行没有 bundle，
+    ///     也就没有可刷新的小组件）。注入以便单测。
+    ///   - reloadTimelines: 真正的刷新动作。注入以便单测观察调用次数与时机。
+    init(minimumInterval: TimeInterval = 15,
+         bundleIdentifier: @escaping @MainActor () -> String? = { @MainActor in Bundle.main.bundleIdentifier },
+         reloadTimelines: @escaping @MainActor () -> Void = { @MainActor in
+             WidgetCenter.shared.reloadTimelines(ofKind: WidgetRefresher.widgetKind)
+         }) {
         self.minimumInterval = minimumInterval
+        self.bundleIdentifier = bundleIdentifier
+        self.reloadTimelines = reloadTimelines
     }
 
     static func isRelevant(_ event: CableNotificationEvent) -> Bool {
@@ -28,7 +42,7 @@ final class WidgetRefresher {
 
     func handle(_ events: [CableNotificationEvent]) {
         // SwiftPM 裸可执行没有 bundle，也就没有可刷新的小组件。
-        guard Bundle.main.bundleIdentifier != nil, events.contains(where: Self.isRelevant) else { return }
+        guard bundleIdentifier() != nil, events.contains(where: Self.isRelevant) else { return }
         let now = Date()
         if let lastReload, now.timeIntervalSince(lastReload) < minimumInterval {
             guard pendingReload == nil else { return }
@@ -45,6 +59,6 @@ final class WidgetRefresher {
 
     private func reload() {
         lastReload = Date()
-        WidgetCenter.shared.reloadTimelines(ofKind: Self.widgetKind)
+        reloadTimelines()
     }
 }

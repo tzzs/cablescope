@@ -196,7 +196,12 @@ final class MonitorViewModel: ObservableObject {
 
     // MARK: - 内部
 
-    private func ingest(_ snapshot: CableSnapshot) {
+    /// 摄入一份快照：更新派生状态、记录并落盘评级、派发通知事件。
+    ///
+    /// 内部可见（而非 `private`）是为了让单测能注入构造好的快照——否则状态派生规则
+    /// （会话选择回退、电源归属、PDO 选取、显示器匹配）只能在真机"碰巧插了某根线"时才
+    /// 被碰到。`refresh()` 与快照流走的仍是同一条路径。
+    func ingest(_ snapshot: CableSnapshot) {
         self.snapshot = snapshot
 
         // 选中会话被拔除时自动回退到第一根，避免详情区悬空。

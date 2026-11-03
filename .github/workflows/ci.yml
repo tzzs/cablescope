@@ -33,10 +33,13 @@ jobs:
       - name: Build (debug)
         run: swift build
 
-      - name: Test
+      - name: Test with coverage
         # 部分用例含真机冒烟（USB-C / 电池 / IORegistry），在空环境的 runner 上
         # 会走"无设备/无数据"降级分支，属合法结果，不应失败。
-        run: swift test
+        run: swift test --enable-code-coverage
+
+      - name: Enforce necessary logic coverage
+        run: python3 scripts/check_coverage.py
 
       - name: Install xcodegen
         run: brew install xcodegen

@@ -102,7 +102,7 @@ swift run CableScopeApp
 | `watch` | 监听变化，内容变化时打印差异行（`--interval N` 调整兜底轮询） |
 | `rating` | 记录并显示线缆能力卡（持久化于 `~/Library/Application Support/CableScope/`），`--reset` 清空 |
 | `properties [类名]` | 按类名枚举 IORegistry 条目，输出**全量** IOKit 属性（ioreg 风格文本；`--json` 结构化输出） |
-| `throughput` | 可选的 U 盘实测吞吐基准（写入临时测试文件读写测速；`--volume <路径\|卷名>` 选卷，`--seconds N` 调整每阶段时长，默认 5 秒） |
+| `throughput` | 可选的挂载卷读写基准（不代表线缆能力；会写入临时测试文件；`--volume <路径\|卷名>` 选卷，`--seconds N` 设置每阶段时长，默认 5 秒） |
 
 输出语言跟随系统；设置 `CABLESCOPE_LANG=en` 或 `CABLESCOPE_LANG=zh` 可覆盖（也认 `LC_ALL` / `LC_MESSAGES`；刻意不读 `LANG`，因为终端常会自动把它设成 `en_US.UTF-8`）。
 
@@ -118,13 +118,14 @@ Sources/
 ├── CableScopeCLI/     # 命令行工具
 └── CableScopeApp/     # SwiftUI 菜单栏 App（MenuBarExtra + 主窗口 + Swift Charts 功率曲线）
 Tests/
-├── CableKitTests/       # 243 个测试：数据契约、按端口分桶评级引擎 + 旧格式迁移、端口分组、解析器（真机样例回归）、诊断（含「充电器档位 vs PD 合同」归因）、充电概览组装、子进程封装、显示缓冲扩容、厂商库、评级存储、IORegistry 检查器（含截断可见性）、profiler 缓存 + 真机冒烟
+├── CableKitTests/       # 254 个测试：数据契约、按端口分桶评级引擎 + 旧格式迁移、端口分组、解析器（真机样例回归）、诊断（含「充电器档位 vs PD 合同」归因）、充电概览组装、子进程封装、显示缓冲扩容、厂商库、评级存储、IORegistry 检查器（含截断可见性与全局索引）、profiler 缓存 + 真机冒烟
 ├── CableScopeCLITests/  # 108 个测试：参数解析（含 throughput）、格式化、watch 快照差异计算、pretty 渲染、rating/throughput/properties 命令体（注入临时目录，绝不碰你真实的评级文件）、英文输出与语言解析
-└── CableScopeAppTests/  # 61 个测试：更新检查（版本号、安装渠道、每日检查）、启动弹窗决策、通知限流、功率历史、通知偏好开关逻辑、通知设置深链、英文本地化（含复数）、视图层文案格式化、MonitorViewModel 对真实 CableMonitor 的冒烟测试
+└── CableScopeAppTests/  # 85 个测试：更新检查（版本号、安装渠道、每日检查、对话框文案）、启动弹窗决策、通知限流与通知文案组装、功率历史、通知偏好开关逻辑、通知设置深链、Widget 刷新限流与补发、英文本地化（含复数）、视图层文案格式化、MonitorViewModel 对注入快照的状态派生
 Docs/                  # 数据获取指南 / 优化路线图 / 术语表
 scripts/bundle_app.sh     # .app 打包脚本
 scripts/check_layering.sh # 分层规则检查（CableKit 之外禁止直接碰 IOKit/CoreGraphics/system_profiler）
 scripts/check_localization.py # 本地化检查（含 CLI 在内的每条中文文案都必须有英文译文）
+scripts/check_coverage.py # 必要逻辑行覆盖率门槛（≥80%）
 ```
 
 ## 数据来源（详见 [Docs/03-数据获取指南.md](Docs/03-数据获取指南.md)）
@@ -136,7 +137,7 @@ scripts/check_localization.py # 本地化检查（含 CLI 在内的每条中文�
 
 ## 开发状态
 
-- [x] CableKit 适配层（USB/电源/显示器/雷雳 + 快照流 + 评级引擎）— 412/412 测试通过（含 CLI 与 App 测试 target）
+- [x] CableKit 适配层（USB/电源/显示器/雷雳 + 快照流 + 评级引擎）— 447/447 测试通过（含 CLI 与 App 测试 target）
 - [x] CLI 六个子命令（真机验证：PD 合同识别、e-marker 推断、评级持久化）
 - [x] macOS 菜单栏 App（整机概览、每线一卡 + 线缆详情、实时功率曲线、端口评级）
 - [x] IOKit 属性检查器（App 专属窗口 + CLI `properties` 子命令；快照携带全量 `rawProperties`）
@@ -144,7 +145,7 @@ scripts/check_localization.py # 本地化检查（含 CLI 在内的每条中文�
 - [x] 系统通知（UNUserNotificationCenter）：五类事件分别开关，按端口限流与分组
 - [x] 设置页：登录时启动、启动行为、主题、App 内语言、可选的自动检查更新
 - [x] App、Widget、CLI 全量中英双语
-- [x] USB 实测吞吐（CLI `throughput` 子命令 + App「吞吐实测」区：挂载卷读写测速；Mac App Store 构建中隐藏——MAS 沙盒无法在外接卷写入测速文件）
+- [x] CLI `throughput` 可选挂载卷读写基准（通用存储测试，不用于判断线缆能力）
 - [x] IOKit 通知替代轮询（AppleSmartBattery 兴趣通知 + USB 匹配通知 + 轮询兜底的混合模式）
 - [x] App 图标（经典 Assets.car appiconset + Icon Composer Liquid Glass 分层，Xcode 与 SwiftPM/DMG 两路均已接入）
 - [ ] 正式分发 —— 发版自动化已跑通（release-please → tag → 构建发布 → 同步 Homebrew tap），CLI 的 formula 不需要签名即可发布；已公证的 App 发布仍待配置 Apple 开发者 secrets（`APPLE_ID` / `APPLE_TEAM_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `DEVELOPER_ID_APPLICATION`）

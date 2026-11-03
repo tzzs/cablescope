@@ -170,6 +170,36 @@ enum UpdateChecker {
 
     // MARK: - 更新提示对话框
 
+    /// 对话框文案（纯函数，便于单测）。
+    ///
+    /// 文案规则按渠道不同：直接下载的用户给"前往下载页"，Homebrew 用户必须给
+    /// `brew upgrade` 命令——让他们手动覆盖安装会让 brew 记录与实际文件脱节。
+    struct UpdateDialogContent: Equatable {
+        let message: String
+        let informative: String
+        /// 主按钮标题：Homebrew 渠道是"拷贝命令"，直装渠道是"前往下载页"。
+        let primaryButtonTitle: String
+    }
+
+    static func dialogContent(current: String?,
+                              latest: String,
+                              locale: Locale,
+                              channel: InstallChannel) -> UpdateDialogContent {
+        let message = String(format: AppLocalization.string("发现新版本 %@", locale: locale), latest)
+        let currentLabel = current ?? AppLocalization.string("开发版", locale: locale)
+        var informative = String(format: AppLocalization.string("当前版本：%@", locale: locale), currentLabel)
+        if let command = channel.upgradeCommand {
+            let template = AppLocalization.string("通过 Homebrew 安装，请在终端运行：\n%@", locale: locale)
+            informative += "\n\n" + String(format: template, command)
+        }
+        let primaryButtonTitle = channel.upgradeCommand != nil
+            ? AppLocalization.string("拷贝命令", locale: locale)
+            : AppLocalization.string("前往下载页", locale: locale)
+        return UpdateDialogContent(message: message,
+                                   informative: informative,
+                                   primaryButtonTitle: primaryButtonTitle)
+    }
+
     /// 弹出更新提示："发现新版本 <latest> / 当前 <current 或 开发版>"。
     /// 直接下载的用户："前往下载页"打开 GitHub Releases；Homebrew 用户：给出对应的
     /// `brew upgrade` 命令并可一键拷贝（见 `InstallChannel`）。NSAlert 不在 SwiftUI view
@@ -177,21 +207,12 @@ enum UpdateChecker {
     @MainActor
     static func presentUpdateDialog(current: String?, latest: String, locale: Locale,
                                     channel: InstallChannel = currentInstallChannel) {
+        let content = dialogContent(current: current, latest: latest, locale: locale, channel: channel)
         let alert = NSAlert()
-        alert.messageText = String(format: AppLocalization.string("发现新版本 %@", locale: locale), latest)
-        let currentLabel = current ?? AppLocalization.string("开发版", locale: locale)
-        var informative = String(format: AppLocalization.string("当前版本：%@", locale: locale), currentLabel)
-        if let command = channel.upgradeCommand {
-            let template = AppLocalization.string("通过 Homebrew 安装，请在终端运行：\n%@", locale: locale)
-            informative += "\n\n" + String(format: template, command)
-        }
-        alert.informativeText = informative
+        alert.messageText = content.message
+        alert.informativeText = content.informative
         alert.alertStyle = .informational
-        if channel.upgradeCommand != nil {
-            alert.addButton(withTitle: AppLocalization.string("拷贝命令", locale: locale))
-        } else {
-            alert.addButton(withTitle: AppLocalization.string("前往下载页", locale: locale))
-        }
+        alert.addButton(withTitle: content.primaryButtonTitle)
         alert.addButton(withTitle: AppLocalization.string("以后再说", locale: locale))
 
         guard alert.runModal() == .alertFirstButtonReturn else { return }
