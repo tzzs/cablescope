@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/tzzs/cablescope/compare/v0.6.2...v1.0.0) (2026-11-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* **kit:** CableKit 公开 API 变更——服务协议与 `CableMonitor` 去掉 `throws`，`PowerSnapshot.adapterAmperageMA` 改名 `batteryAmperageMA`， `ChargingBottleneck` 枚举取值调整为 notConnected/paused/chargingWithinContract/ cableLikelyLimited/unknown。
+
+### Code Refactoring
+
+* **kit:** 收敛充电功率量纲与 5A 证据链，清理服务契约 ([#24](https://github.com/tzzs/cablescope/issues/24)) ([36aa183](https://github.com/tzzs/cablescope/commit/36aa1833b8614ed1732d9bb099c61273fbec4d07))
+
 ## [0.6.2](https://github.com/tzzs/cablescope/compare/v0.6.1...v0.6.2) (2026-10-18)
 
 
